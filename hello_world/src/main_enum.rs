@@ -19,6 +19,13 @@ fn print_expr(expr: Expr) {
     }
 }
 
+fn is_alphanumeric(c: char) -> bool {
+    match c {
+        'a' ..= 'z' | 'A' ..= 'Z' | '0' ..= '9' => true,
+        _ => false,
+    }
+}
+
 fn main() {
 
     let mut expr = Expr::Null;
@@ -41,4 +48,15 @@ fn main() {
 
     expr = Expr::Val(3);
     print_expr(expr);
+
+    println!("Is alpha numeric ? {}", is_alphanumeric('z'));
+    println!("Is alpha numeric ? {}", is_alphanumeric('0'));
+    println!("Is alpha numeric ? {}", is_alphanumeric('é'));
+
+    let tuple = (12, 24);
+    let (a, b) = tuple;
+    println!("My typle {}, {}", a, b);
+
+    let (c, d) = tuple;
+    println!("My typle {}, {}", c, d);
 }
