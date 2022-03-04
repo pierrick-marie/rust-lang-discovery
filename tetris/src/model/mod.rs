@@ -12,15 +12,28 @@ pub mod score {
 		pub nb_lines: u32,
 	}
 	
+	const DISPLAY_POINTS: &str = ": points = ";
+	const DISPLAY_LINES: &str = " lines = ";
+	
 	impl Display for Score {
 		fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-			writeln!(f, "{}: points = {} lines = {}", self.name, self.nb_points, self.nb_lines)
+			writeln!(f, "{}{}{}{}{}", self.name, DISPLAY_POINTS, self.nb_points, DISPLAY_LINES, self.nb_lines)
 		}
 	}
 	
 	impl Eq for Score {}
 	
-	impl Ord for Score{
+	impl PartialEq for Score {
+		fn eq(&self, other: &Self) -> bool {
+			self.nb_points == other.nb_points && self.nb_lines == other.nb_lines
+		}
+		
+		fn ne(&self, other: &Self) -> bool {
+			self.nb_points != other.nb_points || self.nb_lines != other.nb_lines
+		}
+	}
+	
+	impl Ord for Score {
 		fn cmp(&self, other: &Self) -> Ordering {
 			self.partial_cmp(other).unwrap()
 		}
@@ -59,7 +72,7 @@ pub mod score {
 			if self.gt(other) {
 				return Some(Ordering::Greater);
 			}
-		
+			
 			if self.lt(other) {
 				return Some(Ordering::Less);
 			}
@@ -84,31 +97,7 @@ pub mod score {
 		}
 	}
 	
-	impl PartialEq for Score {
-		fn eq(&self, other: &Self) -> bool {
-			self.nb_points == other.nb_points && self.nb_lines == other.nb_lines
-		}
-	
-		fn ne(&self, other: &Self) -> bool {
-			self.nb_points != other.nb_points || self.nb_lines != other.nb_lines
-		}
-	}
-	
 	const SCORE_FILE_PATH: &str = "./assets/score.txt";
-	
-	fn extract_numbers(text: &str) -> Option<(u32, u32)> {
-		let re = Regex::new(
-			r"\d+"
-		).unwrap();
-		let result: Vec<u32> = re.find_iter(text)
-			.filter_map(|digits| digits.as_str().parse().ok())
-			.collect();
-		if 2 == result.len() {
-			Some((result[0], result[1]))
-		} else {
-			None
-		}
-	}
 	
 	pub fn save_score(scores: &mut Vec<Score>) {
 		let mut f = File::create(SCORE_FILE_PATH).expect("Failed to open score file");
@@ -121,13 +110,12 @@ pub mod score {
 	}
 	
 	pub fn read_score() -> Vec<Score> {
-		
 		let mut scores: Vec<Score> = vec![];
 		let file_content = read_score_file();
 		
 		for line in file_content.split("\n").collect::<Vec<&str>>() {
 			if !line.is_empty() {
-				scores.push(get_score_line(String::from(line)));
+				scores.push(extract_numbers(line).unwrap());
 			}
 		}
 		
@@ -135,7 +123,6 @@ pub mod score {
 	}
 	
 	fn read_score_file() -> String {
-		
 		let mut f = File::open(SCORE_FILE_PATH).expect("Failed to open score file");
 		let mut content = String::new();
 		
@@ -145,22 +132,21 @@ pub mod score {
 		};
 	}
 	
-	fn get_score_line(line: String) -> Score {
+	fn extract_numbers(text: &str) -> Option<Score> {
+		let re = Regex::new(
+			r"(.+): points = (\d+) lines = (\d+)"
+		).unwrap();
+		let cap = re.captures(text).unwrap();
 		
-		let numbers = extract_numbers(&*line);
-		let name = line.split(':').collect::<Vec<&str>>()[0];
-		
-		match numbers {
-			Some((points, lines)) => Score {
-				name: String::from(name),
-				nb_points: points,
-				nb_lines: lines,
-			},
-			None => Score {
-				name: String::new(),
-				nb_points: 0,
-				nb_lines: 0,
-			},
+		// there are three patterns in the regex + the text itself
+		if 4 == cap.len() {
+			Some(Score {
+				name: String::from(cap.get(1).unwrap().as_str()),
+				nb_points: cap.get(2).unwrap().as_str().parse::<u32>().unwrap(),
+				nb_lines: cap.get(2).unwrap().as_str().parse::<u32>().unwrap(),
+			})
+		} else {
+			None
 		}
 	}
 }
