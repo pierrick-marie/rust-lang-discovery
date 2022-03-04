@@ -1,2 +1,3 @@
-: points = 56 lines = 12
-
+Toto: points = 32 lines = 12
+Titi: points = 42 lines = 6
+Tata: points = 52 lines = 3

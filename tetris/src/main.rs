@@ -1,12 +1,17 @@
 extern crate sdl2;
-use crate::model::score::{DataScore, read_score, save_score};
+use crate::model::score::{Score, read_score, save_score};
 
 mod model;
 
 fn main() {
-	let result_to_save = DataScore { name: String::new(), nb_points: 56, nb_lines: 12 };
-	save_score(&result_to_save).expect("Failed to save results");
+	let mut result_to_save = vec![Score { name: String::from("Toto"), nb_points: 32, nb_lines: 12 },
+	                              Score { name: String::from("Titi"), nb_points: 42, nb_lines: 6 },
+	                              Score { name: String::from("Tata"), nb_points: 52, nb_lines: 3 },];
+
+
+	save_score(&mut result_to_save);
 	
 	let saved_result = read_score();
-	assert_eq!(result_to_save, saved_result);
+	println!("{:#?}", saved_result);
+	// assert_eq!(result_to_save, saved_result);
 }
