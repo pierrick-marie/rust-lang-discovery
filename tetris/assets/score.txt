@@ -1,0 +1,2 @@
+: points = 56 lines = 12
+

@@ -10,5 +10,5 @@ version = "0.35.2"
 default-features = false
 features = ["image"]
 
-
-
+[dependencies]
+regex = "1"
