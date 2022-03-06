@@ -5,3 +5,4 @@ Cargo.lock
 # Folders
 target/
 .idea/
+production/
