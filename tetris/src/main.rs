@@ -1,32 +1,117 @@
 extern crate sdl2;
 
-mod model;
-mod controler;
+use sdl2::pixels::Color;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use std::time::{Duration, SystemTime};
+use std::thread::sleep;
+use sdl2::render::{Canvas, Texture, TextureCreator};
+use sdl2::rect::Rect;
+use sdl2::video::{Window, WindowContext};
 
-use crate::model::score::score_module::*;
-use crate::controler::*;
-use crate::controler::controler::generate_tetrimino;
-use crate::game::{Coordinate, Game, GameFunction};
-use crate::model::game::*;
+const TEXTURE_SIZE: u32 = 32;
 
-fn main() {
-	let mut result_to_save = vec![Score { name: String::from("Toto"), nb_points: 32, nb_lines: 12 },
-	                              Score { name: String::from("Titi"), nb_points: 42, nb_lines: 6 },
-	                              Score { name: String::from("Tata"), nb_points: 52, nb_lines: 3 }, ];
+#[derive(Clone, Copy)]
+enum TextureColor {
+	Green,
+	Blue,
+}
+
+fn crate_texture_rect<'a>(canvas: &mut Canvas<Window>,
+                          texture_creator: &'a TextureCreator<WindowContext>,
+                          color: TextureColor,
+                          size: u32) -> Option<Texture<'a>> {
+	if let Ok(mut square_texture) = texture_creator.create_texture_target(
+		None,
+		size,
+		size) {
+		canvas.with_texture_canvas(&mut square_texture, |texture| {
+			match color {
+				TextureColor::Green =>
+					texture.set_draw_color(Color::RGB(0, 255, 0)),
+				TextureColor::Blue =>
+					texture.set_draw_color(Color::RGB(0, 0, 255)),
+			}
+			texture.clear();
+		}).expect("Failed to color texture");
+		Some(square_texture)
+	} else {
+		None
+	}
+}
+
+pub fn main() {
+	let sdl_context = sdl2::init().expect("SDL initialization failed");
+	let video_subsystem = sdl_context.video().expect("Couldn't get SDL video subsystem");
+	let window = video_subsystem.window("rust-sdl2 demo: Video", 800, 600)
+		.position_centered()
+		.opengl()
+		.build()
+		.expect("Failed to create window");
 	
-	save_score(&mut result_to_save);
+	let mut canvas = window.into_canvas()
+		.target_texture()
+		.present_vsync()
+		.build()
+		.expect("Failed to convert window into canvas");
 	
-	let saved_result = read_score();
+	// ==== <<< BEGIN personal texture >>> ====
+	let now = SystemTime::now();
 	
-	let mut game: Game = Game::new();
+	let texture_creator: TextureCreator<_> = canvas.texture_creator();
+	let blue_square_texture: Texture = crate_texture_rect(
+		&mut canvas,
+		&texture_creator,
+		TextureColor::Blue,
+		TEXTURE_SIZE).expect("Failed to create blue square");
+	let green_square_texture: Texture = crate_texture_rect(
+		&mut canvas,
+		&texture_creator,
+		TextureColor::Green,
+		TEXTURE_SIZE).expect("Failed to create blue square");
+	// ==== <<< END personal texture >>> ====
 	
-	let coord = Coordinate{
-		x: 0,
-		y: 0,
-	};
+	let mut event_pump = sdl_context.event_pump().expect("Failed to get SDL event pump");
 	
-	game.switch_value(&coord);
-	println!("Value {}: {}", coord, game.get_value(&coord).unwrap());
-	game.switch_value(&coord);
-	println!("Value {}: {}", coord, game.get_value(&coord).unwrap());
+	let mut now = SystemTime::now();
+	let mut blue_square_color = true;
+	
+	'running: loop {
+		for event in event_pump.poll_iter() {
+			match event {
+				Event::Quit { .. } |
+				Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+					break 'running;
+				}
+				_ => {}
+			}
+		}
+		
+		canvas.set_draw_color(Color::RGB(255, 0, 0));
+		canvas.clear();
+		
+		match now.elapsed() {
+			Ok(elapsed) => {
+				if 1 < elapsed.as_secs() {
+					blue_square_color = !blue_square_color;
+					now = SystemTime::now();
+				}
+			}
+			Err(e) => {
+				// an error occurred!
+				println!("Error: {:?}", e);
+			}
+		}
+		
+		if blue_square_color {
+			canvas.copy(&blue_square_texture, None, Rect::new(10, 10, TEXTURE_SIZE, TEXTURE_SIZE))
+				.expect("Could not copy texture into window");
+		} else {
+			canvas.copy(&green_square_texture, None, Rect::new(10, 10, TEXTURE_SIZE, TEXTURE_SIZE))
+				.expect("Could not copy texture into window");
+		}
+		canvas.present();
+		
+		sleep(Duration::new(0, 1_000_000_000u32 / 60));
+	}
 }
