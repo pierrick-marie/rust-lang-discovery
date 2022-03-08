@@ -1,117 +1,54 @@
 extern crate sdl2;
 
+mod model;
+mod view;
+
+use sdl2::libc::termios;
 use sdl2::pixels::Color;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use std::time::{Duration, SystemTime};
-use std::thread::sleep;
-use sdl2::render::{Canvas, Texture, TextureCreator};
-use sdl2::rect::Rect;
-use sdl2::video::{Window, WindowContext};
+use model::score::*;
+use model::game::*;
+use model::tetrimino::*;
+use crate::model::tetrimino;
+use crate::view::*;
 
-const TEXTURE_SIZE: u32 = 32;
-
-#[derive(Clone, Copy)]
-enum TextureColor {
-	Green,
-	Blue,
-}
-
-fn crate_texture_rect<'a>(canvas: &mut Canvas<Window>,
-                          texture_creator: &'a TextureCreator<WindowContext>,
-                          color: TextureColor,
-                          size: u32) -> Option<Texture<'a>> {
-	if let Ok(mut square_texture) = texture_creator.create_texture_target(
-		None,
-		size,
-		size) {
-		canvas.with_texture_canvas(&mut square_texture, |texture| {
-			match color {
-				TextureColor::Green =>
-					texture.set_draw_color(Color::RGB(0, 255, 0)),
-				TextureColor::Blue =>
-					texture.set_draw_color(Color::RGB(0, 0, 255)),
-			}
-			texture.clear();
-		}).expect("Failed to color texture");
-		Some(square_texture)
-	} else {
-		None
-	}
-}
-
-pub fn main() {
-	let sdl_context = sdl2::init().expect("SDL initialization failed");
-	let video_subsystem = sdl_context.video().expect("Couldn't get SDL video subsystem");
-	let window = video_subsystem.window("rust-sdl2 demo: Video", 800, 600)
-		.position_centered()
-		.opengl()
-		.build()
-		.expect("Failed to create window");
+fn main() {
 	
-	let mut canvas = window.into_canvas()
-		.target_texture()
-		.present_vsync()
-		.build()
-		.expect("Failed to convert window into canvas");
+	// let mut game: Game = Game::new();
 	
-	// ==== <<< BEGIN personal texture >>> ====
-	let now = SystemTime::now();
+	// let mut tetrimino: Tetrimino = tetrimino::generate_tetrimino();
+	// println!("{}", tetrimino);
+	// tetrimino.rotate_left();
+	// println!("{}", tetrimino);
 	
-	let texture_creator: TextureCreator<_> = canvas.texture_creator();
-	let blue_square_texture: Texture = crate_texture_rect(
-		&mut canvas,
-		&texture_creator,
-		TextureColor::Blue,
-		TEXTURE_SIZE).expect("Failed to create blue square");
-	let green_square_texture: Texture = crate_texture_rect(
-		&mut canvas,
-		&texture_creator,
-		TextureColor::Green,
-		TEXTURE_SIZE).expect("Failed to create blue square");
-	// ==== <<< END personal texture >>> ====
+	// println!("{}", tetrimino.coordinate.add((2, 2)));
 	
-	let mut event_pump = sdl_context.event_pump().expect("Failed to get SDL event pump");
+	// tetrimino.move_right();
+	// tetrimino.move_left();
+	// tetrimino.move_right();
 	
-	let mut now = SystemTime::now();
-	let mut blue_square_color = true;
+	// game.add_tetrimino(&tetrimino);
+	// game.add(&tetrimino);
 	
-	'running: loop {
-		for event in event_pump.poll_iter() {
-			match event {
-				Event::Quit { .. } |
-				Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-					break 'running;
-				}
-				_ => {}
-			}
-		}
-		
-		canvas.set_draw_color(Color::RGB(255, 0, 0));
-		canvas.clear();
-		
-		match now.elapsed() {
-			Ok(elapsed) => {
-				if 1 < elapsed.as_secs() {
-					blue_square_color = !blue_square_color;
-					now = SystemTime::now();
-				}
-			}
-			Err(e) => {
-				// an error occurred!
-				println!("Error: {:?}", e);
-			}
-		}
-		
-		if blue_square_color {
-			canvas.copy(&blue_square_texture, None, Rect::new(10, 10, TEXTURE_SIZE, TEXTURE_SIZE))
-				.expect("Could not copy texture into window");
-		} else {
-			canvas.copy(&green_square_texture, None, Rect::new(10, 10, TEXTURE_SIZE, TEXTURE_SIZE))
-				.expect("Could not copy texture into window");
-		}
-		canvas.present();
-		
-		sleep(Duration::new(0, 1_000_000_000u32 / 60));
-	}
+	// let mut view: View =
+	view::run();
+	// view.add_texture_rect(&Color::WHITE);
+	// view.add_texture_rect(Color:Black);
+	
+	// view.display(&game);
+	
+	// test(&mut tetrimino, Tetrimino::rotate_left);
+	
+	// tetrimino.rotate_left();
+	
+	// println!("{}", tetrimino);
+	
+	// let coord = Coordinate{
+	// 	x: 0,
+	// 	y: 0,
+	// };
+	
+	// game.switch_value(&coord);
+	// println!("Value {}: {}", coord, game.get_value(&coord).unwrap());
+	// game.switch_value(&coord);
+	// println!("Value {}: {}", coord, game.get_value(&coord).unwrap());
 }
