@@ -26,57 +26,29 @@ impl Display for Tetrimino {
 		       self.name,
 		       self.color.r, self.color.g, self.color.b,
 		       self.current_state) //,
-		// self.coordinate)
 	}
 }
 
 impl Tetrimino {
+	/*
+	 * never used
+	 *
 	pub fn rotate_right(&mut self) {
 		if self.current_state as usize >= (self.states.len() - 1) {
 			self.current_state = 0;
 		} else {
-			// current_state < states.len()
 			self.current_state += 1;
 		}
-		// self.update_coordinate();
 	}
+	 */
 	
 	pub fn rotate_left(&mut self) {
 		if self.current_state > 0 {
 			self.current_state -= 1;
 		} else {
-			// current_state == 0
 			self.current_state = (self.states.len() - 1) as u8;
 		}
-		// self.update_coordinate();
 	}
-	
-	// fn update_coordinate(&mut self) {
-	// 	for y in 0..3 {
-	// 		for x in 0..3 {
-	// 			if self.states[self.current_state as usize][y][x] {
-	// 				self.coordinate.x = x;
-	// 				self.coordinate.y = y;
-	// 				return;
-	// 			}
-	// 		}
-	// 	}
-	// }
-	
-	pub fn move_left(&mut self) {
-		// if self.coordinate.x > 0 {
-		// 	self.coordinate.x -= 1;
-		// }
-	}
-	
-	pub fn move_right(&mut self) {
-		// match self.coordinate.x  {
-		// 	coordinate::X_BOUNDS => self.coordinate.x += 1,
-		// 	_ => println!("Out of bounds"),
-		// }
-	}
-	
-	
 	
 	pub fn get_state(&self) -> &Orientation {
 		&self.states[self.current_state as usize]
@@ -107,7 +79,7 @@ pub fn generate_tetrimino() -> Tetrimino {
 		rand_nb = rand::random::<u8>() % tetrimino.states.len() as u8;
 	}
 	unsafe { PREV = rand_nb };
-	for i in 0..rand_nb {
+	for _ in 0..rand_nb {
 		tetrimino.rotate_left();
 	};
 	

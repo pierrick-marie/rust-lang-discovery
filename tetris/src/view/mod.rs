@@ -43,7 +43,7 @@ impl View {
 			.build()
 			.expect("failed to build window");
 		
-		let mut canvas: Canvas<Window> = window.into_canvas()
+		let canvas: Canvas<Window> = window.into_canvas()
 			.build()
 			.expect("failed to build window's canvas");
 		
@@ -53,8 +53,8 @@ impl View {
 		for y in MIN_Y_BOUND..MAX_Y_BOUND {
 			for x in MIN_X_BOUND..MAX_X_BOUND {
 				coordinate = Coordinate { x, y };
-				coordinates.insert(coordinate, Rect::new((X_OFF_SET + (x * (SQUARE_SIZE + SQUARE_BORDER)) as i32),
-				                                         (Y_OFF_SET + (y * (SQUARE_SIZE + SQUARE_BORDER)) as i32),
+				coordinates.insert(coordinate, Rect::new(X_OFF_SET + (x * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
+				                                         Y_OFF_SET + (y * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
 				                                         SQUARE_SIZE,
 				                                         SQUARE_SIZE));
 			}
@@ -144,7 +144,7 @@ impl View {
 		
 		for coordinate in &self.coordinates {
 			self.canvas.set_draw_color(self.game.get_cell(coordinate.0).unwrap().color);
-			self.canvas.fill_rect((*coordinate.1));
+			self.canvas.fill_rect(*coordinate.1).expect("Failed to add a new shape");
 		}
 	}
 }

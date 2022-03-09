@@ -164,6 +164,9 @@ impl Game {
 		}
 	}
 	
+	/*
+	 * never used
+	 *
 	pub fn rotate_right(&mut self) -> bool {
 		let mut new_tetrimino = self.active_tetrimino.clone();
 		new_tetrimino.rotate_right();
@@ -179,6 +182,7 @@ impl Game {
 			false
 		}
 	}
+	*/
 	
 	fn move_tetrimino(&mut self, new_coordinate: &Coordinate) -> bool {
 		self.remove_tetrimino(&self.active_coordinate.clone(), &self.active_tetrimino.clone());
@@ -214,7 +218,7 @@ impl Game {
 	}
 	
 	fn check_coordinate(&self, coordinate: &Coordinate) -> bool {
-		0 <= coordinate.x && coordinate.x < MAX_X_BOUND && 0 <= coordinate.y && coordinate.y < MAX_Y_BOUND
+		coordinate.x < MAX_X_BOUND && coordinate.y < MAX_Y_BOUND
 	}
 }
 

@@ -17,7 +17,7 @@ fn main() {
 	
 	let mut game: Game = Game::new();
 	
-	let mut tetrimino: Tetrimino = tetrimino::generate_tetrimino();
+	let tetrimino: Tetrimino = tetrimino::generate_tetrimino();
 	// let mut tetrimino = TetriminoI::new();
 	// tetrimino.rotate_left();
 	
