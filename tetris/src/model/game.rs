@@ -30,6 +30,7 @@ pub struct Game {
 	map: Map,
 	active_tetrimino: Tetrimino,
 	active_coordinate: Coordinate,
+	pub next_tetrimino: Tetrimino,
 }
 
 impl Game {
@@ -38,6 +39,7 @@ impl Game {
 			map: Vec::new(),
 			active_tetrimino: Tetrimino::new(),
 			active_coordinate: DEFAULT_COORD,
+			next_tetrimino: tetrimino::generate_tetrimino(),
 		};
 		
 		Game::init(&mut game);
@@ -128,7 +130,9 @@ impl Game {
 		
 		if !self.move_tetrimino(&new_coordinate) {
 			self.clean_map();
-			return self.add_tetrimino(tetrimino::generate_tetrimino());
+			let next = self.next_tetrimino.clone();
+			self.next_tetrimino = tetrimino::generate_tetrimino();
+			return self.add_tetrimino(next);
 		}
 		true
 	}
@@ -155,8 +159,8 @@ impl Game {
 		self.remove_tetrimino(&self.active_coordinate.clone(), &self.active_tetrimino.clone());
 		
 		if self.check_free_place(&self.active_coordinate, &new_tetrimino) {
+			self.save_tetrimino(&self.active_coordinate.clone(), &new_tetrimino);
 			self.active_tetrimino = new_tetrimino;
-			self.save_tetrimino(&self.active_coordinate.clone(), &self.active_tetrimino.clone());
 			true
 		} else {
 			self.save_tetrimino(&self.active_coordinate.clone(), &self.active_tetrimino.clone());
@@ -188,8 +192,8 @@ impl Game {
 		self.remove_tetrimino(&self.active_coordinate.clone(), &self.active_tetrimino.clone());
 		
 		if self.check_free_place(&new_coordinate, &self.active_tetrimino) {
+			self.save_tetrimino(new_coordinate, &self.active_tetrimino.clone());
 			self.active_coordinate = *new_coordinate;
-			self.save_tetrimino(&self.active_coordinate.clone(), &self.active_tetrimino.clone());
 			true
 		} else {
 			self.save_tetrimino(&self.active_coordinate.clone(), &self.active_tetrimino.clone());

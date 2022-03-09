@@ -19,17 +19,22 @@ use crate::model::coordinate;
 use crate::model::game;
 use crate::model::game::{Game, MIN_X_BOUND, MIN_Y_BOUND, MAX_Y_BOUND, MAX_X_BOUND};
 use crate::model::coordinate::Coordinate;
+use crate::tetrimino;
 
 const SQUARE_SIZE: u32 = 32;
 const SQUARE_BORDER: u32 = 1;
 const X_OFF_SET: i32 = 60;
 const Y_OFF_SET: i32 = 20;
 
+const MINI_BOARD_X_OFF_SET: i32 = 600;
+const MINI_BOARD_Y_OFF_SET: i32 = 120;
+
 const BACKGROUND_COLOR: Color = Color::WHITE;
 
 pub struct View {
 	game: Game,
-	coordinates: HashMap<Coordinate, Rect>,
+	board: HashMap<Coordinate, Rect>,
+	mini_board: HashMap<Coordinate, Rect>,
 	canvas: WindowCanvas,
 	sdl_context: Sdl,
 }
@@ -47,22 +52,35 @@ impl View {
 			.build()
 			.expect("failed to build window's canvas");
 		
-		let mut coordinates: HashMap<Coordinate, Rect> = HashMap::new();
+		let mut board: HashMap<Coordinate, Rect> = HashMap::new();
 		let mut coordinate: Coordinate;
 		
 		for y in MIN_Y_BOUND..MAX_Y_BOUND {
 			for x in MIN_X_BOUND..MAX_X_BOUND {
 				coordinate = Coordinate { x, y };
-				coordinates.insert(coordinate, Rect::new(X_OFF_SET + (x * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
-				                                         Y_OFF_SET + (y * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
-				                                         SQUARE_SIZE,
-				                                         SQUARE_SIZE));
+				board.insert(coordinate, Rect::new(X_OFF_SET + (x * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
+				                                   Y_OFF_SET + (y * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
+				                                   SQUARE_SIZE,
+				                                   SQUARE_SIZE));
+			}
+		}
+		
+		let mut mini_board: HashMap<Coordinate, Rect> = HashMap::new();
+		
+		for y in 0..tetrimino::SIZE_OF {
+			for x in 0..tetrimino::SIZE_OF {
+				coordinate = Coordinate { x: x as u32, y: y as u32 };
+				mini_board.insert(coordinate, Rect::new(MINI_BOARD_X_OFF_SET + ((x as u32) * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
+				                                        MINI_BOARD_Y_OFF_SET + ((y as u32) * (SQUARE_SIZE + SQUARE_BORDER)) as i32,
+				                                        SQUARE_SIZE,
+				                                        SQUARE_SIZE));
 			}
 		}
 		
 		View {
 			game,
-			coordinates,
+			board,
+			mini_board,
 			canvas,
 			sdl_context,
 		}
@@ -142,7 +160,17 @@ impl View {
 		self.canvas.set_draw_color(BACKGROUND_COLOR);
 		self.canvas.clear();
 		
-		for coordinate in &self.coordinates {
+		
+		for coordinate in &self.mini_board {
+			if self.game.next_tetrimino.get_state()[coordinate.0.y as usize][coordinate.0.x as usize] {
+				self.canvas.set_draw_color(self.game.next_tetrimino.color);
+			} else {
+				self.canvas.set_draw_color(BACKGROUND_COLOR);
+			}
+			self.canvas.fill_rect(*coordinate.1).expect("Failed to add a new shape");
+		}
+		
+		for coordinate in &self.board {
 			self.canvas.set_draw_color(self.game.get_cell(coordinate.0).unwrap().color);
 			self.canvas.fill_rect(*coordinate.1).expect("Failed to add a new shape");
 		}
