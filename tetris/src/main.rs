@@ -13,24 +13,20 @@ use crate::view::*;
 
 fn main() {
 	
-	// let mut game: Game = Game::new();
 	
-	// let mut tetrimino: Tetrimino = tetrimino::generate_tetrimino();
-	// println!("{}", tetrimino);
+	
+	let mut game: Game = Game::new();
+	
+	let mut tetrimino: Tetrimino = tetrimino::generate_tetrimino();
+	// let mut tetrimino = TetriminoI::new();
 	// tetrimino.rotate_left();
-	// println!("{}", tetrimino);
 	
-	// println!("{}", tetrimino.coordinate.add((2, 2)));
+	game.add_tetrimino(tetrimino);
 	
-	// tetrimino.move_right();
-	// tetrimino.move_left();
-	// tetrimino.move_right();
+	let mut view: View = View::new(game);
+	view.run();
 	
-	// game.add_tetrimino(&tetrimino);
-	// game.add(&tetrimino);
 	
-	// let mut view: View =
-	view::run();
 	// view.add_texture_rect(&Color::WHITE);
 	// view.add_texture_rect(Color:Black);
 	

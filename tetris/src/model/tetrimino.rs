@@ -6,6 +6,8 @@ use crate::model::coordinate::Coordinate;
 type Orientation = Vec<Vec<bool>>;
 type States = Vec<Orientation>;
 
+pub const SIZE_OF: usize = 4;
+
 #[derive(Debug, Clone)]
 pub struct Tetrimino {
 	states: States,
@@ -74,11 +76,7 @@ impl Tetrimino {
 		// }
 	}
 	
-	pub fn move_down(&mut self) {
-		// if self.coordinate.y < coordinate::Y_BOUNDS {
-		// 	self.coordinate.y += 1;
-		// }
-	}
+	
 	
 	pub fn get_state(&self) -> &Orientation {
 		&self.states[self.current_state as usize]
@@ -125,7 +123,6 @@ impl TetriminoGenerator for Tetrimino {
 		Tetrimino {
 			states: vec![vec![vec![]]],
 			name: "Tetrimino".to_string(),
-			// coordinate: Coordinate { x: 0, y: 0 },
 			current_state: 0,
 			color: Color::WHITE,
 		}
@@ -140,13 +137,12 @@ impl TetriminoGenerator for TetriminoI {
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, true, false, false],
-			                  vec![false, true, false, false],
-			                  vec![false, true, false, false],
-			                  vec![false, true, false, false]],
+			             vec![vec![true, false, false, false],
+			                  vec![true, false, false, false],
+			                  vec![true, false, false, false],
+			                  vec![true, false, false, false]],
 			],
 			name: "TetriminoI".to_string(),
-			// coordinate: Coordinate { x: 0, y: 0 },
 			current_state: 0,
 			color: Color::CYAN,
 		}
@@ -157,17 +153,17 @@ pub struct TetriminoL;
 impl TetriminoGenerator for TetriminoL {
 	fn new() -> Tetrimino {
 		Tetrimino {
-			states: vec![vec![vec![false, true, false, false],
-			                  vec![false, true, false, false],
-			                  vec![false, true, true, false],
+			states: vec![vec![vec![true, false, false, false],
+			                  vec![true, false, false, false],
+			                  vec![true, true, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, false, false, true],
-			                  vec![false, true, true, true],
+			             vec![vec![false, false, true, false],
+			                  vec![true, true, true, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, true, true, false],
-			                  vec![false, false, true, false],
-			                  vec![false, false, true, false],
+			             vec![vec![true, true, false, false],
+			                  vec![false, true, false, false],
+			                  vec![false, true, false, false],
 			                  vec![false, false, false, false]],
 			             vec![vec![true, true, true, false],
 			                  vec![true, false, false, false],
@@ -175,7 +171,6 @@ impl TetriminoGenerator for TetriminoL {
 			                  vec![false, false, false, false]],
 			],
 			name: "TetriminoL".to_string(),
-			// coordinate: Coordinate { x: 1, y: 0 },
 			current_state: 0,
 			color: Color::RGB(255, 165, 0), // Orange
 		}
@@ -190,13 +185,13 @@ impl TetriminoGenerator for TetriminoJ {
 			                  vec![false, true, false, false],
 			                  vec![true, true, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, true, true, true],
-			                  vec![false, false, false, true],
+			             vec![vec![true, true, true, false],
+			                  vec![ false, false, true, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, true, true, false],
-			                  vec![false, true, false, false],
-			                  vec![false, true, false, false],
+			             vec![vec![true, true, false, false],
+			                  vec![true, false, false, false],
+			                  vec![true, false, false, false],
 			                  vec![false, false, false, false]],
 			             vec![vec![true, false, false, false],
 			                  vec![true, true, true, false],
@@ -204,7 +199,6 @@ impl TetriminoGenerator for TetriminoJ {
 			                  vec![false, false, false, false]],
 			],
 			name: "TetriminoJ".to_string(),
-			// coordinate: Coordinate { x: 1, y: 0 },
 			current_state: 0,
 			color: Color::RED,
 		}
@@ -215,13 +209,12 @@ pub struct TetriminoO;
 impl TetriminoGenerator for TetriminoO {
 	fn new() -> Tetrimino {
 		Tetrimino {
-			states: vec![vec![vec![false, true, true, false],
-			                  vec![false, true, true, false],
+			states: vec![vec![vec![true, true, false, false],
+			                  vec![true, true, false, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]]
 			],
 			name: "TetriminoO".to_string(),
-			// coordinate: Coordinate { x: 1, y: 0 },
 			current_state: 0,
 			color: Color::YELLOW,
 		}
@@ -232,17 +225,16 @@ pub struct TetriminoS;
 impl TetriminoGenerator for TetriminoS {
 	fn new() -> Tetrimino {
 		Tetrimino {
-			states: vec![vec![vec![false, false, true, true],
-			                  vec![false, true, true, false],
+			states: vec![vec![vec![false, true, true, false],
+			                  vec![true, true, false, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, true, false, false],
-			                  vec![false, true, true, false],
-			                  vec![false, false, true, false],
+			             vec![vec![true, false, false, false],
+			                  vec![true, true, false, false],
+			                  vec![false, true, false, false],
 			                  vec![false, false, false, false]],
 			],
 			name: "TetriminoS".to_string(),
-			// coordinate: Coordinate { x: 2, y: 0 },
 			current_state: 0,
 			color: Color::RGB(255, 192, 203), // Pink
 		}
@@ -257,13 +249,12 @@ impl TetriminoGenerator for TetriminoZ {
 			                  vec![false, true, true, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, false, true, false],
-			                  vec![false, true, true, false],
-			                  vec![false, true, false, false],
+			             vec![vec![false, true, false, false],
+			                  vec![true, true, false, false],
+			                  vec![true, false, false, false],
 			                  vec![false, false, false, false]],
 			],
 			name: "TetriminoZ".to_string(),
-			// coordinate: Coordinate { x: 1, y: 0 },
 			current_state: 0,
 			color: Color::GREEN,
 		}
@@ -278,21 +269,20 @@ impl TetriminoGenerator for TetriminoT {
 			                  vec![true, true, true, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, false, true, false],
-			                  vec![false, true, true, false],
-			                  vec![false, false, true, false],
+			             vec![vec![false, true, false, false],
+			                  vec![true, true, false, false],
+			                  vec![false, true, false, false],
 			                  vec![false, false, false, false]],
 			             vec![vec![true, true, true, false],
 			                  vec![false, true, false, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
-			             vec![vec![false, true, false, false],
-			                  vec![false, true, true, false],
-			                  vec![false, true, false, false],
+			             vec![vec![true, false, false, false],
+			                  vec![true, true, false, false],
+			                  vec![true, false, false, false],
 			                  vec![false, false, false, false]],
 			],
 			name: "TetriminoT".to_string(),
-			// coordinate: Coordinate { x: 1, y: 0 },
 			current_state: 0,
 			color: Color::RGB(128, 0, 128), // Purple
 		}

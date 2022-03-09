@@ -1,10 +1,10 @@
 use std::fmt::{Display, Formatter, Result};
 use std::ops::{Range, RangeInclusive};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, std::hash::Hash)]
 pub struct Coordinate {
-	pub x: usize,
-	pub y: usize,
+	pub x: u32,
+	pub y: u32,
 }
 
 impl std::ops::Add for Coordinate {
@@ -25,3 +25,14 @@ impl Display for Coordinate {
 	}
 }
 
+impl Eq for Coordinate {}
+
+impl PartialEq for Coordinate {
+	fn eq(&self, other: &Self) -> bool {
+		self.x == other.x && self.y == other.y
+	}
+	
+	fn ne(&self, other: &Self) -> bool {
+		self.x != other.x || self.y != other.y
+	}
+}
