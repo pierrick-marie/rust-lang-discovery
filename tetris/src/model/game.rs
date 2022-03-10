@@ -1,13 +1,8 @@
-use std::fmt::{Display, Formatter};
-use std::ops::Add;
-use std::thread::current;
-use sdl2::libc::{termios, uinput_user_dev};
 use sdl2::pixels::Color;
 
-use crate::model::coordinate;
 use crate::model::coordinate::{Coordinate};
 use crate::model::tetrimino::*;
-use crate::tetrimino;
+use crate::{Score, tetrimino};
 
 #[derive(Debug, Clone)]
 pub struct Cell {
@@ -28,6 +23,7 @@ pub const MAX_Y_BOUND: u32 = 16;
 #[derive(Debug)]
 pub struct Game {
 	map: Map,
+	pub score: Score,
 	active_tetrimino: Tetrimino,
 	active_coordinate: Coordinate,
 	pub next_tetrimino: Tetrimino,
@@ -37,6 +33,7 @@ impl Game {
 	pub fn new() -> Game {
 		let mut game = Game {
 			map: Vec::new(),
+			score: Score::new(),
 			active_tetrimino: Tetrimino::new(),
 			active_coordinate: DEFAULT_COORD,
 			next_tetrimino: tetrimino::generate_tetrimino(),
@@ -107,22 +104,26 @@ impl Game {
 	
 	fn clean_map(&mut self) {
 		
-		let mut counter= 0;
-		let mut counters = vec![];
+		let mut index_line = 0;
+		let mut line_to_remove = vec![];
 		
 		for line in &self.map {
 			let res = line.windows(1).all(|it| true == it[0].is_occupied);
 			
 			if res {
-				counters.push(counter);
+				line_to_remove.push(index_line);
 			}
-			counter += 1;
+			index_line += 1;
 		}
 		
-		for line in counters {
+		let nb_lines = line_to_remove.len();
+		
+		for line in line_to_remove {
 			self.map.remove(line as usize);
 			self.map.insert(0, Game::new_line());
 		}
+		
+		self.score.add_line(nb_lines as u32);
 	}
 	
 	pub fn move_down(&mut self) -> bool {

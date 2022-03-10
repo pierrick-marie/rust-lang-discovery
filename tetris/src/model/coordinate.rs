@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter, Result};
-use std::ops::{Range, RangeInclusive};
 
 #[derive(Debug, Copy, Clone, std::hash::Hash)]
 pub struct Coordinate {

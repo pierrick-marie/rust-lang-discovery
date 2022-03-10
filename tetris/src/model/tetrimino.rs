@@ -1,7 +1,5 @@
-use std::fmt::{Display, Formatter, write};
+use std::fmt::{Display, Formatter};
 use sdl2::pixels::Color;
-use crate::model::coordinate;
-use crate::model::coordinate::Coordinate;
 
 type Orientation = Vec<Vec<bool>>;
 type States = Vec<Orientation>;

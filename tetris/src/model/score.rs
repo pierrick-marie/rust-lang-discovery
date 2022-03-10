@@ -6,10 +6,13 @@ use regex::Regex;
 
 #[derive(Debug, Clone)]
 pub struct Score {
-	pub name: String,
+	name: String,
 	pub nb_points: u32,
 	pub nb_lines: u32,
 }
+
+const SIMPLE_MULTIPLICATOR: f32 = 1.5;
+const BIG_MULTIPLICATOR: f32 = 2.5;
 
 const DISPLAY_POINTS: &str = ": points = ";
 const DISPLAY_LINES: &str = " lines = ";
@@ -18,6 +21,28 @@ const SCORE_FILE_PATH: &str = "./assets/score.txt";
 impl Display for Score {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		writeln!(f, "{}{}{}{}{}", self.name, DISPLAY_POINTS, self.nb_points, DISPLAY_LINES, self.nb_lines)
+	}
+}
+
+impl Score {
+	pub fn new() -> Score {
+		Score {
+			name: "player".to_string(),
+			nb_points: 0,
+			nb_lines: 0,
+		}
+	}
+	
+	pub fn add_line(&mut self, nb_lines: u32) {
+		self.nb_lines += nb_lines;
+		
+		if 4 == nb_lines {
+			self.nb_points += ((nb_lines as f32) * BIG_MULTIPLICATOR) as u32;
+		} else {
+			self.nb_points += ((nb_lines as f32) * SIMPLE_MULTIPLICATOR) as u32;
+		}
+		
+		println!("Nb lines {} & Nb points {}", self.nb_lines, self.nb_points);
 	}
 }
 
@@ -97,7 +122,7 @@ impl PartialOrd for Score {
 	}
 }
 
-pub fn save_score(scores: &mut Vec<Score>) {
+pub fn save_score(scores: &mut Vec<&Score>) {
 	let mut f = File::create(SCORE_FILE_PATH).expect("Failed to open score file");
 	
 	scores.sort();
@@ -163,7 +188,6 @@ mod tests {
 	}
 	
 	fn test_save() {
-		
 		let mut result_to_save = vec![Score { name: String::from("Toto"), nb_points: 32, nb_lines: 12 },
 		                              Score { name: String::from("Titi"), nb_points: 42, nb_lines: 6 },
 		                              Score { name: String::from("Tata"), nb_points: 52, nb_lines: 3 }, ];

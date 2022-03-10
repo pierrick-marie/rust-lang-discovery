@@ -1,10 +1,6 @@
-extern crate sdl2;
-
 mod model;
 mod view;
 
-use sdl2::libc::termios;
-use sdl2::pixels::Color;
 use model::score::*;
 use model::game::*;
 use model::tetrimino::*;
