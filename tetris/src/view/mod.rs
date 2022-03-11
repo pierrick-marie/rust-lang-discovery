@@ -98,25 +98,24 @@ impl View {
 						break 'running;
 					}
 					Event::KeyDown { keycode: Some(Keycode::Down), .. } => {
-						if self.game.move_down() {
+						if keep_running && self.game.move_down() {
 							self.update_map(&mut canvas);
 						} else {
-							println!("Fin du game");
 							keep_running = false;
 						}
 					}
 					Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
-						if self.game.move_left() {
+						if keep_running && self.game.move_left() {
 							self.update_map(&mut canvas);
 						}
 					}
 					Event::KeyDown { keycode: Some(Keycode::Right), .. } => {
-						if self.game.move_right() {
+						if keep_running && self.game.move_right() {
 							self.update_map(&mut canvas);
 						}
 					}
 					Event::KeyDown { keycode: Some(Keycode::Up), .. } => {
-						if self.game.rotate_left() {
+						if keep_running && self.game.rotate_left() {
 							self.update_map(&mut canvas);
 						}
 					}
@@ -130,7 +129,6 @@ impl View {
 						if self.game.move_down() {
 							self.update_map(&mut canvas);
 						} else {
-							println!("Fin du game");
 							keep_running = false;
 						}
 						now = SystemTime::now();
@@ -146,13 +144,10 @@ impl View {
 			
 			canvas.present();
 			
-			if !keep_running {
-				
-				score::save_score(&mut vec![&self.game.score]);
-			}
-			
 			sleep(Duration::new(0, 1_000_000_000u32 / 60));
 		}
+		
+		score::save(&mut self.game.score);
 	}
 	
 	fn display_game_information<'a>(&self, canvas: &mut Canvas<Window>,

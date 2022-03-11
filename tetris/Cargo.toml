@@ -12,3 +12,4 @@ features = ["image", "ttf"]
 regex = "1"
 rand = "0.8.1"
 lazy_static = "1.4.0"
+chrono = "0.4"

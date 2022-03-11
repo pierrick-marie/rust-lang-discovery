@@ -3,10 +3,11 @@ use std::fmt::{Display, Formatter};
 use std::fs::{File};
 use std::io::{Write, Read};
 use regex::Regex;
+use chrono::{Utc};
 
 #[derive(Debug, Clone)]
 pub struct Score {
-	name: String,
+	date: String,
 	pub nb_points: u32,
 	pub nb_lines: u32,
 }
@@ -14,20 +15,21 @@ pub struct Score {
 const SIMPLE_MULTIPLICATOR: f32 = 1.5;
 const BIG_MULTIPLICATOR: f32 = 2.5;
 
-const DISPLAY_POINTS: &str = ": points = ";
+const DISPLAY_POINTS: &str = " : points = ";
 const DISPLAY_LINES: &str = " lines = ";
 const SCORE_FILE_PATH: &str = "./assets/score.txt";
+const DATE_FORMAT: &str = "%Y-%m-%d %Hh %Mm";
 
 impl Display for Score {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		writeln!(f, "{}{}{}{}{}", self.name, DISPLAY_POINTS, self.nb_points, DISPLAY_LINES, self.nb_lines)
+		writeln!(f, "{}{}{}{}{}", self.date, DISPLAY_POINTS, self.nb_points, DISPLAY_LINES, self.nb_lines)
 	}
 }
 
 impl Score {
 	pub fn new() -> Score {
 		Score {
-			name: "player".to_string(),
+			date: "".to_string(),
 			nb_points: 0,
 			nb_lines: 0,
 		}
@@ -41,8 +43,6 @@ impl Score {
 		} else {
 			self.nb_points += ((nb_lines as f32) * SIMPLE_MULTIPLICATOR) as u32;
 		}
-		
-		println!("Nb lines {} & Nb points {}", self.nb_lines, self.nb_points);
 	}
 }
 
@@ -122,13 +122,20 @@ impl PartialOrd for Score {
 	}
 }
 
-pub fn save_score(scores: &mut Vec<&Score>) {
+pub fn save(score: &mut Score) {
+	
+	let now = Utc::now();
+	score.date = now.format(DATE_FORMAT).to_string();
+	
+	let mut saved_result = read_score();
+	saved_result.push(score.clone());
+	saved_result.sort();
+	saved_result.reverse();
+	
 	let mut f = File::create(SCORE_FILE_PATH).expect("Failed to open score file");
 	
-	scores.sort();
-	
-	for score in scores {
-		write!(f, "{}", score).expect("Failed to save scores")
+	for it_score in saved_result {
+		write!(f, "{}", it_score).expect("Failed to save scores")
 	}
 }
 
@@ -146,25 +153,35 @@ pub fn read_score() -> Vec<Score> {
 }
 
 fn read_score_file() -> String {
-	let mut f = File::open(SCORE_FILE_PATH).expect("Failed to open score file");
 	let mut content = String::new();
-	
-	match f.read_to_string(&mut content) {
-		Ok(_) => return content,
-		Err(error) => panic!("Failed to read score file file: {:?}", error),
-	};
+	let  result = File::open(SCORE_FILE_PATH);
+	match result {
+		Ok(mut f) => {
+			match f.read_to_string(&mut content) {
+				Ok(_) => return content,
+				Err(_) => {
+					println!("Failed to read score file");
+					return content
+				},
+			};
+		}
+		Err(_) =>{
+			println!("Failed to open score file");
+			content
+		}
+	}
 }
 
 fn extract_numbers(text: &str) -> Option<Score> {
 	let re = Regex::new(
-		r"(.+): points = (\d+) lines = (\d+)"
+		r"(.+) : points = (\d+) lines = (\d+)"
 	).unwrap();
 	let cap = re.captures(text).unwrap();
 	
 	// there are three patterns in the regex + the text itself
 	if 4 == cap.len() {
 		Some(Score {
-			name: String::from(cap.get(1).unwrap().as_str()),
+			date: String::from(cap.get(1).unwrap().as_str()),
 			nb_points: cap.get(2).unwrap().as_str().parse::<u32>().unwrap(),
 			nb_lines: cap.get(3).unwrap().as_str().parse::<u32>().unwrap(),
 		})
@@ -178,6 +195,8 @@ mod tests {
 	use std::cmp::Ordering;
 	use crate::model::score;
 	use crate::model::score::Score;
+	use chrono::{Utc};
+	use std::fs;
 	
 	#[test]
 	fn run_tests() {
@@ -188,11 +207,17 @@ mod tests {
 	}
 	
 	fn test_save() {
-		let mut result_to_save = vec![Score { name: String::from("Toto"), nb_points: 32, nb_lines: 12 },
-		                              Score { name: String::from("Titi"), nb_points: 42, nb_lines: 6 },
-		                              Score { name: String::from("Tata"), nb_points: 52, nb_lines: 3 }, ];
+		fs::remove_file(score::SCORE_FILE_PATH).expect("Failed to remove score file");
 		
-		score::save_score(&mut result_to_save);
+		let mut result_to_save = vec![
+			Score { date: "".to_string(), nb_points: 32, nb_lines: 12 },
+			Score { date: "".to_string(), nb_points: 42, nb_lines: 6 },
+			Score { date: "".to_string(), nb_points: 52, nb_lines: 3 }
+		];
+		
+		for score in &mut result_to_save {
+			score::save(score);
+		}
 		
 		let saved_result = score::read_score();
 		assert_eq!(result_to_save, saved_result);
@@ -200,19 +225,23 @@ mod tests {
 	}
 	
 	fn test_display() {
+		let now = Utc::now();
+		
 		let score1 = Score {
-			name: String::new(),
+			date: now.format(score::DATE_FORMAT).to_string(),
 			nb_points: 1,
 			nb_lines: 1,
 		};
 		
-		assert_eq!(": points = 1 lines = 1\n", score1.to_string());
+		assert_eq!(format!("{} : points = 1 lines = 1\n", now.format(score::DATE_FORMAT).to_string()), score1.to_string());
 		println!("Test display: OK");
 	}
 	
 	fn test_eq() {
+		let now = Utc::now();
+		
 		let score1 = Score {
-			name: String::new(),
+			date: now.format(score::DATE_FORMAT).to_string(),
 			nb_points: 1,
 			nb_lines: 2,
 		};
@@ -229,14 +258,16 @@ mod tests {
 	}
 	
 	fn test_ord() {
+		let now = Utc::now();
+		
 		let ls_score = Score {
-			name: String::new(),
+			date: now.format(score::DATE_FORMAT).to_string(),
 			nb_points: 1,
 			nb_lines: 2,
 		};
 		
 		let gt_score = Score {
-			name: String::new(),
+			date: now.format(score::DATE_FORMAT).to_string(),
 			nb_points: 10,
 			nb_lines: 20,
 		};
@@ -251,7 +282,7 @@ mod tests {
 		assert_eq!(ls_score.cmp(&ls_score), Ordering::Equal);
 		
 		let middle_score_test = Score {
-			name: String::new(),
+			date: now.format(score::DATE_FORMAT).to_string(),
 			nb_points: 5,
 			nb_lines: 10,
 		};
