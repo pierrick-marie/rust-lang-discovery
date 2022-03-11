@@ -156,7 +156,7 @@ impl TetriminoGenerator for TetriminoJ {
 			                  vec![true, true, false, false],
 			                  vec![false, false, false, false]],
 			             vec![vec![true, true, true, false],
-			                  vec![ false, false, true, false],
+			                  vec![false, false, true, false],
 			                  vec![false, false, false, false],
 			                  vec![false, false, false, false]],
 			             vec![vec![true, true, false, false],
@@ -261,40 +261,6 @@ impl TetriminoGenerator for TetriminoT {
 
 #[cfg(test)]
 mod tests {
-	use crate::model::tetrimino::*;
-	
 	#[test]
-	fn run_tests() {
-		test_constructors();
-		test_generate_random();
-	}
-	
-	fn test_generate_random() {
-		for i in 0..10 {
-			println!("{}", generate_tetrimino());
-		}
-	}
-	
-	fn test_constructors() {
-		let i: Tetrimino = TetriminoI::new();
-		// println!("{:#?}", i);
-		
-		let j: Tetrimino = TetriminoJ::new();
-		// println!("{:#?}", j);
-		
-		let l: Tetrimino = TetriminoL::new();
-		// println!("{:#?}", l);
-		
-		let o: Tetrimino = TetriminoO::new();
-		// println!("{:#?}", o);
-		
-		let s: Tetrimino = TetriminoS::new();
-		// println!("{:#?}", s);
-		
-		let z: Tetrimino = TetriminoZ::new();
-		// println!("{:#?}", z);
-		
-		let t: Tetrimino = TetriminoT::new();
-		// println!("{:#?}", t);
-	}
+	fn run_tests() {}
 }

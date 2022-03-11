@@ -44,7 +44,7 @@ impl Game {
 		return game;
 	}
 	
-	fn new_line() -> Line{
+	fn new_line() -> Line {
 		let mut line: Line = Vec::new();
 		for _ in MIN_X_BOUND..MAX_X_BOUND {
 			line.push(Cell { is_occupied: false, color: DEFAULT_COLOR });
@@ -53,7 +53,6 @@ impl Game {
 	}
 	
 	fn init(&mut self) {
-		
 		for _ in MIN_Y_BOUND..MAX_Y_BOUND {
 			self.map.push(Game::new_line());
 		}
@@ -103,7 +102,6 @@ impl Game {
 	}
 	
 	fn clean_map(&mut self) {
-		
 		let mut index_line = 0;
 		let mut line_to_remove = vec![];
 		
@@ -202,10 +200,6 @@ impl Game {
 		}
 	}
 	
-	// pub fn can_move(&self, tetrimino: &mut Tetrimino, f: fn(&mut Tetrimino)) -> bool {
-	// 	false
-	// }
-	
 	fn check_free_place(&self, coordinate: &Coordinate, tetrimino: &Tetrimino) -> bool {
 		for x in 0..4 {
 			for y in 0..4 {
@@ -229,32 +223,6 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
-	use crate::model::game::*;
-	
 	#[test]
-	fn run_tests() {
-		test_bounds();
-		// test_generate_random();
-	}
-	
-	fn test_bounds() {
-		let mut coordinate = Coordinate { x: 0, y: 0 };
-		assert!(check_coordinate(&coordinate));
-		
-		coordinate.x = MAX_X_BOUND - 1;
-		coordinate.y = MAX_Y_BOUND - 1;
-		assert!(check_coordinate(&coordinate));
-		
-		coordinate = coordinate + Coordinate { x: 1, y: 0 };
-		assert_eq!(false, check_coordinate(&coordinate));
-		
-		coordinate.x = MAX_X_BOUND - 1;
-		coordinate.y = MAX_Y_BOUND - 1;
-		assert!(check_coordinate(&coordinate));
-		
-		coordinate = coordinate + Coordinate { x: 0, y: 1 };
-		assert_eq!(false, check_coordinate(&coordinate));
-		
-		println!("Test bounds: OK");
-	}
+	fn run_tests() {}
 }
