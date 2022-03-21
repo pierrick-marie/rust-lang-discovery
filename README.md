@@ -37,6 +37,8 @@ Installer les paquets suivants (Gnu\Linux) :
 
 # 3. Music play
 
+https://framagit.org/pierrick/test-rust/-/tree/master/music-player
+
 Développer un lecteur de music pour desktop
 
 ## 3.1. Prérequis
