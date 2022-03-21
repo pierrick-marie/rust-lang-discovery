@@ -106,12 +106,6 @@ impl View {
 								}
 							}
 							self.update_map(&mut canvas);
-<<<<<<< HEAD
-						} else {
-							keep_running = false;
-							self.display_game_over(&mut canvas, &texture_creator, &font);
-=======
->>>>>>> 32-utiliser-la-barre-espace-pour-descendre-rapidement-une-piece
 						}
 					}
 					Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
@@ -144,19 +138,11 @@ impl View {
 			match now.elapsed() {
 				Ok(elapsed) => {
 					if 800 <= elapsed.as_millis() && keep_running {
-<<<<<<< HEAD
-						if self.game.move_down() {
-							self.update_map(&mut canvas);
-						} else {
-							keep_running = false;
-							self.display_game_over(&mut canvas, &texture_creator, &font);
-=======
 						if !self.game.move_down() {
 							self.game.remove_full_lines();
 							if !self.game.new_tetrimino() {
 								keep_running = false;
 							}
->>>>>>> 32-utiliser-la-barre-espace-pour-descendre-rapidement-une-piece
 						}
 						self.update_map(&mut canvas);
 						now = SystemTime::now();
@@ -168,8 +154,12 @@ impl View {
 				}
 			}
 
+			if ! keep_running {
+				self.display_game_over(&mut canvas, &texture_creator, &font);
+				canvas.present();
+			}
+
 			self.display_game_information(&mut canvas, &texture_creator, &font);
-<<<<<<< HEAD
 			canvas.present();
 			sleep(Duration::new(0, 1_000_000_000u32 / 60));
 		}
@@ -179,29 +169,17 @@ impl View {
 	}
 
 	fn display_game_over<'a>(&self, canvas: &mut Canvas<Window>,
-						  texture_creator: &'a TextureCreator<WindowContext>,
-						  font: &sdl2::ttf::Font) {
-
+					 texture_creator: &'a TextureCreator<WindowContext>,
+					 font: &sdl2::ttf::Font) {
 		let game_over_str = "Game over !".to_string();
 
 		let game_over = create_texture_from_text(&texture_creator, &font,
-								&game_over_str).expect("Cannot render text");
+								     &game_over_str).expect("Cannot render text");
 
 		canvas.copy(&game_over, None, get_rect_from_text(&game_over_str,
-									   540, 50)).expect("Couldn't copy text");
+										 540, 50)).expect("Couldn't copy text");
 	}
 
-=======
-
-			canvas.present();
-
-			sleep(Duration::new(0, 1_000_000_000u32 / 60));
-		}
-
-		score::save(&mut self.game.score);
-	}
-
->>>>>>> 32-utiliser-la-barre-espace-pour-descendre-rapidement-une-piece
 	fn display_game_information<'a>(&self, canvas: &mut Canvas<Window>,
 						  texture_creator: &'a TextureCreator<WindowContext>,
 						  font: &sdl2::ttf::Font) {
