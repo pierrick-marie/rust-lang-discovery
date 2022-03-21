@@ -24,6 +24,8 @@ Développer un tetris avec la bibliothèque SDL2
 * jouer une partie
 * enregistrer les scores dans un fichier texte
 
+![Tetris screenshot](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/tetris/tetris.jpg)
+
 ## 2.1. Prérequis
 
 Installer les paquets suivants : 
