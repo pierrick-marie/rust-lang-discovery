@@ -28,9 +28,19 @@ Développer un tetris avec la bibliothèque SDL2
 
 ## 2.1. Prérequis
 
-Installer les paquets suivants : 
+Installer les paquets suivants (Gnu\Linux) : 
 
- * libsdl2-dev 
- * libsdl2-gfx-dev 
- * libsdl2-image-dev 
- * libsdl2-ttf-dev
+* libsdl2-dev 
+* libsdl2-gfx-dev 
+* libsdl2-image-dev 
+* libsdl2-ttf-dev
+
+# 3. Music play
+
+Développer un lecteur de music pour desktop
+
+## 3.1. Prérequis
+
+Installer les paquest suivants (Gnu\Linux) :
+
+* libgtk-3-dev
