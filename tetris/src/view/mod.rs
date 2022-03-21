@@ -20,7 +20,7 @@ const SQUARE_BORDER: u32 = 1;
 const X_OFF_SET: i32 = 60;
 const Y_OFF_SET: i32 = 20;
 
-const MINI_BOARD_X_OFF_SET: i32 = 600;
+const MINI_BOARD_X_OFF_SET: i32 = 570;
 const MINI_BOARD_Y_OFF_SET: i32 = 120;
 
 const BACKGROUND_COLOR: Color = Color::WHITE;
@@ -102,6 +102,7 @@ impl View {
 							self.update_map(&mut canvas);
 						} else {
 							keep_running = false;
+							self.display_game_over(&mut canvas, &texture_creator, &font);
 						}
 					}
 					Event::KeyDown { keycode: Some(Keycode::Left), .. } => {
@@ -130,6 +131,7 @@ impl View {
 							self.update_map(&mut canvas);
 						} else {
 							keep_running = false;
+							self.display_game_over(&mut canvas, &texture_creator, &font);
 						}
 						now = SystemTime::now();
 					}
@@ -141,15 +143,27 @@ impl View {
 			}
 			
 			self.display_game_information(&mut canvas, &texture_creator, &font);
-			
 			canvas.present();
-			
 			sleep(Duration::new(0, 1_000_000_000u32 / 60));
 		}
-		
+
+		// Window is closed
 		score::save(&mut self.game.score);
 	}
-	
+
+	fn display_game_over<'a>(&self, canvas: &mut Canvas<Window>,
+						  texture_creator: &'a TextureCreator<WindowContext>,
+						  font: &sdl2::ttf::Font) {
+
+		let game_over_str = "Game over !".to_string();
+
+		let game_over = create_texture_from_text(&texture_creator, &font,
+								&game_over_str).expect("Cannot render text");
+
+		canvas.copy(&game_over, None, get_rect_from_text(&game_over_str,
+									   540, 50)).expect("Couldn't copy text");
+	}
+
 	fn display_game_information<'a>(&self, canvas: &mut Canvas<Window>,
 	                                texture_creator: &'a TextureCreator<WindowContext>,
 	                                font: &sdl2::ttf::Font) {
