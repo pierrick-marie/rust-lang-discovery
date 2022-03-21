@@ -23,3 +23,7 @@ Développer un tetris avec la bibliothèque SDL2
 
 * jouer une partie
 * enregistrer les scores dans un fichier texte
+
+## Prérequis
+
+Installer les paquets suivants : libsdl2-dev libsdl2-gfx-dev libsdl2-image-dev libsdl2-ttf-dev
