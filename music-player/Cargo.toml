@@ -6,5 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gio = "^0.3.0"
-gtk = "^0.3.0"
+gio = "0.15.10"
+gtk = "0.15.4"

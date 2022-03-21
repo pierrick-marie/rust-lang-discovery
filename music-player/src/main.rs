@@ -1,24 +1,21 @@
-extern crate gio;
-extern crate gtk;
-
-use std::env;
-use gio::{ApplicationExt, ApplicationExtManual, ApplicationFlags};
-use gtk::{
-	Application,
-	ApplicationWindow,
-	WidgetExt,
-	GtkWindowExt,
-};
+use gtk::prelude::*;
+use gtk::{Application, ApplicationWindow};
 
 fn main() {
-	let application = Application::new("com.github.rust-by-example", ApplicationFlags::empty()).expect("Application initialization failed");
+	let app = Application::builder()
+		.application_id("org.example.HelloWorld")
+		.build();
 
-	application.connect_startup(|application| {
-		let window = ApplicationWindow::new(&application);
-		window.set_title("Rusic");
-		window.show();
+	app.connect_activate(|app| {
+		// We create the main window.
+		let win = ApplicationWindow::builder()
+			.application(app)
+			.title("Hello, World!")
+			.build();
+
+		// Don't forget to make all widgets visible.
+		win.show_all();
 	});
 
-	application.connect_activate(|_| {});
-	application.run(&env::args().collect::<Vec<_>>());
+	app.run();
 }
