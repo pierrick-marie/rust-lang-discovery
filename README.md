@@ -35,6 +35,29 @@ Installer les paquets suivants (Gnu\Linux) :
 * libsdl2-image-dev 
 * libsdl2-ttf-dev
 
+## 2.2. Contrôles
+
+BAS : descendre la pièce
+
+HAUT : tourner la pièce d'un quart de tour
+
+GAUCHE : déplacer la pièce d'une case vers la gauche
+
+DROITE : déplacer la pièce d'une case vers la droite
+
+ESPACE : déplacer la pièce en bas de la grille
+
+ECHAP : quitte le jeu
+
+## Comment jouer ?
+
+Une nouvelle partie commence dès le lancement du jeux.
+
+La partie s'arrête quand il n'est plus possible d'ajouter une nouvelle pièce dans la grille. Une partie se termine donc quand le joueur est mis en échec.
+
+Le score du joueur est affiché à droite de la grille.
+L'historique des scrores du joueur sont enregistré par ordre décroissant de points dans le fichier `assets/score.txt` au format suivant : `date heure minute : points = XX lines = YY`
+
 # 3. Music play
 
 https://framagit.org/pierrick/test-rust/-/tree/master/music-player
