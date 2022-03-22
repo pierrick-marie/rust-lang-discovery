@@ -2,7 +2,9 @@
 
 Tester et expérimenter les exemples du livre « Rust Programming by Example »
 
-# 1. Hello World
+![Rust Programming by Example](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/rust-programming-example.jpg)
+
+# Exemple 1 : Hello World
 
 https://framagit.org/pierrick/test-rust/-/tree/master/hello_world 
 
@@ -15,7 +17,7 @@ Découvrir les bases du langage
 * macro
 * generic
 
-# 2. Tetris
+# Exemple 2 : Tetris
 
 https://framagit.org/pierrick/test-rust/-/tree/master/tetris
 
@@ -58,7 +60,7 @@ La partie s'arrête quand il n'est plus possible d'ajouter une nouvelle pièce d
 Le score du joueur est affiché à droite de la grille.
 L'historique des scrores du joueur sont enregistré par ordre décroissant de points dans le fichier `assets/score.txt` au format suivant : `date heure minute : points = XX lines = YY`
 
-# 3. Music play
+# Exemple 3 : Music play (en cours)
 
 https://framagit.org/pierrick/test-rust/-/tree/master/music-player
 
