@@ -4,6 +4,12 @@ Tester et expérimenter les exemples du livre « Rust Programming by Example »
 
 ![Rust Programming by Example](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/rust-programming-example.jpg)
 
+# Licence
+
+GNU GENERAL PUBLIC LICENSE v3
+
+https://framagit.org/pierrick/test-rust/-/tree/master/licence-gpl-3.0.txt
+
 # Exemple 1 : Hello World
 
 https://framagit.org/pierrick/test-rust/-/tree/master/hello_world 
