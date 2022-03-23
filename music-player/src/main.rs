@@ -17,10 +17,15 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 mod toolbar;
 mod playlist;
+mod mp3;
+mod utils;
 
 extern crate gtk;
 extern crate gio;
 extern crate gtk_sys;
+extern crate crossbeam;
+extern crate pulse_simple;
+extern crate simplemad;
 
 use std::rc::Rc;
 use std::path::PathBuf;
