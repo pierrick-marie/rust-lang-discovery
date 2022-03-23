@@ -86,31 +86,69 @@ impl MusicApp {
 	}
 
 	fn connect_open(&self) {
-		let playlist_quit = self.playlist.clone();
-		let win_diag = self.window.clone();
+		let playlist = self.playlist.clone();
+		let window = self.window.clone();
 
 		// DEBUG
-		playlist_quit.add(Path::new("/home/pirik/Musique/naps-la-kiffance-clip-officiel.mp3"));
+		playlist.add(Path::new("/home/pirik/Musique/naps-la-kiffance-clip-officiel.mp3"));
+		playlist.add(Path::new("/home/pirik/Musique/timal-gazo-filtre-clip-officiel.mp3"));
+		playlist.add(Path::new("/home/pirik/Musique/bande-organisee-remix-version-feminine-clip-officiel.mp3"));
 
 		self.toolbar.open_button.connect_clicked(move |_| {
-			let file = show_open_dialog(&win_diag);
+			let file = show_open_dialog(&window);
 			if let Some(file) = file {
-				playlist_quit.add(&file);
+				playlist.add(&file);
+			}
+		});
+	}
+
+	fn connect_next(&self) {
+		let playlist = self.playlist.clone();
+		let cover = self.cover.clone();
+		self.toolbar.next_button.connect_clicked(move |_| {
+			playlist.next_song();
+			playlist.stop();
+			playlist.play();
+			let res = playlist.pixbuf();
+			match res {
+				Ok(pixbuf) => {
+					cover.set_from_pixbuf(Some(&pixbuf));
+					cover.show();
+				}
+				_ => {}
+			}
+		});
+	}
+
+	fn connect_previous(&self) {
+		let playlist = self.playlist.clone();
+		let cover = self.cover.clone();
+		self.toolbar.previous_button.connect_clicked(move |_| {
+			playlist.previous_song();
+			playlist.stop();
+			playlist.play();
+			let res = playlist.pixbuf();
+			match res {
+				Ok(pixbuf) => {
+					cover.set_from_pixbuf(Some(&pixbuf));
+					cover.show();
+				}
+				_ => {}
 			}
 		});
 	}
 
 	fn connect_remove(&self) {
-		let playlist_remove = self.playlist.clone();
+		let playlist = self.playlist.clone();
 		self.toolbar.remove_button.connect_clicked(move |_| {
-			playlist_remove.remove_selection();
+			playlist.remove_selection();
 		});
 	}
 
 	fn connect_quit(&self) {
-		let win_quit = self.window.clone();
+		let window = self.window.clone();
 		self.toolbar.quit_button.connect_clicked(move |_| {
-			unsafe { win_quit.destroy(); }
+			unsafe { window.destroy(); }
 		});
 	}
 
@@ -183,6 +221,8 @@ fn main() {
 		music_app.connect_play();
 		music_app.connect_remove();
 		music_app.connect_stop();
+		music_app.connect_next();
+		music_app.connect_previous();
 	});
 
 	music_player.run();

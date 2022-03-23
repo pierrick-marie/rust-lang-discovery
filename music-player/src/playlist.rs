@@ -139,6 +139,26 @@ impl Playlist {
 		}
 	}
 
+	pub fn next_song(&self) {
+		let selection = self.treeview.selection();
+		if let Some((res, iter)) = selection.selected() {
+			if self.model.iter_next(&iter) {
+				let value = self.model.value(&iter, PATH_COLUMN as i32);
+				selection.select_iter(&iter);
+			}
+		}
+	}
+
+	pub fn previous_song(&self) {
+		let selection = self.treeview.selection();
+		if let Some((res, iter)) = selection.selected() {
+			if self.model.iter_previous(&iter) {
+				let value = self.model.value(&iter, PATH_COLUMN as i32);
+				selection.select_iter(&iter);
+			}
+		}
+	}
+
 	pub fn selected_path(&self) -> Result<String, ValueTypeMismatchOrNoneError> {
 		let selection = self.treeview.selection();
 		if let Some((_, iter)) = selection.selected() {
@@ -150,7 +170,7 @@ impl Playlist {
 
 	pub fn play(&self) {
 		let state = (*self.player.state.lock().unwrap()).clone();
-		let mut action= state.clone();
+		let mut action = state.clone();
 		match state {
 			Action::Stop => {
 				let res = self.selected_path();
@@ -158,8 +178,7 @@ impl Playlist {
 					Ok(path) => {
 						action = Action::Play(Path::new(&path).to_path_buf());
 					}
-					Err(msg) => {
-					}
+					Err(msg) => {}
 				}
 			}
 			_ => {
@@ -171,7 +190,6 @@ impl Playlist {
 	}
 
 	pub fn stop(&self) {
-
 		self.player.queue.push(Action::Stop);
 		*self.player.state.lock().unwrap() = Action::Stop;
 	}
