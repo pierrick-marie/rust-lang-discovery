@@ -26,7 +26,7 @@ fn next_frame<R: Read>(decoder: &mut simplemad::Decoder<R>) -> simplemad::Frame 
 	decoder.filter_map(|f| f.ok()).next()
 		.unwrap_or_else(|| {
 			simplemad::Frame {
-				bit_rate: 0,
+				bit_rate: 128,
 				layer: Default::default(),
 				mode: Default::default(),
 				sample_rate: 44100,
@@ -86,7 +86,8 @@ fn next_sample<R: Read>(decoder: &mut Mp3Decoder<R>) -> Option<i16> {
 
 	// getting the sample and converting it from fixed step to i16
 	let sample = decoder.current_frame.samples[decoder.current_frame_channel][decoder.current_frame_sample_pos];
-	let sample = sample.to_i32() + (1 << (28 - 16));
+	//let sample = sample.to_i32() + (1 << (28 - 16));
+	let sample = sample.to_i32();
 
 	let sample = if sample >= 0x10000000 {
 		0x10000000 - 1

@@ -14,14 +14,14 @@ use self::Action::*;
 const BUFFER_SIZE: usize = 1000;
 const DEFAULT_RATE: u32 = 44100;
 
-enum Action {
+pub enum Action {
 	Load(PathBuf),
 	Stop,
 }
 
 pub struct Player {
-	app_state: Arc<Mutex<super::State>>,
-	event_loop: EventLoop,
+	pub app_state: Arc<Mutex<super::State>>,
+	pub event_loop: EventLoop,
 }
 
 impl Player {
@@ -45,6 +45,7 @@ impl Player {
 									source.samples_rate()).unwrap_or(DEFAULT_RATE);
 								playback = Playback::new("MP3", "MP3 Playback", None, rate);
 								app_state.lock().unwrap().stopped = false;
+								*event_loop.playing.lock().unwrap() = true;
 							}
 							Stop => {}
 						}
@@ -57,11 +58,11 @@ impl Player {
 								written = true;
 							}
 						}
-					}
-					if !written {
-						app_state.lock().unwrap().stopped = true;
-						*event_loop.playing.lock().unwrap() = false;
-						source = None;
+						if !written {
+							app_state.lock().unwrap().stopped = true;
+							*event_loop.playing.lock().unwrap() = false;
+							source = None;
+						}
 					}
 				}
 			});
@@ -73,7 +74,7 @@ impl Player {
 	}
 }
 
-fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16;2]; BUFFER_SIZE]) -> usize {
+fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16; 2]; BUFFER_SIZE]) -> usize {
 	let mut iter = iter.take(BUFFER_SIZE);
 	let mut index = 0;
 	while let Some(sample1) = iter.next() {
@@ -87,8 +88,8 @@ fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16;2]; BU
 }
 
 #[derive(Clone)]
-struct EventLoop {
-	queue: Arc<SegQueue<Action>>,
+pub struct EventLoop {
+	pub queue: Arc<SegQueue<Action>>,
 	playing: Arc<Mutex<bool>>,
 }
 

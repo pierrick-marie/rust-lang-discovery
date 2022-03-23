@@ -33,7 +33,7 @@ use gtk::{CellLayout, CellRendererPixbuf, CellRendererText, ListStore, TreeIter,
 use id3::{Tag, TagLike};
 
 use super::State;
-use crate::player::Player;
+use crate::player::{Player, Action};
 
 
 const THUMBNAIL_COLUMN: u32 = 0;
@@ -137,6 +137,30 @@ impl Playlist {
 				self.model.set_value(row, PIXBUF_COLUMN, &pixbuf.to_value());
 			}
 			pixbuf_loader.close().unwrap();
+		}
+	}
+
+	pub fn selected_path(&self) -> Result<String, ValueTypeMismatchOrNoneError> {
+		let selection = self.treeview.selection();
+		if let Some((_, iter)) = selection.selected() {
+			let value = self.model.value(&iter, PATH_COLUMN as i32);
+			return value.get::<String>();
+		}
+		Err(ValueTypeMismatchOrNoneError::UnexpectedNone)
+	}
+
+	pub fn play(&self) -> bool {
+
+		let res = self.selected_path();
+
+		match res {
+			Ok(path) => {
+				self.player.event_loop.queue.push(Action::Load(Path::new(&path).to_path_buf()));
+				true
+			}
+			Err(msg) => {
+				false
+			}
 		}
 	}
 

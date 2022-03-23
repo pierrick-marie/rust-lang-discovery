@@ -29,7 +29,7 @@ extern crate pulse_simple;
 extern crate simplemad;
 
 use std::rc::Rc;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use gtk::prelude::*;
@@ -101,6 +101,9 @@ impl MusicApp {
 	fn connect_open(&self) {
 		let playlist_quit = self.playlist.clone();
 		let win_diag = self.window.clone();
+
+		playlist_quit.add(Path::new("/home/pirik/Musique/naps-la-kiffance-clip-officiel.mp3"));
+
 		self.toolbar.open_button.connect_clicked(move |_| {
 			let file = show_open_dialog(&win_diag);
 			if let Some(file) = file {
@@ -127,24 +130,36 @@ impl MusicApp {
 		let play_button = self.toolbar.play_button.clone();
 		let cover_play = self.cover.clone();
 		let play = self.playlist.clone();
+		let state_play = self.state.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
 
-			cover_play.set_from_pixbuf(Some(&play.pixbuf().unwrap()));
-			cover_play.show();
 			// if play_button.get_stock_id() == Some(PLAY_STOCK.to_string()) {
 			// 	play_button.set_stock_id(PAUSE_STOCK);
 			// } else {
 			// 	play_button.set_stock_id(PLAY_STOCK);
 			// }
+			if state_play.lock().unwrap().stopped {
+				if play.play() {
+					cover_play.set_from_pixbuf(Some(&play.pixbuf().unwrap()));
+					cover_play.show();
+					// set_image_icon(&play_image, PAUSE_ICON);
+					// self.set_cover();
+				}
+			}
 		});
 	}
 
 	fn set_cover(&self) {
-		self.cover.set_from_pixbuf(Some(&self.playlist.pixbuf().unwrap()));
-		self.cover.show();
+		let res = self.playlist.pixbuf();
+		match res {
+			Ok(pix) => {
+				self.cover.set_from_pixbuf(Some(&pix));
+				self.cover.show();
+			}
+			Err(msg) => {}
+		}
 	}
 }
-
 
 
 fn show_open_dialog(parent: &ApplicationWindow) -> Option<PathBuf> {
