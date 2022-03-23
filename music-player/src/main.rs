@@ -19,6 +19,7 @@ mod toolbar;
 mod playlist;
 mod mp3;
 mod utils;
+mod player;
 
 extern crate gtk;
 extern crate gio;
@@ -29,6 +30,7 @@ extern crate simplemad;
 
 use std::rc::Rc;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
@@ -36,11 +38,16 @@ use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, Separato
 use crate::playlist::Playlist;
 use crate::toolbar::MusicToolbar;
 
+pub struct State {
+	stopped: bool,
+}
+
 struct MusicApp {
 	toolbar: MusicToolbar,
 	cover: Image,
 	scale: Scale,
 	playlist: Rc<Playlist>,
+	state: Arc<Mutex<State>>,
 	window: ApplicationWindow,
 }
 
@@ -65,7 +72,11 @@ impl MusicApp {
 		let scale = Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
 		scale.set_draw_value(false);
 
-		let playlist = Rc::new(Playlist::new());
+		let state = Arc::new(Mutex::new(State {
+			stopped: true,
+		}));
+
+		let playlist = Rc::new(Playlist::new(state.clone()));
 
 		main_container.add(&toolbar.container);
 		main_container.add(&cover);
@@ -82,6 +93,7 @@ impl MusicApp {
 			cover,
 			scale,
 			playlist,
+			state,
 			window,
 		}
 	}

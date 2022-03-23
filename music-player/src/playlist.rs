@@ -20,15 +20,20 @@ extern crate id3;
 
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
 use gdk_pixbuf::glib::value::ValueTypeChecker;
+
 use gio::glib::value::{ValueTypeMismatchError, ValueTypeMismatchOrNoneError};
 
 use crate::gtk::prelude::*;
 use gtk::{CellLayout, CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, TreeViewColumn, FileChooserAction, FileChooserDialog, FileFilter, ApplicationWindow};
 
 use id3::{Tag, TagLike};
+
+use super::State;
+use crate::player::Player;
 
 
 const THUMBNAIL_COLUMN: u32 = 0;
@@ -47,6 +52,7 @@ const INTERP_HYPER: InterpType = InterpType::Hyper;
 
 pub struct Playlist {
 	model: ListStore,
+	player: Player,
 	treeview: TreeView,
 }
 
@@ -59,7 +65,7 @@ enum Visibility {
 }
 
 impl Playlist {
-	pub fn new() -> Self {
+	pub(crate) fn new(state: Arc<Mutex<State>>) -> Self {
 		let model = ListStore::new(&[
 			Pixbuf::static_type(),
 			String::static_type(),
@@ -79,6 +85,7 @@ impl Playlist {
 
 		Playlist {
 			model,
+			player: Player::new(state.clone()),
 			treeview,
 		}
 	}
