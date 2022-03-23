@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::cell::Cell;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -39,8 +40,8 @@ impl Player {
 
 				let mut playback: Playback<[i16; 2]> = Playback::new("MP3", "MP3 Playback", None, DEFAULT_RATE);
 				let mut source = None;
-				let mut play = false;
 				let mut written = false;
+				let mut play = false;
 				loop {
 					if let Some(action) = queue.pop() {
 						match action {

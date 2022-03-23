@@ -18,6 +18,7 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 extern crate gdk_pixbuf;
 extern crate id3;
 
+use std::borrow::{Borrow, BorrowMut};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -149,26 +150,24 @@ impl Playlist {
 
 	pub fn play(&self) {
 		let state = (*self.player.state.lock().unwrap()).clone();
+		let mut action= state.clone();
 		match state {
 			Action::Stop => {
 				let res = self.selected_path();
-
 				match res {
 					Ok(path) => {
-						let action = Action::Play(Path::new(&path).to_path_buf());
-						self.player.queue.push(action.clone());
-						*self.player.state.lock().unwrap() = action.clone();
+						action = Action::Play(Path::new(&path).to_path_buf());
 					}
 					Err(msg) => {
 					}
 				}
 			}
 			_ => {
-				let action = Action::Pause;
-				self.player.queue.push(action.clone());
-				*self.player.state.lock().unwrap() = action.clone();
+				action = Action::Pause;
 			}
 		}
+		self.player.queue.push(action.clone());
+		*self.player.state.lock().unwrap() = action.clone();
 	}
 
 	pub fn stop(&self) {
