@@ -147,27 +147,34 @@ impl Playlist {
 		Err(ValueTypeMismatchOrNoneError::UnexpectedNone)
 	}
 
-	pub fn play(&self) -> bool {
+	pub fn play(&self) {
+		let state = (*self.player.state.lock().unwrap()).clone();
+		match state {
+			Action::Stop => {
+				let res = self.selected_path();
 
-		let res = self.selected_path();
-
-		match res {
-			Ok(path) => {
-				self.player.queue.push(Action::Load(Path::new(&path).to_path_buf()));
-				true
+				match res {
+					Ok(path) => {
+						let action = Action::Play(Path::new(&path).to_path_buf());
+						self.player.queue.push(action.clone());
+						*self.player.state.lock().unwrap() = action.clone();
+					}
+					Err(msg) => {
+					}
+				}
 			}
-			Err(msg) => {
-				false
+			_ => {
+				let action = Action::Pause;
+				self.player.queue.push(action.clone());
+				*self.player.state.lock().unwrap() = action.clone();
 			}
 		}
 	}
 
-	pub fn is_playing(&self) -> bool {
-		self.player.state()
-	}
+	pub fn stop(&self) {
 
-	pub fn pause(&self) {
 		self.player.queue.push(Action::Stop);
+		*self.player.state.lock().unwrap() = Action::Stop;
 	}
 
 	pub fn remove_selection(&self) {

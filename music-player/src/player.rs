@@ -15,56 +15,64 @@ use self::Action::*;
 const BUFFER_SIZE: usize = 1000;
 const DEFAULT_RATE: u32 = 44100;
 
+#[derive(PartialEq, Clone)]
 pub enum Action {
-	Load(PathBuf),
+	Play(PathBuf),
+	Pause,
 	Stop,
 }
 
 pub struct Player {
 	pub queue: Arc<SegQueue<Action>>,
-	playing: Arc<Mutex<bool>>,
+	pub state: Arc<Mutex<Action>>,
 }
 
 impl Player {
 	pub(crate) fn new() -> Self {
-
-		let playing = Arc::new(Mutex::new(false));
+		let state = Arc::new(Mutex::new(Action::Stop));
 		let queue = Arc::new(SegQueue::new());
 		{
 			let queue = queue.clone();
-			let playing = playing.clone();
 
 			thread::spawn(move || {
 				let mut buffer = [[0; 2]; BUFFER_SIZE];
 
 				let mut playback: Playback<[i16; 2]> = Playback::new("MP3", "MP3 Playback", None, DEFAULT_RATE);
 				let mut source = None;
+				let mut play = false;
+				let mut written = false;
 				loop {
 					if let Some(action) = queue.pop() {
 						match action {
-							Load(path) => {
+							Play(path) => {
 								let file = File::open(path).unwrap();
 								source = Some(Mp3Decoder::new(BufReader::new(file)).unwrap());
 								let rate = source.as_ref().map(|source|
 									source.samples_rate()).unwrap_or(DEFAULT_RATE);
 								playback = Playback::new("MP3", "MP3 Playback", None, rate);
-								*playing.lock().unwrap() = true;
+								play = true;
+							}
+							Pause => {
+								play = !play;
 							}
 							Stop => {
-								*playing.lock().unwrap() = false;
+								play = false;
+								written = false;
 							}
 						}
-					} else if *playing.lock().unwrap() {
-						let mut written = false;
-						if let Some(ref mut source) = source {
-							let size = iter_to_buffer(source, &mut buffer);
-							if size > 0 {
-								playback.write(&buffer[..size]);
-								written = true;
+					} else {
+						if play {
+							written = false;
+							if let Some(ref mut source) = source {
+								let size = iter_to_buffer(source, &mut buffer);
+								if size > 0 {
+									playback.write(&buffer[..size]);
+									written = true;
+								}
 							}
 						}
 						if !written {
-							*playing.lock().unwrap() = false;
+							play = false;
 							source = None;
 						}
 					}
@@ -72,14 +80,14 @@ impl Player {
 			});
 		}
 		Player {
-			playing,
+			state,
 			queue,
 		}
 	}
 
-	pub fn state(&self) -> bool {
-		*self.playing.lock().unwrap()
-	}
+	// pub fn state(&self) -> Action {
+	// 	*self.state.lock().unwrap()
+	// }
 }
 
 fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16; 2]; BUFFER_SIZE]) -> usize {

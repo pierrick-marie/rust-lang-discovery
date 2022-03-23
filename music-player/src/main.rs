@@ -30,6 +30,7 @@ extern crate simplemad;
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use gdk_pixbuf::Pixbuf;
 
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
@@ -58,7 +59,6 @@ impl MusicApp {
 		let toolbar = MusicToolbar::new();
 
 		let cover = Image::new();
-		// cover.set_from_file(Some("assets/cover.png"));
 
 		let adjustment = Adjustment::new(0.0, 0.0, 10.0, 0.0, 0.0, 0.0);
 		let scale = Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
@@ -81,7 +81,6 @@ impl MusicApp {
 			cover,
 			scale,
 			playlist,
-			// state,
 			window,
 		}
 	}
@@ -120,15 +119,25 @@ impl MusicApp {
 		let cover = self.cover.clone();
 		let playlist = self.playlist.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
-
-			if ! playlist.is_playing() {
-				if playlist.play() {
-					cover.set_from_pixbuf(Some(&playlist.pixbuf().unwrap()));
+			playlist.play();
+			let res = playlist.pixbuf();
+			match res {
+				Ok(pixbuf) => {
+					cover.set_from_pixbuf(Some(&pixbuf));
 					cover.show();
 				}
-			} else {
-				playlist.pause();
+				_ => {}
 			}
+		});
+	}
+
+	fn connect_stop(&self) {
+		let button = self.toolbar.stop_button.clone();
+		let playlist = self.playlist.clone();
+		let cover = self.cover.clone();
+		self.toolbar.stop_button.connect_clicked(move |_| {
+			playlist.stop();
+			cover.hide();
 		});
 	}
 
@@ -173,6 +182,7 @@ fn main() {
 		music_app.connect_quit();
 		music_app.connect_play();
 		music_app.connect_remove();
+		music_app.connect_stop();
 	});
 
 	music_player.run();
