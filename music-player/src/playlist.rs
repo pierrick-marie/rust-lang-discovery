@@ -32,9 +32,7 @@ use gtk::{CellLayout, CellRendererPixbuf, CellRendererText, ListStore, TreeIter,
 
 use id3::{Tag, TagLike};
 
-use super::State;
 use crate::player::{Player, Action};
-
 
 const THUMBNAIL_COLUMN: u32 = 0;
 const TITLE_COLUMN: u32 = 1;
@@ -65,7 +63,7 @@ enum Visibility {
 }
 
 impl Playlist {
-	pub(crate) fn new(state: Arc<Mutex<State>>) -> Self {
+	pub(crate) fn new() -> Self {
 		let model = ListStore::new(&[
 			Pixbuf::static_type(),
 			String::static_type(),
@@ -85,7 +83,7 @@ impl Playlist {
 
 		Playlist {
 			model,
-			player: Player::new(state.clone()),
+			player: Player::new(),
 			treeview,
 		}
 	}
@@ -155,13 +153,21 @@ impl Playlist {
 
 		match res {
 			Ok(path) => {
-				self.player.event_loop.queue.push(Action::Load(Path::new(&path).to_path_buf()));
+				self.player.queue.push(Action::Load(Path::new(&path).to_path_buf()));
 				true
 			}
 			Err(msg) => {
 				false
 			}
 		}
+	}
+
+	pub fn is_playing(&self) -> bool {
+		self.player.state()
+	}
+
+	pub fn pause(&self) {
+		self.player.queue.push(Action::Stop);
 	}
 
 	pub fn remove_selection(&self) {

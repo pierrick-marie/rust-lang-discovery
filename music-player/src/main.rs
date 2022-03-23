@@ -18,7 +18,6 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 mod toolbar;
 mod playlist;
 mod mp3;
-mod utils;
 mod player;
 
 extern crate gtk;
@@ -38,16 +37,11 @@ use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, Separato
 use crate::playlist::Playlist;
 use crate::toolbar::MusicToolbar;
 
-pub struct State {
-	stopped: bool,
-}
-
 struct MusicApp {
 	toolbar: MusicToolbar,
 	cover: Image,
 	scale: Scale,
 	playlist: Rc<Playlist>,
-	state: Arc<Mutex<State>>,
 	window: ApplicationWindow,
 }
 
@@ -57,8 +51,6 @@ impl MusicApp {
 		// We create the main window.
 		let window = ApplicationWindow::builder()
 			.application(app)
-			// .default_width(256)
-			// .default_height(120)
 			.title("Rust music player")
 			.build();
 
@@ -72,11 +64,7 @@ impl MusicApp {
 		let scale = Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
 		scale.set_draw_value(false);
 
-		let state = Arc::new(Mutex::new(State {
-			stopped: true,
-		}));
-
-		let playlist = Rc::new(Playlist::new(state.clone()));
+		let playlist = Rc::new(Playlist::new());
 
 		main_container.add(&toolbar.container);
 		main_container.add(&cover);
@@ -93,7 +81,7 @@ impl MusicApp {
 			cover,
 			scale,
 			playlist,
-			state,
+			// state,
 			window,
 		}
 	}
@@ -102,6 +90,7 @@ impl MusicApp {
 		let playlist_quit = self.playlist.clone();
 		let win_diag = self.window.clone();
 
+		// DEBUG
 		playlist_quit.add(Path::new("/home/pirik/Musique/naps-la-kiffance-clip-officiel.mp3"));
 
 		self.toolbar.open_button.connect_clicked(move |_| {
@@ -127,24 +116,18 @@ impl MusicApp {
 	}
 
 	fn connect_play(&self) {
-		let play_button = self.toolbar.play_button.clone();
-		let cover_play = self.cover.clone();
-		let play = self.playlist.clone();
-		let state_play = self.state.clone();
+		let button = self.toolbar.play_button.clone();
+		let cover = self.cover.clone();
+		let playlist = self.playlist.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
 
-			// if play_button.get_stock_id() == Some(PLAY_STOCK.to_string()) {
-			// 	play_button.set_stock_id(PAUSE_STOCK);
-			// } else {
-			// 	play_button.set_stock_id(PLAY_STOCK);
-			// }
-			if state_play.lock().unwrap().stopped {
-				if play.play() {
-					cover_play.set_from_pixbuf(Some(&play.pixbuf().unwrap()));
-					cover_play.show();
-					// set_image_icon(&play_image, PAUSE_ICON);
-					// self.set_cover();
+			if ! playlist.is_playing() {
+				if playlist.play() {
+					cover.set_from_pixbuf(Some(&playlist.pixbuf().unwrap()));
+					cover.show();
 				}
+			} else {
+				playlist.pause();
 			}
 		});
 	}

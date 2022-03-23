@@ -86,19 +86,7 @@ fn next_sample<R: Read>(decoder: &mut Mp3Decoder<R>) -> Option<i16> {
 
 	// getting the sample and converting it from fixed step to i16
 	let sample = decoder.current_frame.samples[decoder.current_frame_channel][decoder.current_frame_sample_pos];
-	//let sample = sample.to_i32() + (1 << (28 - 16));
-	let sample = sample.to_i32();
-
-	let sample = if sample >= 0x10000000 {
-		0x10000000 - 1
-	} else if sample <= -0x10000000 {
-		-0x10000000
-	} else {
-		sample
-	};
-
-	let sample = sample >> (28 + 1 - 16);
-	let sample = sample as i16;
+	let sample = sample.to_i16();
 
 	decoder.current_frame_channel += 1;
 

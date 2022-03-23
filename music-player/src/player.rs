@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -20,23 +21,26 @@ pub enum Action {
 }
 
 pub struct Player {
-	pub app_state: Arc<Mutex<super::State>>,
-	pub event_loop: EventLoop,
+	pub queue: Arc<SegQueue<Action>>,
+	playing: Arc<Mutex<bool>>,
 }
 
 impl Player {
-	pub(crate) fn new(app_state: Arc<Mutex<super::State>>) -> Self {
-		let event_loop = EventLoop::new();
+	pub(crate) fn new() -> Self {
+
+		let playing = Arc::new(Mutex::new(false));
+		let queue = Arc::new(SegQueue::new());
 		{
-			let app_state = app_state.clone();
-			let event_loop = event_loop.clone();
+			let queue = queue.clone();
+			let playing = playing.clone();
+
 			thread::spawn(move || {
 				let mut buffer = [[0; 2]; BUFFER_SIZE];
 
 				let mut playback: Playback<[i16; 2]> = Playback::new("MP3", "MP3 Playback", None, DEFAULT_RATE);
 				let mut source = None;
 				loop {
-					if let Some(action) = event_loop.queue.pop() {
+					if let Some(action) = queue.pop() {
 						match action {
 							Load(path) => {
 								let file = File::open(path).unwrap();
@@ -44,12 +48,13 @@ impl Player {
 								let rate = source.as_ref().map(|source|
 									source.samples_rate()).unwrap_or(DEFAULT_RATE);
 								playback = Playback::new("MP3", "MP3 Playback", None, rate);
-								app_state.lock().unwrap().stopped = false;
-								*event_loop.playing.lock().unwrap() = true;
+								*playing.lock().unwrap() = true;
 							}
-							Stop => {}
+							Stop => {
+								*playing.lock().unwrap() = false;
+							}
 						}
-					} else if *event_loop.playing.lock().unwrap() {
+					} else if *playing.lock().unwrap() {
 						let mut written = false;
 						if let Some(ref mut source) = source {
 							let size = iter_to_buffer(source, &mut buffer);
@@ -59,8 +64,7 @@ impl Player {
 							}
 						}
 						if !written {
-							app_state.lock().unwrap().stopped = true;
-							*event_loop.playing.lock().unwrap() = false;
+							*playing.lock().unwrap() = false;
 							source = None;
 						}
 					}
@@ -68,9 +72,13 @@ impl Player {
 			});
 		}
 		Player {
-			app_state,
-			event_loop,
+			playing,
+			queue,
 		}
+	}
+
+	pub fn state(&self) -> bool {
+		*self.playing.lock().unwrap()
 	}
 }
 
@@ -86,20 +94,4 @@ fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16; 2]; B
 	}
 	index
 }
-
-#[derive(Clone)]
-pub struct EventLoop {
-	pub queue: Arc<SegQueue<Action>>,
-	playing: Arc<Mutex<bool>>,
-}
-
-impl EventLoop {
-	fn new() -> Self {
-		EventLoop {
-			queue: Arc::new(SegQueue::new()),
-			playing: Arc::new(Mutex::new(false)),
-		}
-	}
-}
-
 
