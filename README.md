@@ -71,3 +71,5 @@ Développer un lecteur de music pour desktop
 Installer les paquest suivants (Gnu\Linux) :
 
 * libgtk-3-dev
+* libmad0-dev
+* libpulse-dev
