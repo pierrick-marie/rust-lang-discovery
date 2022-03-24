@@ -19,9 +19,13 @@ extern crate gdk_pixbuf;
 extern crate id3;
 
 use std::borrow::{Borrow, BorrowMut};
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
 use gdk_pixbuf::glib::value::ValueTypeChecker;
@@ -33,8 +37,10 @@ use crate::gtk::prelude::*;
 use gtk::{CellLayout, CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, TreeViewColumn, FileChooserAction, FileChooserDialog, FileFilter, ApplicationWindow};
 
 use id3::{Tag, TagLike};
+use crate::mp3::{Mp3Decoder, to_millis};
 
 use crate::player::{Player, Action};
+use crate::ProgressBar;
 
 const THUMBNAIL_COLUMN: u32 = 0;
 const TITLE_COLUMN: u32 = 1;
@@ -54,6 +60,7 @@ pub struct Playlist {
 	model: ListStore,
 	player: Player,
 	treeview: TreeView,
+	progress_bar: Arc<Mutex<ProgressBar>>,
 }
 
 use self::Visibility::*;
@@ -65,7 +72,7 @@ enum Visibility {
 }
 
 impl Playlist {
-	pub(crate) fn new() -> Self {
+	pub(crate) fn new(progress_bar: Arc<Mutex<ProgressBar>>) -> Self {
 		let model = ListStore::new(&[
 			Pixbuf::static_type(),
 			String::static_type(),
@@ -85,8 +92,9 @@ impl Playlist {
 
 		Playlist {
 			model,
-			player: Player::new(),
+			player: Player::new(progress_bar.clone()),
 			treeview,
+			progress_bar,
 		}
 	}
 
@@ -142,9 +150,9 @@ impl Playlist {
 
 	pub fn next_song(&self) {
 		let selection = self.treeview.selection();
-		if let Some((res, iter)) = selection.selected() {
+		if let Some((_, iter)) = selection.selected() {
 			if self.model.iter_next(&iter) {
-				let value = self.model.value(&iter, PATH_COLUMN as i32);
+				// let value = self.model.value(&iter, PATH_COLUMN as i32);
 				selection.select_iter(&iter);
 			}
 		}
@@ -152,9 +160,9 @@ impl Playlist {
 
 	pub fn previous_song(&self) {
 		let selection = self.treeview.selection();
-		if let Some((res, iter)) = selection.selected() {
+		if let Some((_, iter)) = selection.selected() {
 			if self.model.iter_previous(&iter) {
-				let value = self.model.value(&iter, PATH_COLUMN as i32);
+				// let value = self.model.value(&iter, PATH_COLUMN as i32);
 				selection.select_iter(&iter);
 			}
 		}
@@ -178,8 +186,9 @@ impl Playlist {
 				match res {
 					Ok(path) => {
 						action = Action::Play(Path::new(&path).to_path_buf());
+						(*self.progress_bar.lock().unwrap()).current_time = 0;
 					}
-					Err(msg) => {}
+					Err(_) => {}
 				}
 			}
 			_ => {
@@ -193,7 +202,6 @@ impl Playlist {
 	pub fn remove_selection(&self) {
 		let selection = self.treeview.selection();
 		if let Some((_, iter)) = selection.selected() {
-
 			let value = self.model.value(&iter, PATH_COLUMN as i32);
 			let current_path = value.get::<String>().expect("Failed to get current path");
 
@@ -252,7 +260,41 @@ impl Playlist {
 		} else {
 			self.model.set_value(&row, TITLE_COLUMN, &filename.to_value());
 		}
+		self.compute_duration(path);
 		let path = path.to_str().unwrap_or_default();
 		self.model.set_value(&row, PATH_COLUMN, &path.to_value());
+	}
+
+	fn compute_duration(&self, path: &Path) {
+		let progress_bar = self.progress_bar.clone();
+		let path = path.to_string_lossy().to_string();
+		let mut duration = 0;
+		thread::spawn(move || {
+			if let Some(duration) = Player::compute_duration(&path) {
+				progress_bar.lock().unwrap().durations.insert(path, to_millis(duration));
+			}
+		});
+	}
+
+	pub fn path(&self) -> String {
+		let mut path= "".to_string();
+		let state = (*self.player.state.lock().unwrap()).clone();
+		match state {
+			Action::Play(path_buf) => {
+				let path =  path_buf.as_path().to_str().unwrap();
+				return path.to_string();
+			}
+			_ => {}
+		}
+		return path;
+	}
+
+	pub fn is_playing(&self) -> bool {
+		match *self.player.state.lock().unwrap() {
+			Action::Play(_) => {
+				true
+			}
+			_ => {false}
+		}
 	}
 }

@@ -27,10 +27,13 @@ extern crate crossbeam;
 extern crate pulse_simple;
 extern crate simplemad;
 
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use gdk_pixbuf::Pixbuf;
+use gio::glib;
 
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
@@ -38,13 +41,21 @@ use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, Separato
 use crate::playlist::Playlist;
 use crate::toolbar::MusicToolbar;
 
+pub struct ProgressBar {
+	pub current_time: u64,
+	pub durations: HashMap<String, u64>,
+}
+
 struct MusicApp {
 	toolbar: MusicToolbar,
 	cover: Image,
-	scale: Scale,
+	adjustment: Adjustment,
 	playlist: Rc<Playlist>,
+	progress_bar: Arc<Mutex<ProgressBar>>,
 	window: ApplicationWindow,
 }
+
+unsafe impl Sync for MusicApp {}
 
 impl MusicApp {
 	fn new(app: &Application) -> Self {
@@ -64,7 +75,13 @@ impl MusicApp {
 		let scale = Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
 		scale.set_draw_value(false);
 
-		let playlist = Rc::new(Playlist::new());
+		let current_time = 0;
+		let durations = HashMap::new();
+		let progress_bar = Arc::new(Mutex::new(ProgressBar {
+			current_time,
+			durations,
+		}));
+		let playlist = Rc::new(Playlist::new(progress_bar.clone()));
 
 		main_container.add(&toolbar.container);
 		main_container.add(&cover);
@@ -76,21 +93,25 @@ impl MusicApp {
 		// Don't forget to make all widgets visible.
 		window.show_all();
 
+
 		MusicApp {
 			toolbar,
 			cover,
-			scale,
+			adjustment,
 			playlist,
+			progress_bar,
 			window,
 		}
 	}
 
 	fn connect_open(&self) {
+		// let playlist = (*self.playlist.lock().unwrap()).clone();
+
 		let playlist = self.playlist.clone();
 		let window = self.window.clone();
 
 		self.toolbar.open_button.connect_clicked(move |_| {
-			for file in show_open_dialog(&window) {
+			for file in MusicApp::show_open_dialog(&window) {
 				playlist.add(&file);
 			}
 		});
@@ -103,7 +124,7 @@ impl MusicApp {
 			playlist.next_song();
 			playlist.stop();
 			playlist.play();
-			set_cover(&playlist, &cover);
+			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
 
@@ -114,7 +135,7 @@ impl MusicApp {
 			playlist.previous_song();
 			playlist.stop();
 			playlist.play();
-			set_cover(&playlist, &cover);
+			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
 
@@ -123,7 +144,7 @@ impl MusicApp {
 		let cover = self.cover.clone();
 		self.toolbar.remove_button.connect_clicked(move |_| {
 			playlist.remove_selection();
-			set_cover(&playlist, &cover);
+			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
 
@@ -139,8 +160,25 @@ impl MusicApp {
 		let cover = self.cover.clone();
 		let playlist = self.playlist.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
+			MusicApp::set_cover(&playlist, &cover);
 			playlist.play();
-			set_cover(&playlist, &cover);
+		});
+
+		let playlist = self.playlist.clone();
+		let adjustment = self.adjustment.clone();
+		let progress_bar = self.progress_bar.clone();
+		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
+			let path = playlist.path();
+			if let Some(&duration) = progress_bar.lock().unwrap().durations.get(&path) {
+				adjustment.set_upper(duration as f64);
+			}
+
+			if playlist.is_playing() {
+				adjustment.set_value(progress_bar.lock().unwrap().current_time as f64);
+			} else {
+				adjustment.set_value(0 as f64);
+			}
+			Continue(true)
 		});
 	}
 
@@ -148,41 +186,43 @@ impl MusicApp {
 		let button = self.toolbar.stop_button.clone();
 		let playlist = self.playlist.clone();
 		let cover = self.cover.clone();
+		let progress_bar = self.progress_bar.clone();
 		self.toolbar.stop_button.connect_clicked(move |_| {
 			playlist.stop();
 			cover.hide();
 		});
 	}
-}
 
-fn set_cover(playlist: &Rc<Playlist>, cover: &Image) {
-	let res = playlist.pixbuf();
-	match res {
-		Ok(pix) => {
-			cover.set_from_pixbuf(Some(&pix));
-			cover.show();
+	fn set_cover(playlist: &Playlist, cover: &Image) {
+		let res = playlist.pixbuf();
+		match res {
+			Ok(pix) => {
+				cover.set_from_pixbuf(Some(&pix));
+				cover.show();
+			}
+			Err(_) => {}
 		}
-		Err(msg) => {}
+	}
+
+	fn show_open_dialog(parent: &ApplicationWindow) -> Vec<PathBuf> {
+		let mut files = vec![];
+		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
+		let filter = FileFilter::new();
+		filter.add_mime_type("audio/mp3");
+		filter.set_name(Some("MP3 audio file"));
+		dialog.add_filter(&filter);
+		dialog.set_select_multiple(true);
+		dialog.add_button("Cancel", ResponseType::Cancel);
+		dialog.add_button("Accept", ResponseType::Accept);
+		let result = dialog.run();
+		if result == ResponseType::Accept {
+			files = dialog.filenames();
+		}
+		unsafe { dialog.destroy(); }
+		files
 	}
 }
 
-fn show_open_dialog(parent: &ApplicationWindow) -> Vec<PathBuf> {
-	let mut files = vec![];
-	let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
-	let filter = FileFilter::new();
-	filter.add_mime_type("audio/mp3");
-	filter.set_name(Some("MP3 audio file"));
-	dialog.add_filter(&filter);
-	dialog.set_select_multiple(true);
-	dialog.add_button("Cancel", ResponseType::Cancel);
-	dialog.add_button("Accept", ResponseType::Accept);
-	let result = dialog.run();
-	if result == ResponseType::Accept {
-		files = dialog.filenames();
-	}
-	unsafe { dialog.destroy(); }
-	files
-}
 
 fn main() {
 	let music_player = Application::builder()

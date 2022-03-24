@@ -5,10 +5,11 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+use std::time::Duration;
 use crossbeam::queue::SegQueue;
 use pulse_simple::{ChannelCount, Playback, Sampleable};
 
-use crate::mp3;
+use crate::{mp3, ProgressBar};
 use mp3::Mp3Decoder;
 
 use self::Action::*;
@@ -29,7 +30,7 @@ pub struct Player {
 }
 
 impl Player {
-	pub(crate) fn new() -> Self {
+	pub(crate) fn new(progress_bar: Arc<Mutex<ProgressBar>>) -> Self {
 		let state = Arc::new(Mutex::new(Action::Stop));
 		let queue = Arc::new(SegQueue::new());
 		{
@@ -65,10 +66,11 @@ impl Player {
 						if play {
 							written = false;
 							if let Some(ref mut source) = source {
-								let size = iter_to_buffer(source, &mut buffer);
+								let size = Player::iter_to_buffer(source, &mut buffer);
 								if size > 0 {
 									playback.write(&buffer[..size]);
 									written = true;
+									(*progress_bar.lock().unwrap()).current_time = source.current_time();
 								}
 							}
 						}
@@ -86,21 +88,23 @@ impl Player {
 		}
 	}
 
-	// pub fn state(&self) -> Action {
-	// 	*self.state.lock().unwrap()
-	// }
-}
-
-fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16; 2]; BUFFER_SIZE]) -> usize {
-	let mut iter = iter.take(BUFFER_SIZE);
-	let mut index = 0;
-	while let Some(sample1) = iter.next() {
-		if let Some(sample2) = iter.next() {
-			buffer[index][0] = sample1;
-			buffer[index][1] = sample2;
+	fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16; 2]; BUFFER_SIZE]) -> usize {
+		let mut iter = iter.take(BUFFER_SIZE);
+		let mut index = 0;
+		while let Some(sample1) = iter.next() {
+			if let Some(sample2) = iter.next() {
+				buffer[index][0] = sample1;
+				buffer[index][1] = sample2;
+			}
+			index += 1;
 		}
-		index += 1;
+		index
 	}
-	index
+
+	pub fn compute_duration<P>(path: P) -> Option<Duration>
+		where P: AsRef<Path> {
+		let file = File::open(path).unwrap();
+		Mp3Decoder::compute_duration(BufReader::new(file))
+	}
 }
 
