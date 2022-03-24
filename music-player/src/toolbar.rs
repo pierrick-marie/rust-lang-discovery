@@ -18,13 +18,8 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 extern crate gtk;
 extern crate gio;
 
-use std::path::PathBuf;
-
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, SeparatorToolItem, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
-
-const PLAY_STOCK: &str = "gtk-media-play";
-const PAUSE_STOCK: &str = "gtk-media-pause";
+use gtk::{Button, Box, IconSize, SeparatorToolItem};
 
 pub struct MusicToolbar {
 	pub open_button: Button,
@@ -51,7 +46,7 @@ impl MusicToolbar {
 		let previous_button = Button::from_icon_name(Some("gtk-media-previous"), IconSize::LargeToolbar);
 		toolbar.add(&previous_button);
 
-		let play_button = Button::from_icon_name(Some(PLAY_STOCK), IconSize::LargeToolbar);
+		let play_button = Button::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar);
 		toolbar.add(&play_button);
 
 		let stop_button = Button::from_icon_name(Some("gtk-media-stop"), IconSize::LargeToolbar);

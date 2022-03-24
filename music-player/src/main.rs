@@ -32,11 +32,10 @@ use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use gdk_pixbuf::Pixbuf;
 use gio::glib;
 
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
+use gtk::{Application, ApplicationWindow, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
 
 use crate::playlist::Playlist;
 use crate::toolbar::MusicToolbar;

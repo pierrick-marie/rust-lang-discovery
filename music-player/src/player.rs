@@ -15,8 +15,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::borrow::Borrow;
-use std::cell::Cell;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -24,7 +22,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 use crossbeam::queue::SegQueue;
-use pulse_simple::{ChannelCount, Playback, Sampleable};
+use pulse_simple::{Playback};
 
 use crate::{mp3, ProgressBar};
 use mp3::Mp3Decoder;

@@ -18,26 +18,19 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 extern crate gdk_pixbuf;
 extern crate id3;
 
-use std::borrow::{Borrow, BorrowMut};
-use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
-use gdk_pixbuf::glib::value::ValueTypeChecker;
-use gio::dbus_gvalue_to_gvariant;
 
-use gio::glib::value::{ValueTypeMismatchError, ValueTypeMismatchOrNoneError};
+use gio::glib::value::{ValueTypeMismatchOrNoneError};
 
 use crate::gtk::prelude::*;
-use gtk::{CellLayout, CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, TreeViewColumn, FileChooserAction, FileChooserDialog, FileFilter, ApplicationWindow};
+use gtk::{CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, TreeViewColumn};
 
 use id3::{Tag, TagLike};
-use crate::mp3::{Mp3Decoder, to_millis};
+use crate::mp3::{to_millis};
 
 use crate::player::{Player, Action};
 use crate::ProgressBar;
@@ -178,7 +171,7 @@ impl Playlist {
 	}
 
 	pub fn play(&self) {
-		let mut path = "".to_string();
+		let path ;
 		let res_path = self.selected_path();
 		match res_path {
 			Ok(res) => { path = res; }
@@ -205,8 +198,6 @@ impl Playlist {
 				self.player.condition_variable.1.notify_all();
 			}
 		}
-		// self.player.queue.push(action.clone());
-		// *self.player.state.lock().unwrap() = action.clone();
 	}
 
 	pub fn remove_selection(&self) {
@@ -278,7 +269,6 @@ impl Playlist {
 	fn compute_duration(&self, path: &Path) {
 		let progress_bar = self.progress_bar.clone();
 		let path = path.to_string_lossy().to_string();
-		let mut duration = 0;
 		thread::spawn(move || {
 			if let Some(duration) = Player::compute_duration(&path) {
 				progress_bar.lock().unwrap().durations.insert(path, to_millis(duration));
@@ -287,7 +277,6 @@ impl Playlist {
 	}
 
 	pub fn path(&self) -> String {
-		let mut path = "".to_string();
 		let state = (*self.player.state.lock().unwrap()).clone();
 		match state {
 			Action::Play(path_buf) => {
@@ -296,7 +285,7 @@ impl Playlist {
 			}
 			_ => {}
 		}
-		return path;
+		return "".to_string();
 	}
 
 	pub fn is_playing(&self) -> bool {
