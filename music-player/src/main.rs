@@ -89,14 +89,8 @@ impl MusicApp {
 		let playlist = self.playlist.clone();
 		let window = self.window.clone();
 
-		// DEBUG
-		playlist.add(Path::new("./assets/songs/naps-la-kiffance-clip-officiel.mp3"));
-		playlist.add(Path::new("./assets/songs/timal-gazo-filtre-clip-officiel.mp3"));
-		playlist.add(Path::new("./assets/songs/bande-organisee-remix-version-feminine-clip-officiel.mp3"));
-
 		self.toolbar.open_button.connect_clicked(move |_| {
-			let file = show_open_dialog(&window);
-			if let Some(file) = file {
+			for file in show_open_dialog(&window) {
 				playlist.add(&file);
 			}
 		});
@@ -172,21 +166,22 @@ fn set_cover(playlist: &Rc<Playlist>, cover: &Image) {
 	}
 }
 
-fn show_open_dialog(parent: &ApplicationWindow) -> Option<PathBuf> {
-	let mut file = None;
+fn show_open_dialog(parent: &ApplicationWindow) -> Vec<PathBuf> {
+	let mut files = vec![];
 	let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
 	let filter = FileFilter::new();
 	filter.add_mime_type("audio/mp3");
 	filter.set_name(Some("MP3 audio file"));
 	dialog.add_filter(&filter);
+	dialog.set_select_multiple(true);
 	dialog.add_button("Cancel", ResponseType::Cancel);
 	dialog.add_button("Accept", ResponseType::Accept);
 	let result = dialog.run();
 	if result == ResponseType::Accept {
-		file = dialog.filename();
+		files = dialog.filenames();
 	}
 	unsafe { dialog.destroy(); }
-	file
+	files
 }
 
 fn main() {
