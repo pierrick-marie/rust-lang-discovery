@@ -21,6 +21,7 @@ extern crate gio;
 use gtk::prelude::*;
 use gtk::{Button, Box, IconSize, SeparatorToolItem};
 
+#[derive(Clone)]
 pub struct MusicToolbar {
 	pub open_button: Button,
 	pub next_button: Button,

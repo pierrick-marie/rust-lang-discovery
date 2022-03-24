@@ -33,7 +33,7 @@ use id3::{Tag, TagLike};
 use crate::mp3::{to_millis};
 
 use crate::player::{Player, Action};
-use crate::ProgressBar;
+use crate::State;
 
 const THUMBNAIL_COLUMN: u32 = 0;
 const TITLE_COLUMN: u32 = 1;
@@ -53,7 +53,7 @@ pub struct Playlist {
 	model: ListStore,
 	player: Player,
 	treeview: TreeView,
-	progress_bar: Arc<Mutex<ProgressBar>>,
+	state: Arc<Mutex<State>>,
 }
 
 use self::Visibility::*;
@@ -65,7 +65,7 @@ enum Visibility {
 }
 
 impl Playlist {
-	pub(crate) fn new(progress_bar: Arc<Mutex<ProgressBar>>) -> Self {
+	pub(crate) fn new(state: Arc<Mutex<State>>) -> Self {
 		let model = ListStore::new(&[
 			Pixbuf::static_type(),
 			String::static_type(),
@@ -85,9 +85,9 @@ impl Playlist {
 
 		Playlist {
 			model,
-			player: Player::new(progress_bar.clone()),
+			player: Player::new(state.clone()),
 			treeview,
-			progress_bar,
+			state,
 		}
 	}
 
@@ -145,7 +145,6 @@ impl Playlist {
 		let selection = self.treeview.selection();
 		if let Some((_, iter)) = selection.selected() {
 			if self.model.iter_next(&iter) {
-				// let value = self.model.value(&iter, PATH_COLUMN as i32);
 				selection.select_iter(&iter);
 			}
 		}
@@ -155,7 +154,6 @@ impl Playlist {
 		let selection = self.treeview.selection();
 		if let Some((_, iter)) = selection.selected() {
 			if self.model.iter_previous(&iter) {
-				// let value = self.model.value(&iter, PATH_COLUMN as i32);
 				selection.select_iter(&iter);
 			}
 		}
@@ -178,24 +176,22 @@ impl Playlist {
 			_ => { return; }
 		}
 
-		let state = (*self.player.state.lock().unwrap()).clone();
-		match state {
+		let action = (*self.state.lock().unwrap()).action.clone();
+		match action {
 			Action::Stop => {
 				let action = Action::Play(Path::new(&path).to_path_buf());
 				self.player.queue.push(action.clone());
-				*self.player.state.lock().unwrap() = action.clone();
-				(*self.player.condition_variable.0.lock().unwrap()) = true;
-				self.player.condition_variable.1.notify_all();
+				(*self.state.lock().unwrap()).action = action.clone();
+				self.player.wake_up();
 			}
 			Action::Play(_) => {
 				self.player.queue.push(Action::Pause);
-				*self.player.state.lock().unwrap() = Action::Pause;
+				(*self.state.lock().unwrap()).action = Action::Pause;
 			}
 			Action::Pause => {
 				self.player.queue.push(Action::Pause);
-				*self.player.state.lock().unwrap() = Action::Play(Path::new(&path).to_path_buf());
-				(*self.player.condition_variable.0.lock().unwrap()) = true;
-				self.player.condition_variable.1.notify_all();
+				(*self.state.lock().unwrap()).action = Action::Play(Path::new(&path).to_path_buf());
+				self.player.wake_up();
 			}
 		}
 	}
@@ -205,13 +201,11 @@ impl Playlist {
 		if let Some((_, iter)) = selection.selected() {
 			let value = self.model.value(&iter, PATH_COLUMN as i32);
 			let current_path = value.get::<String>().expect("Failed to get current path");
-
-			let state = (*self.player.state.lock().unwrap()).clone();
+			let state = (*self.state.lock().unwrap()).action.clone();
 			match state {
 				Action::Play(path) => {
 					if path.as_path().to_str().unwrap() == current_path {
-						self.player.queue.push(Action::Stop);
-						*self.player.state.lock().unwrap() = Action::Stop;
+						self.stop();
 					}
 				}
 				_ => {}
@@ -231,7 +225,7 @@ impl Playlist {
 
 	pub fn stop(&self) {
 		self.player.queue.push(Action::Stop);
-		*self.player.state.lock().unwrap() = Action::Stop;
+		(*self.state.lock().unwrap()).action = Action::Stop;
 	}
 
 	pub fn add(&self, path: &Path) {
@@ -267,7 +261,7 @@ impl Playlist {
 	}
 
 	fn compute_duration(&self, path: &Path) {
-		let progress_bar = self.progress_bar.clone();
+		let progress_bar = self.state.clone();
 		let path = path.to_string_lossy().to_string();
 		thread::spawn(move || {
 			if let Some(duration) = Player::compute_duration(&path) {
@@ -277,7 +271,7 @@ impl Playlist {
 	}
 
 	pub fn path(&self) -> String {
-		let state = (*self.player.state.lock().unwrap()).clone();
+		let state = (*self.state.lock().unwrap()).action.clone();
 		match state {
 			Action::Play(path_buf) => {
 				let path = path_buf.as_path().to_str().unwrap();
@@ -286,14 +280,5 @@ impl Playlist {
 			_ => {}
 		}
 		return "".to_string();
-	}
-
-	pub fn is_playing(&self) -> bool {
-		match *self.player.state.lock().unwrap() {
-			Action::Play(_) => {
-				true
-			}
-			_ => { false }
-		}
 	}
 }
