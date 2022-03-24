@@ -92,7 +92,6 @@ impl MusicApp {
 		}));
 		let playlist = Rc::new(Playlist::new(progress_bar.clone()));
 
-
 		main_container.add(&toolbar.container);
 		main_container.add(&cover);
 		main_container.add(&hbox);
@@ -165,11 +164,18 @@ impl MusicApp {
 	}
 
 	fn connect_play(&self) {
+		let play_button = self.toolbar.play_button.clone();
+
 		let cover = self.cover.clone();
 		let playlist = self.playlist.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
 			MusicApp::set_cover(&playlist, &cover);
 			playlist.play();
+			if playlist.is_playing() {
+				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar)));
+			} else {
+				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar)));
+			}
 		});
 
 		let playlist = self.playlist.clone();
@@ -189,12 +195,11 @@ impl MusicApp {
 	}
 
 	fn convert_milli_to_min(milli: &u64) -> String {
-
 		let mut nb_seconds = milli / 1000;
 		let nb_minutes = nb_seconds / 60;
 		nb_seconds = nb_seconds - (nb_minutes * 60);
 
-		format!("{}m {}s",  nb_minutes, nb_seconds)
+		format!("{}m {}s", nb_minutes, nb_seconds)
 	}
 
 	fn connect_stop(&self) {
