@@ -164,24 +164,19 @@ impl MusicApp {
 	}
 
 	fn connect_play(&self) {
-		let play_button = self.toolbar.play_button.clone();
 
 		let cover = self.cover.clone();
 		let playlist = self.playlist.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
 			MusicApp::set_cover(&playlist, &cover);
 			playlist.play();
-			if playlist.is_playing() {
-				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar)));
-			} else {
-				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar)));
-			}
 		});
 
 		let playlist = self.playlist.clone();
 		let adjustment = self.adjustment.clone();
 		let progress_bar = self.progress_bar.clone();
 		let duration_label = self.duration_label.clone();
+		let play_button = self.toolbar.play_button.clone();
 		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
 			let path = playlist.path();
 			let current_time = progress_bar.lock().unwrap().current_time;
@@ -190,6 +185,11 @@ impl MusicApp {
 				duration_label.set_label(&format!("{} / {}", MusicApp::convert_milli_to_min(&current_time), MusicApp::convert_milli_to_min(&duration)));
 			}
 			adjustment.set_value(current_time as f64);
+			if playlist.is_playing() {
+				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar)));
+			} else {
+				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar)));
+			}
 			Continue(true)
 		});
 	}

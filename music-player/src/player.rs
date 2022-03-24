@@ -53,6 +53,7 @@ impl Player {
 		let queue = Arc::new(SegQueue::new());
 		let condition_variable = Arc::new((Mutex::new(false), Condvar::new()));
 
+		let current_state = state.clone();
 		{
 			let queue = queue.clone();
 			let condition_variable = condition_variable.clone();
@@ -103,6 +104,9 @@ impl Player {
 									playback.write(&buffer[..size]);
 									written = true;
 									(*progress_bar.lock().unwrap()).current_time = source.current_time();
+								} else {
+									play = false;
+									*current_state.lock().unwrap() = Action::Stop;
 								}
 							}
 						} else {
