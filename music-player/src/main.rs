@@ -109,14 +109,7 @@ impl MusicApp {
 			playlist.next_song();
 			playlist.stop();
 			playlist.play();
-			let res = playlist.pixbuf();
-			match res {
-				Ok(pixbuf) => {
-					cover.set_from_pixbuf(Some(&pixbuf));
-					cover.show();
-				}
-				_ => {}
-			}
+			set_cover(&playlist, &cover);
 		});
 	}
 
@@ -127,21 +120,16 @@ impl MusicApp {
 			playlist.previous_song();
 			playlist.stop();
 			playlist.play();
-			let res = playlist.pixbuf();
-			match res {
-				Ok(pixbuf) => {
-					cover.set_from_pixbuf(Some(&pixbuf));
-					cover.show();
-				}
-				_ => {}
-			}
+			set_cover(&playlist, &cover);
 		});
 	}
 
 	fn connect_remove(&self) {
 		let playlist = self.playlist.clone();
+		let cover = self.cover.clone();
 		self.toolbar.remove_button.connect_clicked(move |_| {
 			playlist.remove_selection();
+			set_cover(&playlist, &cover);
 		});
 	}
 
@@ -158,14 +146,7 @@ impl MusicApp {
 		let playlist = self.playlist.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
 			playlist.play();
-			let res = playlist.pixbuf();
-			match res {
-				Ok(pixbuf) => {
-					cover.set_from_pixbuf(Some(&pixbuf));
-					cover.show();
-				}
-				_ => {}
-			}
+			set_cover(&playlist, &cover);
 		});
 	}
 
@@ -178,19 +159,18 @@ impl MusicApp {
 			cover.hide();
 		});
 	}
-
-	fn set_cover(&self) {
-		let res = self.playlist.pixbuf();
-		match res {
-			Ok(pix) => {
-				self.cover.set_from_pixbuf(Some(&pix));
-				self.cover.show();
-			}
-			Err(msg) => {}
-		}
-	}
 }
 
+fn set_cover(playlist: &Rc<Playlist>, cover: &Image) {
+	let res = playlist.pixbuf();
+	match res {
+		Ok(pix) => {
+			cover.set_from_pixbuf(Some(&pix));
+			cover.show();
+		}
+		Err(msg) => {}
+	}
+}
 
 fn show_open_dialog(parent: &ApplicationWindow) -> Option<PathBuf> {
 	let mut file = None;

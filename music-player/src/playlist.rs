@@ -25,6 +25,7 @@ use std::sync::{Arc, Mutex};
 
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
 use gdk_pixbuf::glib::value::ValueTypeChecker;
+use gio::dbus_gvalue_to_gvariant;
 
 use gio::glib::value::{ValueTypeMismatchError, ValueTypeMismatchOrNoneError};
 
@@ -189,14 +190,23 @@ impl Playlist {
 		*self.player.state.lock().unwrap() = action.clone();
 	}
 
-	pub fn stop(&self) {
-		self.player.queue.push(Action::Stop);
-		*self.player.state.lock().unwrap() = Action::Stop;
-	}
-
 	pub fn remove_selection(&self) {
 		let selection = self.treeview.selection();
 		if let Some((_, iter)) = selection.selected() {
+
+			let value = self.model.value(&iter, PATH_COLUMN as i32);
+			let current_path = value.get::<String>().expect("Failed to get current path");
+
+			let state = (*self.player.state.lock().unwrap()).clone();
+			match state {
+				Action::Play(path) => {
+					if path.as_path().to_str().unwrap() == current_path {
+						self.player.queue.push(Action::Stop);
+						*self.player.state.lock().unwrap() = Action::Stop;
+					}
+				}
+				_ => {}
+			}
 			self.model.remove(&iter);
 		}
 	}
@@ -208,6 +218,11 @@ impl Playlist {
 			return value.get::<Pixbuf>();
 		}
 		Err(ValueTypeMismatchOrNoneError::UnexpectedNone)
+	}
+
+	pub fn stop(&self) {
+		self.player.queue.push(Action::Stop);
+		*self.player.state.lock().unwrap() = Action::Stop;
 	}
 
 	pub fn add(&self, path: &Path) {

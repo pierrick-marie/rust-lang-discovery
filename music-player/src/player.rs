@@ -16,7 +16,7 @@ use self::Action::*;
 const BUFFER_SIZE: usize = 1000;
 const DEFAULT_RATE: u32 = 44100;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Action {
 	Play(PathBuf),
 	Pause,
