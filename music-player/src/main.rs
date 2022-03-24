@@ -90,9 +90,9 @@ impl MusicApp {
 		let window = self.window.clone();
 
 		// DEBUG
-		playlist.add(Path::new("/home/pirik/Musique/naps-la-kiffance-clip-officiel.mp3"));
-		playlist.add(Path::new("/home/pirik/Musique/timal-gazo-filtre-clip-officiel.mp3"));
-		playlist.add(Path::new("/home/pirik/Musique/bande-organisee-remix-version-feminine-clip-officiel.mp3"));
+		playlist.add(Path::new("./assets/songs/naps-la-kiffance-clip-officiel.mp3"));
+		playlist.add(Path::new("./assets/songs/timal-gazo-filtre-clip-officiel.mp3"));
+		playlist.add(Path::new("./assets/songs/bande-organisee-remix-version-feminine-clip-officiel.mp3"));
 
 		self.toolbar.open_button.connect_clicked(move |_| {
 			let file = show_open_dialog(&window);
