@@ -50,6 +50,7 @@ struct MusicApp {
 	toolbar: MusicToolbar,
 	cover: Image,
 	adjustment: Adjustment,
+	duration_label: Label,
 	playlist: Rc<Playlist>,
 	progress_bar: Arc<Mutex<ProgressBar>>,
 	window: ApplicationWindow,
@@ -71,9 +72,17 @@ impl MusicApp {
 
 		let cover = Image::new();
 
+		let duration_label = Label::new(Some("0 / 0"));
 		let adjustment = Adjustment::new(0.0, 0.0, 10.0, 0.0, 0.0, 0.0);
 		let scale = Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
 		scale.set_draw_value(false);
+		scale.set_hexpand(true);
+
+		let hbox = Box::new(gtk::Orientation::Horizontal, 3);
+		hbox.add(&SeparatorToolItem::new());
+		hbox.add(&scale);
+		hbox.add(&duration_label);
+		hbox.add(&SeparatorToolItem::new());
 
 		let current_time = 0;
 		let durations = HashMap::new();
@@ -83,9 +92,10 @@ impl MusicApp {
 		}));
 		let playlist = Rc::new(Playlist::new(progress_bar.clone()));
 
+
 		main_container.add(&toolbar.container);
 		main_container.add(&cover);
-		main_container.add(&scale);
+		main_container.add(&hbox);
 		main_container.add(playlist.view());
 
 		window.add(&main_container);
@@ -98,6 +108,7 @@ impl MusicApp {
 			adjustment,
 			playlist,
 			progress_bar,
+			duration_label,
 			window,
 		}
 	}
@@ -105,6 +116,9 @@ impl MusicApp {
 	fn connect_open(&self) {
 		let playlist = self.playlist.clone();
 		let window = self.window.clone();
+
+		playlist.add(Path::new("./assets/songs/timal-gazo-filtre-clip-officiel.mp3"));
+
 		self.toolbar.open_button.connect_clicked(move |_| {
 			for file in MusicApp::show_open_dialog(&window) {
 				playlist.add(&file);
@@ -161,15 +175,26 @@ impl MusicApp {
 		let playlist = self.playlist.clone();
 		let adjustment = self.adjustment.clone();
 		let progress_bar = self.progress_bar.clone();
+		let duration_label = self.duration_label.clone();
 		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
 			let path = playlist.path();
+			let current_time = progress_bar.lock().unwrap().current_time;
 			if let Some(&duration) = progress_bar.lock().unwrap().durations.get(&path) {
 				adjustment.set_upper(duration as f64);
+				duration_label.set_label(&format!("{} / {}", MusicApp::convert_milli_to_min(&current_time), MusicApp::convert_milli_to_min(&duration)));
 			}
-
-			adjustment.set_value(progress_bar.lock().unwrap().current_time as f64);
+			adjustment.set_value(current_time as f64);
 			Continue(true)
 		});
+	}
+
+	fn convert_milli_to_min(milli: &u64) -> String {
+
+		let mut nb_seconds = milli / 1000;
+		let nb_minutes = nb_seconds / 60;
+		nb_seconds = nb_seconds - (nb_minutes * 60);
+
+		format!("{}m {}s",  nb_minutes, nb_seconds)
 	}
 
 	fn connect_stop(&self) {
