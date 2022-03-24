@@ -178,25 +178,35 @@ impl Playlist {
 	}
 
 	pub fn play(&self) {
+		let mut path = "".to_string();
+		let res_path = self.selected_path();
+		match res_path {
+			Ok(res) => { path = res; }
+			_ => { return; }
+		}
+
 		let state = (*self.player.state.lock().unwrap()).clone();
-		let mut action = state.clone();
 		match state {
 			Action::Stop => {
-				let res = self.selected_path();
-				match res {
-					Ok(path) => {
-						action = Action::Play(Path::new(&path).to_path_buf());
-						(*self.progress_bar.lock().unwrap()).current_time = 0;
-					}
-					Err(_) => {}
-				}
+				let action = Action::Play(Path::new(&path).to_path_buf());
+				self.player.queue.push(action.clone());
+				*self.player.state.lock().unwrap() = action.clone();
+				(*self.player.condition_variable.0.lock().unwrap()) = true;
+				self.player.condition_variable.1.notify_all();
 			}
-			_ => {
-				action = Action::Pause;
+			Action::Play(_) => {
+				self.player.queue.push(Action::Pause);
+				*self.player.state.lock().unwrap() = Action::Pause;
+			}
+			Action::Pause => {
+				self.player.queue.push(Action::Pause);
+				*self.player.state.lock().unwrap() = Action::Play(Path::new(&path).to_path_buf());
+				(*self.player.condition_variable.0.lock().unwrap()) = true;
+				self.player.condition_variable.1.notify_all();
 			}
 		}
-		self.player.queue.push(action.clone());
-		*self.player.state.lock().unwrap() = action.clone();
+		// self.player.queue.push(action.clone());
+		// *self.player.state.lock().unwrap() = action.clone();
 	}
 
 	pub fn remove_selection(&self) {
@@ -277,11 +287,11 @@ impl Playlist {
 	}
 
 	pub fn path(&self) -> String {
-		let mut path= "".to_string();
+		let mut path = "".to_string();
 		let state = (*self.player.state.lock().unwrap()).clone();
 		match state {
 			Action::Play(path_buf) => {
-				let path =  path_buf.as_path().to_str().unwrap();
+				let path = path_buf.as_path().to_str().unwrap();
 				return path.to_string();
 			}
 			_ => {}
@@ -294,7 +304,7 @@ impl Playlist {
 			Action::Play(_) => {
 				true
 			}
-			_ => {false}
+			_ => { false }
 		}
 	}
 }

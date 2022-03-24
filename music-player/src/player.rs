@@ -1,3 +1,20 @@
+/* Copyright 2022 Pierrick MARIE
+
+This file is part of rust-discovery
+
+LCS is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Rust-discovery is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
+
 use std::borrow::Borrow;
 use std::cell::Cell;
 use std::fs::File;
@@ -27,22 +44,37 @@ pub enum Action {
 pub struct Player {
 	pub queue: Arc<SegQueue<Action>>,
 	pub state: Arc<Mutex<Action>>,
+	pub condition_variable: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl Player {
 	pub(crate) fn new(progress_bar: Arc<Mutex<ProgressBar>>) -> Self {
 		let state = Arc::new(Mutex::new(Action::Stop));
 		let queue = Arc::new(SegQueue::new());
+		let condition_variable = Arc::new((Mutex::new(false), Condvar::new()));
+
 		{
 			let queue = queue.clone();
+			let condition_variable = condition_variable.clone();
+
 
 			thread::spawn(move || {
-				let mut buffer = [[0; 2]; BUFFER_SIZE];
+				let block = || {
+					let (ref lock, ref condition_variable) = *condition_variable;
+					let mut started = lock.lock().unwrap();
+					*started = false;
+					while !*started {
+						started = condition_variable.wait(started).unwrap();
+					}
+				};
 
+
+				let mut buffer = [[0; 2]; BUFFER_SIZE];
 				let mut playback: Playback<[i16; 2]> = Playback::new("MP3", "MP3 Playback", None, DEFAULT_RATE);
 				let mut source = None;
 				let mut written = false;
 				let mut play = false;
+
 				loop {
 					if let Some(action) = queue.pop() {
 						match action {
@@ -73,18 +105,22 @@ impl Player {
 									(*progress_bar.lock().unwrap()).current_time = source.current_time();
 								}
 							}
-						}
-						if !written {
-							play = false;
-							source = None;
+						} else {
+							if !written {
+								play = false;
+								source = None;
+								(*progress_bar.lock().unwrap()).current_time = 0;
+							}
+							block();
 						}
 					}
 				}
 			});
 		}
 		Player {
-			state,
 			queue,
+			state,
+			condition_variable,
 		}
 	}
 

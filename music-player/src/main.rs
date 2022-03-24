@@ -90,9 +90,7 @@ impl MusicApp {
 
 		window.add(&main_container);
 
-		// Don't forget to make all widgets visible.
 		window.show_all();
-
 
 		MusicApp {
 			toolbar,
@@ -105,11 +103,8 @@ impl MusicApp {
 	}
 
 	fn connect_open(&self) {
-		// let playlist = (*self.playlist.lock().unwrap()).clone();
-
 		let playlist = self.playlist.clone();
 		let window = self.window.clone();
-
 		self.toolbar.open_button.connect_clicked(move |_| {
 			for file in MusicApp::show_open_dialog(&window) {
 				playlist.add(&file);
@@ -156,7 +151,6 @@ impl MusicApp {
 	}
 
 	fn connect_play(&self) {
-		let button = self.toolbar.play_button.clone();
 		let cover = self.cover.clone();
 		let playlist = self.playlist.clone();
 		self.toolbar.play_button.connect_clicked(move |_| {
@@ -173,20 +167,14 @@ impl MusicApp {
 				adjustment.set_upper(duration as f64);
 			}
 
-			if playlist.is_playing() {
-				adjustment.set_value(progress_bar.lock().unwrap().current_time as f64);
-			} else {
-				adjustment.set_value(0 as f64);
-			}
+			adjustment.set_value(progress_bar.lock().unwrap().current_time as f64);
 			Continue(true)
 		});
 	}
 
 	fn connect_stop(&self) {
-		let button = self.toolbar.stop_button.clone();
 		let playlist = self.playlist.clone();
 		let cover = self.cover.clone();
-		let progress_bar = self.progress_bar.clone();
 		self.toolbar.stop_button.connect_clicked(move |_| {
 			playlist.stop();
 			cover.hide();
