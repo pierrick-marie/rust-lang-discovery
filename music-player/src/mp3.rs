@@ -31,11 +31,14 @@ pub fn to_millis(duration: Duration) -> u64 {
 	duration.as_secs() * 1000 + duration.subsec_nanos() as u64 / 1_000_000
 }
 
-fn is_mp3<R>(mut data: R) -> bool
+pub fn is_mp3<R>(mut data: R) -> bool
 	where R: Read + Seek {
 	let stream_pos = data.seek(SeekFrom::Current(0)).unwrap();
 	let is_mp3 = simplemad::Decoder::decode(data.by_ref()).is_ok();
 	data.seek(SeekFrom::Start(stream_pos)).unwrap();
+
+	println!("Is MP3 {}", is_mp3);
+
 	is_mp3
 }
 

@@ -68,7 +68,6 @@ unsafe impl Sync for MusicApp {}
 
 impl MusicApp {
 	fn new(app: &Application) -> Self {
-
 		let current_time = 0;
 		let durations = HashMap::new();
 		let state = Arc::new(Mutex::new(State {
@@ -243,10 +242,17 @@ impl MusicApp {
 	fn show_open_dialog(parent: &ApplicationWindow) -> Vec<PathBuf> {
 		let mut files = vec![];
 		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
-		let filter = FileFilter::new();
-		filter.add_mime_type("audio/mp3");
-		filter.set_name(Some("MP3 audio file"));
-		dialog.add_filter(&filter);
+
+		let mp3_filter = FileFilter::new();
+		mp3_filter.add_mime_type("audio/mp3");
+		mp3_filter.set_name(Some("MP3 audio file"));
+		dialog.add_filter(&mp3_filter);
+
+		let m3u_filter = FileFilter::new();
+		m3u_filter.add_mime_type("audio/m3u");
+		m3u_filter.set_name(Some("M3U audio playlist"));
+		dialog.add_filter(&m3u_filter);
+
 		dialog.set_select_multiple(true);
 		dialog.add_button("Cancel", ResponseType::Cancel);
 		dialog.add_button("Accept", ResponseType::Accept);
