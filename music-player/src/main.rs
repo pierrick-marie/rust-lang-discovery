@@ -32,34 +32,52 @@ use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use gdk_pixbuf::Pixbuf;
 use gio::glib;
 
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
+use gtk::{Application, ApplicationWindow, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
+use crate::player::Action;
 
 use crate::playlist::Playlist;
 use crate::toolbar::MusicToolbar;
 
-pub struct ProgressBar {
+pub struct State {
+	pub action: Action,
 	pub current_time: u64,
 	pub durations: HashMap<String, u64>,
 }
 
-struct MusicApp {
+#[derive(Clone)]
+struct UI {
 	toolbar: MusicToolbar,
 	cover: Image,
 	adjustment: Adjustment,
 	duration_label: Label,
-	playlist: Rc<Playlist>,
-	progress_bar: Arc<Mutex<ProgressBar>>,
 	window: ApplicationWindow,
+	play: Image,
+	pause: Image,
+}
+
+struct MusicApp {
+	ui: UI,
+	playlist: Rc<Playlist>,
+	state: Arc<Mutex<State>>,
 }
 
 unsafe impl Sync for MusicApp {}
 
 impl MusicApp {
 	fn new(app: &Application) -> Self {
+
+		let current_time = 0;
+		let durations = HashMap::new();
+		let state = Arc::new(Mutex::new(State {
+			action: Action::Stop,
+			current_time,
+			durations,
+		}));
+
+		let playlist = Rc::new(Playlist::new(state.clone()));
 
 		// We create the main window.
 		let window = ApplicationWindow::builder()
@@ -78,19 +96,14 @@ impl MusicApp {
 		scale.set_draw_value(false);
 		scale.set_hexpand(true);
 
+		let pause = Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar);
+		let play = Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar);
+
 		let hbox = Box::new(gtk::Orientation::Horizontal, 3);
 		hbox.add(&SeparatorToolItem::new());
 		hbox.add(&scale);
 		hbox.add(&duration_label);
 		hbox.add(&SeparatorToolItem::new());
-
-		let current_time = 0;
-		let durations = HashMap::new();
-		let progress_bar = Arc::new(Mutex::new(ProgressBar {
-			current_time,
-			durations,
-		}));
-		let playlist = Rc::new(Playlist::new(progress_bar.clone()));
 
 		main_container.add(&toolbar.container);
 		main_container.add(&cover);
@@ -98,27 +111,32 @@ impl MusicApp {
 		main_container.add(playlist.view());
 
 		window.add(&main_container);
-
 		window.show_all();
 
-		MusicApp {
+		let ui = UI {
 			toolbar,
 			cover,
 			adjustment,
-			playlist,
-			progress_bar,
 			duration_label,
 			window,
+			play,
+			pause,
+		};
+
+		MusicApp {
+			ui,
+			playlist,
+			state,
 		}
 	}
 
 	fn connect_open(&self) {
 		let playlist = self.playlist.clone();
-		let window = self.window.clone();
+		let window = self.ui.window.clone();
 
 		playlist.add(Path::new("./assets/songs/timal-gazo-filtre-clip-officiel.mp3"));
 
-		self.toolbar.open_button.connect_clicked(move |_| {
+		self.ui.toolbar.open_button.connect_clicked(move |_| {
 			for file in MusicApp::show_open_dialog(&window) {
 				playlist.add(&file);
 			}
@@ -127,8 +145,8 @@ impl MusicApp {
 
 	fn connect_next(&self) {
 		let playlist = self.playlist.clone();
-		let cover = self.cover.clone();
-		self.toolbar.next_button.connect_clicked(move |_| {
+		let cover = self.ui.cover.clone();
+		self.ui.toolbar.next_button.connect_clicked(move |_| {
 			playlist.next_song();
 			playlist.stop();
 			playlist.play();
@@ -138,8 +156,8 @@ impl MusicApp {
 
 	fn connect_previous(&self) {
 		let playlist = self.playlist.clone();
-		let cover = self.cover.clone();
-		self.toolbar.previous_button.connect_clicked(move |_| {
+		let cover = self.ui.cover.clone();
+		self.ui.toolbar.previous_button.connect_clicked(move |_| {
 			playlist.previous_song();
 			playlist.stop();
 			playlist.play();
@@ -149,46 +167,46 @@ impl MusicApp {
 
 	fn connect_remove(&self) {
 		let playlist = self.playlist.clone();
-		let cover = self.cover.clone();
-		self.toolbar.remove_button.connect_clicked(move |_| {
+		let cover = self.ui.cover.clone();
+		self.ui.toolbar.remove_button.connect_clicked(move |_| {
 			playlist.remove_selection();
 			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
 
 	fn connect_quit(&self) {
-		let window = self.window.clone();
-		self.toolbar.quit_button.connect_clicked(move |_| {
+		let window = self.ui.window.clone();
+		self.ui.toolbar.quit_button.connect_clicked(move |_| {
 			unsafe { window.destroy(); }
 		});
 	}
 
 	fn connect_play(&self) {
-
-		let cover = self.cover.clone();
+		let cover = self.ui.cover.clone();
 		let playlist = self.playlist.clone();
-		self.toolbar.play_button.connect_clicked(move |_| {
+		self.ui.toolbar.play_button.connect_clicked(move |_| {
 			MusicApp::set_cover(&playlist, &cover);
 			playlist.play();
 		});
 
 		let playlist = self.playlist.clone();
-		let adjustment = self.adjustment.clone();
-		let progress_bar = self.progress_bar.clone();
-		let duration_label = self.duration_label.clone();
-		let play_button = self.toolbar.play_button.clone();
+		let state = self.state.clone();
+		let ui = self.ui.clone();
 		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
 			let path = playlist.path();
-			let current_time = progress_bar.lock().unwrap().current_time;
-			if let Some(&duration) = progress_bar.lock().unwrap().durations.get(&path) {
-				adjustment.set_upper(duration as f64);
-				duration_label.set_label(&format!("{} / {}", MusicApp::convert_milli_to_min(&current_time), MusicApp::convert_milli_to_min(&duration)));
+			let current_time = state.lock().unwrap().current_time;
+			if let Some(&duration) = state.lock().unwrap().durations.get(&path) {
+				ui.adjustment.set_upper(duration as f64);
+				ui.duration_label.set_label(&format!("{} / {}", MusicApp::convert_milli_to_min(&current_time), MusicApp::convert_milli_to_min(&duration)));
 			}
-			adjustment.set_value(current_time as f64);
-			if playlist.is_playing() {
-				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar)));
-			} else {
-				play_button.set_image(Some(&Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar)));
+			ui.adjustment.set_value(current_time as f64);
+			match state.lock().unwrap().action {
+				Action::Play(_) => {
+					ui.toolbar.play_button.set_image(Some(&ui.pause));
+				}
+				_ => {
+					ui.toolbar.play_button.set_image(Some(&ui.play));
+				}
 			}
 			Continue(true)
 		});
@@ -204,8 +222,8 @@ impl MusicApp {
 
 	fn connect_stop(&self) {
 		let playlist = self.playlist.clone();
-		let cover = self.cover.clone();
-		self.toolbar.stop_button.connect_clicked(move |_| {
+		let cover = self.ui.cover.clone();
+		self.ui.toolbar.stop_button.connect_clicked(move |_| {
 			playlist.stop();
 			cover.hide();
 		});

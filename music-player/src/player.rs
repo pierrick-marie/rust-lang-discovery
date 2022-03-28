@@ -15,8 +15,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::borrow::Borrow;
-use std::cell::Cell;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -24,9 +22,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Duration;
 use crossbeam::queue::SegQueue;
-use pulse_simple::{ChannelCount, Playback, Sampleable};
+use pulse_simple::{Playback};
 
-use crate::{mp3, ProgressBar};
+use crate::{mp3, State};
 use mp3::Mp3Decoder;
 
 use self::Action::*;
@@ -41,91 +39,93 @@ pub enum Action {
 	Stop,
 }
 
+#[derive(Clone)]
 pub struct Player {
 	pub queue: Arc<SegQueue<Action>>,
-	pub state: Arc<Mutex<Action>>,
-	pub condition_variable: Arc<(Mutex<bool>, Condvar)>,
+	condition_variable: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl Player {
-	pub(crate) fn new(progress_bar: Arc<Mutex<ProgressBar>>) -> Self {
-		let state = Arc::new(Mutex::new(Action::Stop));
+	pub(crate) fn new(state: Arc<Mutex<State>>) -> Self {
 		let queue = Arc::new(SegQueue::new());
 		let condition_variable = Arc::new((Mutex::new(false), Condvar::new()));
 
-		let current_state = state.clone();
-		{
-			let queue = queue.clone();
-			let condition_variable = condition_variable.clone();
+		let player = Player {
+			queue,
+			condition_variable,
+		};
 
+		Player::run(player.clone(), state.clone());
+		player
+	}
 
-			thread::spawn(move || {
-				let block = || {
-					let (ref lock, ref condition_variable) = *condition_variable;
-					let mut started = lock.lock().unwrap();
-					*started = false;
-					while !*started {
-						started = condition_variable.wait(started).unwrap();
+	fn run(player: Player, state: Arc<Mutex<State>>) {
+
+		thread::spawn(move || {
+			let block = || {
+				let (ref lock, ref condition_variable) = *player.condition_variable;
+				let mut started = lock.lock().unwrap();
+				*started = false;
+				while !*started {
+					started = condition_variable.wait(started).unwrap();
+				}
+			};
+
+			let mut buffer = [[0; 2]; BUFFER_SIZE];
+			let mut playback: Playback<[i16; 2]> = Playback::new("MP3", "MP3 Playback", None, DEFAULT_RATE);
+			let mut source = None;
+			let mut written = false;
+			let mut play = false;
+
+			loop {
+				if let Some(action) = player.queue.pop() {
+					match action {
+						Play(path) => {
+							let file = File::open(path).unwrap();
+							source = Some(Mp3Decoder::new(BufReader::new(file)).unwrap());
+							let rate = source.as_ref().map(|source|
+								source.samples_rate()).unwrap_or(DEFAULT_RATE);
+							playback = Playback::new("MP3", "MP3 Playback", None, rate);
+							play = true;
+						}
+						Pause => {
+							play = !play;
+						}
+						Stop => {
+							play = false;
+							written = false;
+						}
 					}
-				};
-
-
-				let mut buffer = [[0; 2]; BUFFER_SIZE];
-				let mut playback: Playback<[i16; 2]> = Playback::new("MP3", "MP3 Playback", None, DEFAULT_RATE);
-				let mut source = None;
-				let mut written = false;
-				let mut play = false;
-
-				loop {
-					if let Some(action) = queue.pop() {
-						match action {
-							Play(path) => {
-								let file = File::open(path).unwrap();
-								source = Some(Mp3Decoder::new(BufReader::new(file)).unwrap());
-								let rate = source.as_ref().map(|source|
-									source.samples_rate()).unwrap_or(DEFAULT_RATE);
-								playback = Playback::new("MP3", "MP3 Playback", None, rate);
-								play = true;
-							}
-							Pause => {
-								play = !play;
-							}
-							Stop => {
+				} else {
+					if play {
+						written = false;
+						if let Some(ref mut source) = source {
+							let size = Player::iter_to_buffer(source, &mut buffer);
+							if size > 0 {
+								playback.write(&buffer[..size]);
+								written = true;
+								(*state.lock().unwrap()).current_time = source.current_time();
+							} else {
 								play = false;
-								written = false;
+								(*state.lock().unwrap()).action = Action::Stop;
 							}
 						}
 					} else {
-						if play {
-							written = false;
-							if let Some(ref mut source) = source {
-								let size = Player::iter_to_buffer(source, &mut buffer);
-								if size > 0 {
-									playback.write(&buffer[..size]);
-									written = true;
-									(*progress_bar.lock().unwrap()).current_time = source.current_time();
-								} else {
-									play = false;
-									*current_state.lock().unwrap() = Action::Stop;
-								}
-							}
-						} else {
-							if !written {
-								play = false;
-								source = None;
-								(*progress_bar.lock().unwrap()).current_time = 0;
-							}
-							block();
+						if !written {
+							play = false;
+							source = None;
+							(*state.lock().unwrap()).current_time = 0;
 						}
+						block();
 					}
 				}
-			});
-		}
-		Player {
-			queue,
-			state,
-			condition_variable,
-		}
+			}
+		});
+	}
+
+	pub fn wake_up(&self) {
+		(*self.condition_variable.0.lock().unwrap()) = true;
+		self.condition_variable.1.notify_all();
 	}
 
 	fn iter_to_buffer<I: Iterator<Item=i16>>(iter: &mut I, buffer: &mut [[i16; 2]; BUFFER_SIZE]) -> usize {
