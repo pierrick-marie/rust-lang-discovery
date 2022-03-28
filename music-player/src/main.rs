@@ -28,6 +28,7 @@ extern crate pulse_simple;
 extern crate simplemad;
 
 use std::collections::HashMap;
+use std::fs;
 use std::rc::Rc;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -133,12 +134,22 @@ impl MusicApp {
 		let playlist = self.playlist.clone();
 		let window = self.ui.window.clone();
 
-		playlist.add(Path::new("./assets/songs/timal-gazo-filtre-clip-officiel.mp3"));
-
+		playlist.add(Path::new("./assets/songs/timal-gazo-filtre.mp3"));
+		playlist.add(Path::new("./assets/songs/test.mp3"));
+		
 		self.ui.toolbar.open_button.connect_clicked(move |_| {
 			for file in MusicApp::show_open_dialog(&window) {
 				playlist.add(&file);
 			}
+		});
+	}
+	
+	fn connect_save(&self) {
+		let playlist = self.playlist.clone();
+		let window = self.ui.window.clone();
+		
+		self.ui.toolbar.save_button.connect_clicked(move |_| {
+			MusicApp::show_save_dialog(&window, &playlist);
 		});
 	}
 
@@ -229,7 +240,7 @@ impl MusicApp {
 	}
 
 	fn set_cover(playlist: &Playlist, cover: &Image) {
-		let res = playlist.pixbuf();
+		let res = playlist.get_pixbuf();
 		match res {
 			Ok(pix) => {
 				cover.set_from_pixbuf(Some(&pix));
@@ -263,6 +274,21 @@ impl MusicApp {
 		unsafe { dialog.destroy(); }
 		files
 	}
+	
+	fn show_save_dialog(parent: &ApplicationWindow, playlist: &Rc<Playlist>) {
+		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
+		
+		dialog.set_action(FileChooserAction::Save);
+		dialog.add_button("Cancel", ResponseType::Cancel);
+		dialog.add_button("Accept", ResponseType::Accept);
+		let result = dialog.run();
+	
+		if result == ResponseType::Accept {
+			let path = dialog.filename().unwrap();
+			playlist.save(&path);
+		}
+		unsafe { dialog.destroy(); }
+	}
 }
 
 
@@ -274,6 +300,7 @@ fn main() {
 	music_player.connect_activate(|app| {
 		let music_app = MusicApp::new(app);
 		music_app.connect_open();
+		music_app.connect_save();
 		music_app.connect_quit();
 		music_app.connect_play();
 		music_app.connect_remove();

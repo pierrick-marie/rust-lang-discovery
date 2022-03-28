@@ -24,6 +24,7 @@ use gtk::{Button, Box, IconSize, SeparatorToolItem};
 #[derive(Clone)]
 pub struct MusicToolbar {
 	pub open_button: Button,
+	pub save_button: Button,
 	pub next_button: Button,
 	pub play_button: Button,
 	pub previous_button: Button,
@@ -41,7 +42,10 @@ impl MusicToolbar {
 
 		let open_button = Button::from_icon_name(Some("gtk-open"), IconSize::LargeToolbar);
 		toolbar.add(&open_button);
-
+		
+		let save_button = Button::from_icon_name(Some("gtk-save"), IconSize::LargeToolbar);
+		toolbar.add(&save_button);
+		
 		toolbar.add(&SeparatorToolItem::new());
 
 		let previous_button = Button::from_icon_name(Some("gtk-media-previous"), IconSize::LargeToolbar);
@@ -66,6 +70,7 @@ impl MusicToolbar {
 
 		MusicToolbar {
 			open_button,
+			save_button,
 			next_button,
 			play_button,
 			previous_button,

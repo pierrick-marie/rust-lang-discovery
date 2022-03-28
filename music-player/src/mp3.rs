@@ -33,13 +33,12 @@ pub fn to_millis(duration: Duration) -> u64 {
 
 pub fn is_mp3<R>(mut data: R) -> bool
 	where R: Read + Seek {
-	let stream_pos = data.seek(SeekFrom::Current(0)).unwrap();
-	let is_mp3 = simplemad::Decoder::decode(data.by_ref()).is_ok();
-	data.seek(SeekFrom::Start(stream_pos)).unwrap();
-
-	println!("Is MP3 {}", is_mp3);
-
-	is_mp3
+	
+	if let Ok(mp3) = Mp3Decoder::new(data) {
+		0 != mp3.current_frame.duration.as_nanos()
+	} else {
+		false
+	}
 }
 
 fn next_frame<R: Read>(decoder: &mut simplemad::Decoder<R>) -> simplemad::Frame {
@@ -60,9 +59,9 @@ fn next_frame<R: Read>(decoder: &mut simplemad::Decoder<R>) -> simplemad::Frame 
 
 impl<R> Mp3Decoder<R> where R: Read + Seek {
 	pub fn new(mut data: R) -> Result<Mp3Decoder<R>, R> {
-		if !is_mp3(data.by_ref()) {
-			return Err(data);
-		}
+		// if !is_mp3(data.by_ref()) {
+		// 	return Err(data);
+		// }
 
 		let mut reader = simplemad::Decoder::decode(data).unwrap();
 		let current_frame = next_frame(&mut reader);
@@ -83,11 +82,10 @@ impl<R> Mp3Decoder<R> where R: Read + Seek {
 		self.current_frame.sample_rate
 	}
 
-
 	pub fn compute_duration(mut data: R) -> Option<Duration> {
-		if !is_mp3(data.by_ref()) {
-			return None;
-		}
+		// if !is_mp3(data.by_ref()) {
+		// 	return None;
+		// }
 		let decoder = simplemad::Decoder::decode_headers(data).unwrap();
 		Some(decoder.filter_map(|frame| {
 			match frame {
