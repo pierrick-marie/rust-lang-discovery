@@ -18,6 +18,8 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 extern crate gdk_pixbuf;
 extern crate id3;
 
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -33,7 +35,7 @@ use id3::{Tag, TagLike};
 use crate::mp3::{to_millis};
 
 use crate::player::{Player, Action};
-use crate::State;
+use crate::{mp3, State};
 
 const THUMBNAIL_COLUMN: u32 = 0;
 const TITLE_COLUMN: u32 = 1;
@@ -169,7 +171,7 @@ impl Playlist {
 	}
 
 	pub fn play(&self) {
-		let path ;
+		let path;
 		let res_path = self.selected_path();
 		match res_path {
 			Ok(res) => { path = res; }
@@ -229,6 +231,29 @@ impl Playlist {
 	}
 
 	pub fn add(&self, path: &Path) {
+		if mp3::is_mp3(BufReader::new(File::open(path).unwrap())) {
+			self.add_mp3(path);
+		} else {
+			println!("It's M3U !");
+			self.add_m3u(path);
+		}
+	}
+
+	fn add_m3u(&self, path: &Path) {
+		let filename = path.to_string_lossy().to_string();
+		let mut reader = m3u::Reader::open_ext(filename).unwrap();
+		let read_playlist: Vec<_> = reader.entry_exts().map(|entry| entry.unwrap()).collect();
+		for song in read_playlist {
+			match song.entry {
+				m3u::Entry::Path(path) => {
+					self.add_mp3(path.as_path())
+				}
+				_ => {}
+			}
+		}
+	}
+
+	fn add_mp3(&self, path: &Path) {
 		let filename = path.file_stem().unwrap_or_default().to_str().unwrap_or_default();
 		let row = self.model.append();
 
