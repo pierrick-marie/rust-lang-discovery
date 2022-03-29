@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek};
 use std::time::Duration;
 use simplemad;
 
@@ -31,7 +31,7 @@ pub fn to_millis(duration: Duration) -> u64 {
 	duration.as_secs() * 1000 + duration.subsec_nanos() as u64 / 1_000_000
 }
 
-pub fn is_mp3<R>(mut data: R) -> bool
+pub fn is_mp3<R>(data: R) -> bool
 	where R: Read + Seek {
 	
 	if let Ok(mp3) = Mp3Decoder::new(data) {
@@ -58,10 +58,7 @@ fn next_frame<R: Read>(decoder: &mut simplemad::Decoder<R>) -> simplemad::Frame 
 
 
 impl<R> Mp3Decoder<R> where R: Read + Seek {
-	pub fn new(mut data: R) -> Result<Mp3Decoder<R>, R> {
-		// if !is_mp3(data.by_ref()) {
-		// 	return Err(data);
-		// }
+	pub fn new(data: R) -> Result<Mp3Decoder<R>, R> {
 
 		let mut reader = simplemad::Decoder::decode(data).unwrap();
 		let current_frame = next_frame(&mut reader);
@@ -82,10 +79,8 @@ impl<R> Mp3Decoder<R> where R: Read + Seek {
 		self.current_frame.sample_rate
 	}
 
-	pub fn compute_duration(mut data: R) -> Option<Duration> {
-		// if !is_mp3(data.by_ref()) {
-		// 	return None;
-		// }
+	pub fn compute_duration(data: R) -> Option<Duration> {
+		
 		let decoder = simplemad::Decoder::decode_headers(data).unwrap();
 		Some(decoder.filter_map(|frame| {
 			match frame {

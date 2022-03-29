@@ -32,7 +32,7 @@ use crate::gtk::prelude::*;
 use gtk::{CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, TreeViewColumn};
 
 use id3::{Tag, TagLike};
-use crate::mp3::{Mp3Decoder, to_millis, is_mp3};
+use crate::mp3::{to_millis};
 
 use crate::player::{Player, Action};
 use crate::{mp3, State};
@@ -234,7 +234,7 @@ impl Playlist {
 	
 	pub fn save(&self, path: &Path) {
 		let mut file = File::create(path.to_string_lossy().to_string()).unwrap();
-		file.write_all(b"");
+		file.write_all(b"").expect("Failed to clean content of the playlist file");
 		let mut writer = m3u::Writer::new(&mut file);
 		
 		let mut entries = vec![];
@@ -260,11 +260,14 @@ impl Playlist {
 	}
 	
 	fn add_m3u(&self, path: &Path) {
+		
 		let filename = path.to_string_lossy().to_string();
-		if let Ok(mut reader) = m3u::Reader::open_ext(filename) {
-			let read_playlist: Vec<_> = reader.entry_exts().map(|entry| entry.unwrap()).collect();
+		println!("Add m3u 0");
+		if let Ok(mut reader) = m3u::Reader::open(filename) {
+			println!("Add m3u 1");
+			let read_playlist: Vec<_> = reader.entries().map(|entry| entry.unwrap()).collect();
 			for song in read_playlist {
-				match song.entry {
+				match song {
 					m3u::Entry::Path(path) => {
 						self.add_mp3(path.as_path());
 					}

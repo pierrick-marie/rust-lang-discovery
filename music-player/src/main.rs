@@ -28,9 +28,8 @@ extern crate pulse_simple;
 extern crate simplemad;
 
 use std::collections::HashMap;
-use std::fs;
 use std::rc::Rc;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use gio::glib;
@@ -134,9 +133,6 @@ impl MusicApp {
 		let playlist = self.playlist.clone();
 		let window = self.ui.window.clone();
 
-		playlist.add(Path::new("./assets/songs/timal-gazo-filtre.mp3"));
-		playlist.add(Path::new("./assets/songs/test.mp3"));
-		
 		self.ui.toolbar.open_button.connect_clicked(move |_| {
 			for file in MusicApp::show_open_dialog(&window) {
 				playlist.add(&file);
@@ -268,6 +264,7 @@ impl MusicApp {
 		dialog.add_button("Cancel", ResponseType::Cancel);
 		dialog.add_button("Accept", ResponseType::Accept);
 		let result = dialog.run();
+		
 		if result == ResponseType::Accept {
 			files = dialog.filenames();
 		}
