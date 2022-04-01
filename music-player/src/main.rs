@@ -16,9 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 mod toolbar;
-mod playlist;
-mod mp3;
-mod player;
+pub mod playlist;
 
 extern crate gtk;
 extern crate gio;
@@ -29,22 +27,24 @@ extern crate simplemad;
 
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use gio::glib;
 
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box, Label, IconSize, SeparatorToolItem, Image, Adjustment, Scale, FileChooserAction, FileChooserDialog, FileFilter, ResponseType};
-use crate::player::Action;
+use gtk::{Adjustment, Application, ApplicationWindow, Box, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, Scale, SeparatorToolItem};
 
-use crate::playlist::Playlist;
+use playlist::Playlist;
 use crate::toolbar::MusicToolbar;
 
+extern crate gstreamer as gst;
+extern crate gstreamer_player as gst_player;
+
 pub struct State {
-	pub action: Action,
-	pub current_time: u64,
-	pub durations: HashMap<String, u64>,
+	// pub action: Action,
+	// pub current_time: u64,
+	pub durations: HashMap<String, gst::ClockTime>,
 }
 
 #[derive(Clone)]
@@ -71,47 +71,47 @@ impl MusicApp {
 		let current_time = 0;
 		let durations = HashMap::new();
 		let state = Arc::new(Mutex::new(State {
-			action: Action::Stop,
-			current_time,
+			// action: Action::Stop,
+			// current_time,
 			durations,
 		}));
-
+		
 		let playlist = Rc::new(Playlist::new(state.clone()));
-
+		
 		// We create the main window.
 		let window = ApplicationWindow::builder()
 			.application(app)
 			.title("Rust music player")
 			.build();
-
+		
 		let main_container = Box::new(gtk::Orientation::Vertical, 3);
 		let toolbar = MusicToolbar::new();
-
+		
 		let cover = Image::new();
-
+		
 		let duration_label = Label::new(Some("0 / 0"));
 		let adjustment = Adjustment::new(0.0, 0.0, 10.0, 0.0, 0.0, 0.0);
 		let scale = Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
 		scale.set_draw_value(false);
 		scale.set_hexpand(true);
-
+		
 		let pause = Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar);
 		let play = Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar);
-
+		
 		let hbox = Box::new(gtk::Orientation::Horizontal, 3);
 		hbox.add(&SeparatorToolItem::new());
 		hbox.add(&scale);
 		hbox.add(&duration_label);
 		hbox.add(&SeparatorToolItem::new());
-
+		
 		main_container.add(&toolbar.container);
 		main_container.add(&cover);
 		main_container.add(&hbox);
 		main_container.add(playlist.view());
-
+		
 		window.add(&main_container);
 		window.show_all();
-
+		
 		let ui = UI {
 			toolbar,
 			cover,
@@ -121,18 +121,18 @@ impl MusicApp {
 			play,
 			pause,
 		};
-
+		
 		MusicApp {
 			ui,
 			playlist,
 			state,
 		}
 	}
-
+	
 	fn connect_open(&self) {
 		let playlist = self.playlist.clone();
 		let window = self.ui.window.clone();
-
+		
 		self.ui.toolbar.open_button.connect_clicked(move |_| {
 			for file in MusicApp::show_open_dialog(&window) {
 				playlist.add(&file);
@@ -148,7 +148,7 @@ impl MusicApp {
 			MusicApp::show_save_dialog(&window, &playlist);
 		});
 	}
-
+	
 	fn connect_next(&self) {
 		let playlist = self.playlist.clone();
 		let cover = self.ui.cover.clone();
@@ -159,7 +159,7 @@ impl MusicApp {
 			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
-
+	
 	fn connect_previous(&self) {
 		let playlist = self.playlist.clone();
 		let cover = self.ui.cover.clone();
@@ -170,7 +170,7 @@ impl MusicApp {
 			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
-
+	
 	fn connect_remove(&self) {
 		let playlist = self.playlist.clone();
 		let cover = self.ui.cover.clone();
@@ -179,14 +179,14 @@ impl MusicApp {
 			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
-
+	
 	fn connect_quit(&self) {
 		let window = self.ui.window.clone();
 		self.ui.toolbar.quit_button.connect_clicked(move |_| {
 			unsafe { window.destroy(); }
 		});
 	}
-
+	
 	fn connect_play(&self) {
 		let cover = self.ui.cover.clone();
 		let playlist = self.playlist.clone();
@@ -194,38 +194,40 @@ impl MusicApp {
 			MusicApp::set_cover(&playlist, &cover);
 			playlist.play();
 		});
-
+		
 		let playlist = self.playlist.clone();
 		let state = self.state.clone();
 		let ui = self.ui.clone();
 		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
-			let path = playlist.path();
-			let current_time = state.lock().unwrap().current_time;
-			if let Some(&duration) = state.lock().unwrap().durations.get(&path) {
-				ui.adjustment.set_upper(duration as f64);
-				ui.duration_label.set_label(&format!("{} / {}", MusicApp::convert_milli_to_min(&current_time), MusicApp::convert_milli_to_min(&duration)));
-			}
-			ui.adjustment.set_value(current_time as f64);
-			match state.lock().unwrap().action {
-				Action::Play(_) => {
-					ui.toolbar.play_button.set_image(Some(&ui.pause));
-				}
-				_ => {
-					ui.toolbar.play_button.set_image(Some(&ui.play));
+			if !playlist.is_muted() {
+				let path = playlist.path();
+				// let current_time = state.lock().unwrap().current_time;
+				
+				match playlist.duration() {
+					Some(duration) => {
+						ui.adjustment.set_upper(duration.mseconds() as f64);
+						ui.duration_label.set_label(&format!("{}:{} / {}:{}",
+						                                     playlist.current_time().minutes(),
+						                                     (playlist.current_time().seconds() - playlist.current_time().minutes()*60),
+						                                     duration.minutes(),
+						                                     (duration.seconds() - duration.minutes()*60)));
+						ui.adjustment.set_value(playlist.current_time().mseconds() as f64);
+						// match state.lock().unwrap().action {
+							// Action::Play(_) => {
+							// 	ui.toolbar.play_button.set_image(Some(&ui.pause));
+							// }
+						// 	_ => {
+						// 		ui.toolbar.play_button.set_image(Some(&ui.play));
+						// 	}
+						// }
+					}
+					_ => {}
 				}
 			}
 			Continue(true)
 		});
 	}
-
-	fn convert_milli_to_min(milli: &u64) -> String {
-		let mut nb_seconds = milli / 1000;
-		let nb_minutes = nb_seconds / 60;
-		nb_seconds = nb_seconds - (nb_minutes * 60);
-
-		format!("{}m {}s", nb_minutes, nb_seconds)
-	}
-
+	
 	fn connect_stop(&self) {
 		let playlist = self.playlist.clone();
 		let cover = self.ui.cover.clone();
@@ -234,7 +236,7 @@ impl MusicApp {
 			cover.hide();
 		});
 	}
-
+	
 	fn set_cover(playlist: &Playlist, cover: &Image) {
 		let res = playlist.get_pixbuf();
 		match res {
@@ -245,21 +247,21 @@ impl MusicApp {
 			Err(_) => {}
 		}
 	}
-
+	
 	fn show_open_dialog(parent: &ApplicationWindow) -> Vec<PathBuf> {
 		let mut files = vec![];
 		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
-
+		
 		let mp3_filter = FileFilter::new();
 		mp3_filter.add_mime_type("audio/mp3");
 		mp3_filter.set_name(Some("MP3 audio file"));
 		dialog.add_filter(&mp3_filter);
-
+		
 		let m3u_filter = FileFilter::new();
 		m3u_filter.add_mime_type("audio/m3u");
 		m3u_filter.set_name(Some("M3U audio playlist"));
 		dialog.add_filter(&m3u_filter);
-
+		
 		dialog.set_select_multiple(true);
 		dialog.add_button("Cancel", ResponseType::Cancel);
 		dialog.add_button("Accept", ResponseType::Accept);
@@ -279,10 +281,10 @@ impl MusicApp {
 		dialog.add_button("Cancel", ResponseType::Cancel);
 		dialog.add_button("Accept", ResponseType::Accept);
 		let result = dialog.run();
-	
+		
 		if result == ResponseType::Accept {
 			let path = dialog.filename().unwrap();
-			playlist.save(&path);
+			playlist.save_playlist(&path);
 		}
 		unsafe { dialog.destroy(); }
 	}
@@ -290,10 +292,12 @@ impl MusicApp {
 
 
 fn main() {
+	gst::init().expect("gstreamer initialization failed");
+	
 	let music_player = Application::builder()
 		.application_id("music-player")
 		.build();
-
+	
 	music_player.connect_activate(|app| {
 		let music_app = MusicApp::new(app);
 		music_app.connect_open();
@@ -305,6 +309,6 @@ fn main() {
 		music_app.connect_next();
 		music_app.connect_previous();
 	});
-
+	
 	music_player.run();
 }

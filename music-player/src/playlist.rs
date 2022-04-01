@@ -19,10 +19,9 @@ extern crate gdk_pixbuf;
 extern crate id3;
 
 use std::fs::File;
-use std::io::{BufReader, Read};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::{fs, thread};
+use std::{fs};
 
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
 
@@ -32,12 +31,15 @@ use crate::gtk::prelude::*;
 use gtk::{CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, TreeViewColumn};
 
 use id3::{Tag, TagLike};
-use crate::mp3::{to_millis};
 
-use crate::player::{Player, Action};
-use crate::{mp3, State};
+use crate::{State};
 
-use std::io::Write;
+use std::io::{Read, Write};
+use gst::ClockTime;
+
+// Gstreamer imports
+extern crate gstreamer as gst;
+extern crate gstreamer_player as gst_player;
 
 const THUMBNAIL_COLUMN: u32 = 0;
 const TITLE_COLUMN: u32 = 1;
@@ -55,7 +57,7 @@ const INTERP_HYPER: InterpType = InterpType::Hyper;
 
 pub struct Playlist {
 	model: ListStore,
-	player: Player,
+	player: gst_player::Player,
 	treeview: TreeView,
 	state: Arc<Mutex<State>>,
 }
@@ -87,10 +89,14 @@ impl Playlist {
 		
 		Self::create_columns(&treeview);
 		
+		let dispatcher = gst_player::PlayerGMainContextSignalDispatcher::new(None);
+		let player = gst_player::Player::new(None, Some(&dispatcher.upcast::<gst_player::PlayerSignalDispatcher>()));
+		
+		
 		Playlist {
 			model,
-			player: Player::new(state.clone()),
 			treeview,
+			player,
 			state,
 		}
 	}
@@ -172,6 +178,21 @@ impl Playlist {
 		Err(ValueTypeMismatchOrNoneError::UnexpectedNone)
 	}
 	
+	pub fn current_time(&self) -> ClockTime {
+		match self.player.position() {
+			Some(time) => { return time; }
+			_ => { ClockTime::ZERO }
+		}
+	}
+	
+	pub fn duration(&self) -> Option<ClockTime> {
+		self.player.duration()
+	}
+	
+	pub fn is_muted(&self) -> bool {
+		self.player.is_muted()
+	}
+	
 	pub fn play(&self) {
 		let path;
 		let res_path = self.selected_path();
@@ -180,24 +201,24 @@ impl Playlist {
 			_ => { return; }
 		}
 		
-		let action = (*self.state.lock().unwrap()).action.clone();
-		match action {
-			Action::Stop => {
-				let action = Action::Play(Path::new(&path).to_path_buf());
-				self.player.queue.push(action.clone());
-				(*self.state.lock().unwrap()).action = action.clone();
-				self.player.wake_up();
-			}
-			Action::Play(_) => {
-				self.player.queue.push(Action::Pause);
-				(*self.state.lock().unwrap()).action = Action::Pause;
-			}
-			Action::Pause => {
-				self.player.queue.push(Action::Pause);
-				(*self.state.lock().unwrap()).action = Action::Play(Path::new(&path).to_path_buf());
-				self.player.wake_up();
-			}
-		}
+		// let current_action = (*self.state.lock().unwrap()).action.clone();
+		// match current_action {
+			// Action::Stop => {
+			// 	let action = Action::Play(Path::new(&path).to_path_buf());
+			// 	(*self.state.lock().unwrap()).action = action.clone();
+			// 	let uri = format!("file://{}", path);
+			// 	self.player.set_uri(Some(&uri));
+			// 	self.player.play();
+			// }
+			// Action::Play(_) => {
+			// 	(*self.state.lock().unwrap()).action = Action::Pause;
+			// 	self.player.pause();
+			// }
+			// Action::Pause => {
+			// 	(*self.state.lock().unwrap()).action = Action::Play(Path::new(&path).to_path_buf());
+			// 	self.player.play();
+			// }
+		// }
 	}
 	
 	pub fn remove_selection(&self) {
@@ -205,15 +226,15 @@ impl Playlist {
 		if let Some((_, iter)) = selection.selected() {
 			let value = self.model.value(&iter, PATH_COLUMN as i32);
 			let current_path = value.get::<String>().expect("Failed to get current path");
-			let state = (*self.state.lock().unwrap()).action.clone();
-			match state {
-				Action::Play(path) => {
-					if path.as_path().to_str().unwrap() == current_path {
-						self.stop();
-					}
-				}
-				_ => {}
-			}
+			// let state = (*self.state.lock().unwrap()).action.clone();
+			// match state {
+				// Action::Play(path) => {
+				// 	if path.as_path().to_str().unwrap() == current_path {
+				// 		self.stop();
+				// 	}
+				// }
+			// 	_ => {}
+			// }
 			self.model.remove(&iter);
 		}
 	}
@@ -228,11 +249,10 @@ impl Playlist {
 	}
 	
 	pub fn stop(&self) {
-		self.player.queue.push(Action::Stop);
-		(*self.state.lock().unwrap()).action = Action::Stop;
+		self.player.stop()
 	}
 	
-	pub fn save(&self, path: &Path) {
+	pub fn save_playlist(&self, path: &Path) {
 		let mut file = File::create(path.to_string_lossy().to_string()).unwrap();
 		file.write_all(b"").expect("Failed to clean content of the playlist file");
 		let mut writer = m3u::Writer::new(&mut file);
@@ -248,19 +268,28 @@ impl Playlist {
 	}
 	
 	pub fn add(&self, path: &Path) {
-		if let Ok(file) = File::open(path) {
-			if mp3::is_mp3(BufReader::new(file).by_ref()) {
-				self.add_mp3(path);
-			} else {
+		if let Ok(mut file) = File::open(path) {
+			if self.is_readable(&mut file) {
 				self.add_m3u(path);
+			} else {
+				self.add_mp3(path);
 			}
 		} else {
 			// file does not exist
 		}
 	}
 	
+	fn is_readable(&self, file: &mut File) -> bool {
+		let mut content = String::new();
+		match file.read_to_string(&mut content) {
+			Ok(_) => return true,
+			Err(_) => {
+				return false;
+			}
+		};
+	}
+	
 	fn add_m3u(&self, path: &Path) {
-		
 		let filename = path.to_string_lossy().to_string();
 		println!("Add m3u 0");
 		if let Ok(mut reader) = m3u::Reader::open(filename) {
@@ -280,11 +309,11 @@ impl Playlist {
 	}
 	
 	fn add_mp3(&self, path: &Path) {
-		let filename = path.file_stem().unwrap_or_default().to_str().unwrap_or_default();
+		let filename = path.to_string_lossy().to_string();
 		let row = self.model.append();
 		
 		if let Ok(tag) = Tag::read_from_path(path) {
-			let title = tag.title().unwrap_or(filename);
+			let title = tag.title().unwrap_or(&filename);
 			let artist = tag.artist().unwrap_or("(no artist)");
 			let album = tag.album().unwrap_or("(no album)");
 			let genre = tag.genre().unwrap_or("(no genre)");
@@ -306,30 +335,34 @@ impl Playlist {
 		} else {
 			self.model.set_value(&row, TITLE_COLUMN, &filename.to_value());
 		}
-		self.save_duration(path);
 		let path = path.to_str().unwrap_or_default();
 		self.model.set_value(&row, PATH_COLUMN, &path.to_value());
 	}
 	
-	fn save_duration(&self, path: &Path) {
-		let state = self.state.clone();
-		let path = path.to_string_lossy().to_string();
-		thread::spawn(move || {
-			if let Some(duration) = Player::compute_duration(&path) {
-				state.lock().unwrap().durations.insert(path, to_millis(duration));
-			}
-		});
-	}
+	// fn save_duration(&self, path: &Path) {
+	// 	let state = self.state.clone();
+	// 	let path = path.to_string_lossy().to_string();
+	//
+	// 	let uri = format!("file://{}", path);
+	// 	self.player.set_uri(Some(&uri));
+	// 	if let Some(duration) = self.player.duration() {
+	// 		println!("DURATION {}", duration.minutes());
+	// 		println!("DURATION {}", duration.seconds());
+	// 		println!("DURATION {}", duration.mseconds());
+	//
+	// 		state.lock().unwrap().durations.insert(path, duration);
+	// 	}
+	// }
 	
 	pub fn path(&self) -> String {
-		let state = (*self.state.lock().unwrap()).action.clone();
-		match state {
-			Action::Play(path_buf) => {
-				let path = path_buf.as_path().to_str().unwrap();
-				return path.to_string();
-			}
-			_ => {}
-		}
+		// let state = (*self.state.lock().unwrap()).action.clone();
+		// match state {
+			// Action::Play(path_buf) => {
+			// 	let path = path_buf.as_path().to_str().unwrap();
+			// 	return path.to_string();
+			// }
+		// 	_ => {}
+		// }
 		return "".to_string();
 	}
 }
