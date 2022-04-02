@@ -35,7 +35,6 @@ use id3::{Tag, TagLike};
 use std::io::{Read, Write};
 use gst::ClockTime;
 
-// Gstreamer imports
 extern crate gstreamer as gst;
 extern crate gstreamer_player as gst_player;
 
@@ -88,7 +87,6 @@ impl Playlist {
 		
 		let dispatcher = gst_player::PlayerGMainContextSignalDispatcher::new(None);
 		let player = gst_player::Player::new(None, Some(&dispatcher.upcast::<gst_player::PlayerSignalDispatcher>()));
-		
 		
 		Playlist {
 			model,
@@ -224,6 +222,7 @@ impl Playlist {
 				// Go end of function -> play
 			}
 		}
+		self.player.stop();
 		self.player.set_uri(Some(&path));
 		self.player.play();
 		return true;
@@ -345,32 +344,5 @@ impl Playlist {
 		}
 		let path = path.to_str().unwrap_or_default();
 		self.model.set_value(&row, PATH_COLUMN, &path.to_value());
-	}
-	
-	// fn save_duration(&self, path: &Path) {
-	// 	let state = self.state.clone();
-	// 	let path = path.to_string_lossy().to_string();
-	//
-	// 	let uri = format!("file://{}", path);
-	// 	self.player.set_uri(Some(&uri));
-	// 	if let Some(duration) = self.player.duration() {
-	// 		println!("DURATION {}", duration.minutes());
-	// 		println!("DURATION {}", duration.seconds());
-	// 		println!("DURATION {}", duration.mseconds());
-	//
-	// 		state.lock().unwrap().durations.insert(path, duration);
-	// 	}
-	// }
-	
-	pub fn path(&self) -> String {
-		// let state = (*self.state.lock().unwrap()).action.clone();
-		// match state {
-		// Action::Play(path_buf) => {
-		// 	let path = path_buf.as_path().to_str().unwrap();
-		// 	return path.to_string();
-		// }
-		// 	_ => {}
-		// }
-		return "".to_string();
 	}
 }

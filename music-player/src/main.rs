@@ -141,9 +141,11 @@ impl MusicApp {
 		let is_playing = self.is_playing.clone();
 		self.ui.toolbar.next_button.connect_clicked(move |_| {
 			playlist.next_song();
-			playlist.stop();
-			*is_playing.lock().unwrap() = playlist.play(&(*is_playing.lock().unwrap()));
-			MusicApp::set_cover(&playlist, &cover);
+			// Force player to play new song
+			*is_playing.lock().unwrap() = playlist.play(&false);
+			if *is_playing.lock().unwrap() {
+				MusicApp::set_cover(&playlist, &cover);
+			}
 		});
 	}
 	
@@ -153,9 +155,11 @@ impl MusicApp {
 		let is_playing = self.is_playing.clone();
 		self.ui.toolbar.previous_button.connect_clicked(move |_| {
 			playlist.previous_song();
-			playlist.stop();
-			*is_playing.lock().unwrap() = playlist.play(&(*is_playing.lock().unwrap()));
-			MusicApp::set_cover(&playlist, &cover);
+			// Force player to play new song
+			*is_playing.lock().unwrap() = playlist.play(&false);
+			if *is_playing.lock().unwrap() {
+				MusicApp::set_cover(&playlist, &cover);
+			}
 		});
 	}
 	
