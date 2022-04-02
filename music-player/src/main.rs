@@ -166,8 +166,10 @@ impl MusicApp {
 	fn connect_remove(&self) {
 		let playlist = self.playlist.clone();
 		let cover = self.ui.cover.clone();
+		let is_playing = self.is_playing.clone();
 		self.ui.toolbar.remove_button.connect_clicked(move |_| {
-			playlist.remove_selection();
+			let state = *is_playing.lock().unwrap();
+			*is_playing.lock().unwrap() = playlist.remove_selection(&state);
 			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
@@ -195,6 +197,7 @@ impl MusicApp {
 		let playlist = self.playlist.clone();
 		let ui = self.ui.clone();
 		let is_playing = self.is_playing.clone();
+		let cover = self.ui.cover.clone();
 		
 		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
 			if *is_playing.lock().unwrap() {
@@ -207,6 +210,7 @@ impl MusicApp {
 				ui.toolbar.play_button.set_image(Some(&ui.pause));
 			} else {
 				ui.toolbar.play_button.set_image(Some(&ui.play));
+				MusicApp::set_cover(&playlist, &cover);
 			}
 			Continue(true)
 		});
@@ -233,10 +237,12 @@ impl MusicApp {
 		match res {
 			Ok(pix) => {
 				cover.set_from_pixbuf(Some(&pix));
-				cover.show();
 			}
-			Err(_) => {}
+			Err(_) => {
+				cover.clear();
+			}
 		}
+		cover.show();
 	}
 	
 	fn show_open_dialog(parent: &ApplicationWindow) -> Vec<PathBuf> {

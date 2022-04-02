@@ -52,6 +52,8 @@ const THUMBNAIL_SIZE: i32 = 64;
 
 const INTERP_HYPER: InterpType = InterpType::Hyper;
 
+const URI: &str = "file://";
+
 pub struct Playlist {
 	model: ListStore,
 	player: gst_player::Player,
@@ -190,7 +192,7 @@ impl Playlist {
 		let mut path;
 		let res_path = self.selected_path();
 		match res_path {
-			Ok(res) => { path = format!("file://{}", res); }
+			Ok(res) => { path = format!("{}{}", URI, res); }
 			_ => {
 				// Impossible to read selected path -> not playing -> return false
 				return false;
@@ -228,22 +230,21 @@ impl Playlist {
 		return true;
 	}
 	
-	pub fn remove_selection(&self) {
+	pub fn remove_selection(&self, state: &bool) -> bool {
 		let selection = self.treeview.selection();
 		if let Some((_, iter)) = selection.selected() {
+			
 			let value = self.model.value(&iter, PATH_COLUMN as i32);
-			let current_path = value.get::<String>().expect("Failed to get current path");
-			// let state = (*self.state.lock().unwrap()).action.clone();
-			// match state {
-			// Action::Play(path) => {
-			// 	if path.as_path().to_str().unwrap() == current_path {
-			// 		self.stop();
-			// 	}
-			// }
-			// 	_ => {}
-			// }
+			let selected_path = value.get::<String>().expect("Failed to get current path");
+			let selected_uri = format!("{}{}", URI, selected_path);
+			
 			self.model.remove(&iter);
+			if selected_uri == self.player.uri().unwrap() {
+				self.player.stop();
+				return false;
+			}
 		}
+		return *state;
 	}
 	
 	pub fn get_pixbuf(&self) -> Result<Pixbuf, ValueTypeMismatchOrNoneError> {
