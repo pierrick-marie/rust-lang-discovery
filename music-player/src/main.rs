@@ -41,12 +41,6 @@ use crate::toolbar::MusicToolbar;
 extern crate gstreamer as gst;
 extern crate gstreamer_player as gst_player;
 
-pub struct State {
-	// pub action: Action,
-	// pub current_time: u64,
-	pub durations: HashMap<String, gst::ClockTime>,
-}
-
 #[derive(Clone)]
 struct UI {
 	toolbar: MusicToolbar,
@@ -61,22 +55,14 @@ struct UI {
 struct MusicApp {
 	ui: UI,
 	playlist: Rc<Playlist>,
-	state: Arc<Mutex<State>>,
+	is_playing: Arc<Mutex<bool>>,
 }
 
 unsafe impl Sync for MusicApp {}
 
 impl MusicApp {
 	fn new(app: &Application) -> Self {
-		let current_time = 0;
-		let durations = HashMap::new();
-		let state = Arc::new(Mutex::new(State {
-			// action: Action::Stop,
-			// current_time,
-			durations,
-		}));
-		
-		let playlist = Rc::new(Playlist::new(state.clone()));
+		let playlist = Rc::new(Playlist::new());
 		
 		// We create the main window.
 		let window = ApplicationWindow::builder()
@@ -125,7 +111,7 @@ impl MusicApp {
 		MusicApp {
 			ui,
 			playlist,
-			state,
+			is_playing: Arc::new(Mutex::new(false)),
 		}
 	}
 	
@@ -152,10 +138,11 @@ impl MusicApp {
 	fn connect_next(&self) {
 		let playlist = self.playlist.clone();
 		let cover = self.ui.cover.clone();
+		let is_playing = self.is_playing.clone();
 		self.ui.toolbar.next_button.connect_clicked(move |_| {
 			playlist.next_song();
 			playlist.stop();
-			playlist.play();
+			*is_playing.lock().unwrap() = playlist.play(&(*is_playing.lock().unwrap()));
 			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
@@ -163,10 +150,11 @@ impl MusicApp {
 	fn connect_previous(&self) {
 		let playlist = self.playlist.clone();
 		let cover = self.ui.cover.clone();
+		let is_playing = self.is_playing.clone();
 		self.ui.toolbar.previous_button.connect_clicked(move |_| {
 			playlist.previous_song();
 			playlist.stop();
-			playlist.play();
+			*is_playing.lock().unwrap() = playlist.play(&(*is_playing.lock().unwrap()));
 			MusicApp::set_cover(&playlist, &cover);
 		});
 	}
@@ -190,42 +178,41 @@ impl MusicApp {
 	fn connect_play(&self) {
 		let cover = self.ui.cover.clone();
 		let playlist = self.playlist.clone();
+		let is_playing = self.is_playing.clone();
+		
 		self.ui.toolbar.play_button.connect_clicked(move |_| {
-			MusicApp::set_cover(&playlist, &cover);
-			playlist.play();
+			let state = *is_playing.lock().unwrap();
+			*is_playing.lock().unwrap() = playlist.play(&state);
+			if *is_playing.lock().unwrap() {
+				MusicApp::set_cover(&playlist, &cover);
+			}
 		});
 		
 		let playlist = self.playlist.clone();
-		let state = self.state.clone();
 		let ui = self.ui.clone();
+		let is_playing = self.is_playing.clone();
+		
 		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
-			if !playlist.is_muted() {
-				let path = playlist.path();
-				// let current_time = state.lock().unwrap().current_time;
+			if *is_playing.lock().unwrap() {
+				let m_duration = playlist.duration();
+				let m_current_time = playlist.current_time();
 				
-				match playlist.duration() {
-					Some(duration) => {
-						ui.adjustment.set_upper(duration.mseconds() as f64);
-						ui.duration_label.set_label(&format!("{}:{} / {}:{}",
-						                                     playlist.current_time().minutes(),
-						                                     (playlist.current_time().seconds() - playlist.current_time().minutes()*60),
-						                                     duration.minutes(),
-						                                     (duration.seconds() - duration.minutes()*60)));
-						ui.adjustment.set_value(playlist.current_time().mseconds() as f64);
-						// match state.lock().unwrap().action {
-							// Action::Play(_) => {
-							// 	ui.toolbar.play_button.set_image(Some(&ui.pause));
-							// }
-						// 	_ => {
-						// 		ui.toolbar.play_button.set_image(Some(&ui.play));
-						// 	}
-						// }
-					}
-					_ => {}
-				}
+				ui.adjustment.set_upper(m_duration as f64);
+				ui.adjustment.set_value(m_current_time as f64);
+				ui.duration_label.set_label(&format!("{} / {}", MusicApp::milli_to_string(m_current_time), MusicApp::milli_to_string(m_duration)));
+				ui.toolbar.play_button.set_image(Some(&ui.pause));
+			} else {
+				ui.toolbar.play_button.set_image(Some(&ui.play));
 			}
 			Continue(true)
 		});
+	}
+	
+	fn milli_to_string(milli: u64) -> String {
+		let mut seconds = milli / 1000;
+		let minutes = seconds / 60;
+		seconds = seconds - minutes * 60;
+		format!("{}:{}", minutes, seconds)
 	}
 	
 	fn connect_stop(&self) {

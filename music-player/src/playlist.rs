@@ -32,8 +32,6 @@ use gtk::{CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, T
 
 use id3::{Tag, TagLike};
 
-use crate::{State};
-
 use std::io::{Read, Write};
 use gst::ClockTime;
 
@@ -59,7 +57,6 @@ pub struct Playlist {
 	model: ListStore,
 	player: gst_player::Player,
 	treeview: TreeView,
-	state: Arc<Mutex<State>>,
 }
 
 use self::Visibility::*;
@@ -71,7 +68,7 @@ enum Visibility {
 }
 
 impl Playlist {
-	pub(crate) fn new(state: Arc<Mutex<State>>) -> Self {
+	pub(crate) fn new() -> Self {
 		let model = ListStore::new(&[
 			Pixbuf::static_type(),
 			String::static_type(),
@@ -97,7 +94,6 @@ impl Playlist {
 			model,
 			treeview,
 			player,
-			state,
 		}
 	}
 	
@@ -178,47 +174,59 @@ impl Playlist {
 		Err(ValueTypeMismatchOrNoneError::UnexpectedNone)
 	}
 	
-	pub fn current_time(&self) -> ClockTime {
+	pub fn current_time(&self) -> u64 {
 		match self.player.position() {
-			Some(time) => { return time; }
-			_ => { ClockTime::ZERO }
+			Some(clock) => { clock.mseconds() }
+			_ => { ClockTime::ZERO.mseconds() }
 		}
 	}
 	
-	pub fn duration(&self) -> Option<ClockTime> {
-		self.player.duration()
+	pub fn duration(&self) -> u64 {
+		match self.player.duration() {
+			Some(clock) => { clock.mseconds() }
+			_ => { 0 }
+		}
 	}
 	
-	pub fn is_muted(&self) -> bool {
-		self.player.is_muted()
-	}
-	
-	pub fn play(&self) {
-		let path;
+	pub fn play(&self, state: &bool) -> bool {
+		let mut path;
 		let res_path = self.selected_path();
 		match res_path {
-			Ok(res) => { path = res; }
-			_ => { return; }
+			Ok(res) => { path = format!("file://{}", res); }
+			_ => {
+				// Impossible to read selected path -> not playing -> return false
+				return false;
+			}
 		}
 		
-		// let current_action = (*self.state.lock().unwrap()).action.clone();
-		// match current_action {
-			// Action::Stop => {
-			// 	let action = Action::Play(Path::new(&path).to_path_buf());
-			// 	(*self.state.lock().unwrap()).action = action.clone();
-			// 	let uri = format!("file://{}", path);
-			// 	self.player.set_uri(Some(&uri));
-			// 	self.player.play();
-			// }
-			// Action::Play(_) => {
-			// 	(*self.state.lock().unwrap()).action = Action::Pause;
-			// 	self.player.pause();
-			// }
-			// Action::Pause => {
-			// 	(*self.state.lock().unwrap()).action = Action::Play(Path::new(&path).to_path_buf());
-			// 	self.player.play();
-			// }
-		// }
+		match self.player.uri() {
+			// player is already playing something
+			Some(uri) => {
+				let filename = uri.to_string();
+				
+				if *state {
+					// Player is playing -> pause
+					self.player.pause();
+					return false;
+				} else {
+					// Player is not playing, but uri equals selected path -> player is paused, -> play
+					if filename == path {
+						self.player.play();
+						return true;
+					}
+					// else
+					// Player is not playing -> play new selected song
+					// Go end of function -> play
+				}
+			}
+			_ => {
+				// player is not playing -> play selected song
+				// Go end of function -> play
+			}
+		}
+		self.player.set_uri(Some(&path));
+		self.player.play();
+		return true;
 	}
 	
 	pub fn remove_selection(&self) {
@@ -228,11 +236,11 @@ impl Playlist {
 			let current_path = value.get::<String>().expect("Failed to get current path");
 			// let state = (*self.state.lock().unwrap()).action.clone();
 			// match state {
-				// Action::Play(path) => {
-				// 	if path.as_path().to_str().unwrap() == current_path {
-				// 		self.stop();
-				// 	}
-				// }
+			// Action::Play(path) => {
+			// 	if path.as_path().to_str().unwrap() == current_path {
+			// 		self.stop();
+			// 	}
+			// }
 			// 	_ => {}
 			// }
 			self.model.remove(&iter);
@@ -258,9 +266,9 @@ impl Playlist {
 		let mut writer = m3u::Writer::new(&mut file);
 		
 		let mut entries = vec![];
-		for (song_path, _) in &self.state.lock().unwrap().durations {
-			entries.push(m3u::path_entry(&fs::canonicalize(&song_path).unwrap()));
-		}
+		// for (song_path, _) in &self.state.lock().unwrap().durations {
+		// 	entries.push(m3u::path_entry(&fs::canonicalize(&song_path).unwrap()));
+		// }
 		
 		for entry in &entries {
 			writer.write_entry(entry).unwrap();
@@ -357,10 +365,10 @@ impl Playlist {
 	pub fn path(&self) -> String {
 		// let state = (*self.state.lock().unwrap()).action.clone();
 		// match state {
-			// Action::Play(path_buf) => {
-			// 	let path = path_buf.as_path().to_str().unwrap();
-			// 	return path.to_string();
-			// }
+		// Action::Play(path_buf) => {
+		// 	let path = path_buf.as_path().to_str().unwrap();
+		// 	return path.to_string();
+		// }
 		// 	_ => {}
 		// }
 		return "".to_string();
