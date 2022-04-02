@@ -58,6 +58,7 @@ pub struct Playlist {
 	model: ListStore,
 	player: gst_player::Player,
 	treeview: TreeView,
+	paths: Arc<Mutex<Vec<String>>>,
 }
 
 use self::Visibility::*;
@@ -94,6 +95,7 @@ impl Playlist {
 			model,
 			treeview,
 			player,
+			paths: Arc::new(Mutex::new(vec![])),
 		}
 	}
 	
@@ -233,7 +235,6 @@ impl Playlist {
 	pub fn remove_selection(&self, state: &bool) -> bool {
 		let selection = self.treeview.selection();
 		if let Some((_, iter)) = selection.selected() {
-			
 			let value = self.model.value(&iter, PATH_COLUMN as i32);
 			let selected_path = value.get::<String>().expect("Failed to get current path");
 			let selected_uri = format!("{}{}", URI, selected_path);
@@ -266,9 +267,10 @@ impl Playlist {
 		let mut writer = m3u::Writer::new(&mut file);
 		
 		let mut entries = vec![];
-		// for (song_path, _) in &self.state.lock().unwrap().durations {
-		// 	entries.push(m3u::path_entry(&fs::canonicalize(&song_path).unwrap()));
-		// }
+		
+		for song in &*self.paths.lock().unwrap() {
+			entries.push(m3u::path_entry(&fs::canonicalize(&song).unwrap()));
+		}
 		
 		for entry in &entries {
 			writer.write_entry(entry).unwrap();
@@ -299,9 +301,7 @@ impl Playlist {
 	
 	fn add_m3u(&self, path: &Path) {
 		let filename = path.to_string_lossy().to_string();
-		println!("Add m3u 0");
 		if let Ok(mut reader) = m3u::Reader::open(filename) {
-			println!("Add m3u 1");
 			let read_playlist: Vec<_> = reader.entries().map(|entry| entry.unwrap()).collect();
 			for song in read_playlist {
 				match song {
@@ -344,6 +344,10 @@ impl Playlist {
 			self.model.set_value(&row, TITLE_COLUMN, &filename.to_value());
 		}
 		let path = path.to_str().unwrap_or_default();
+		
+		let mut paths = self.paths.clone();
+		paths.lock().unwrap().push(path.to_string());
+		
 		self.model.set_value(&row, PATH_COLUMN, &path.to_value());
 	}
 }
