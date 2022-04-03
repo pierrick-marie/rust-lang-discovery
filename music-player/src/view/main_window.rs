@@ -4,7 +4,7 @@ use gtk::{Adjustment, Image, Label, Window};
 use gtk::prelude::*;
 
 #[derive(Clone)]
-pub struct View {
+pub struct MusicWindow {
 	pub toolbar: MusicToolbar,
 	pub cover: Image,
 	pub adjustment: Adjustment,
