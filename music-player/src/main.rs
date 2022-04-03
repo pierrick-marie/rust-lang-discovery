@@ -15,296 +15,152 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-mod toolbar;
-pub mod playlist;
-
+#[feature(proc_macro)]
 extern crate gtk;
-extern crate gio;
 extern crate gtk_sys;
+
+#[macro_use]
+extern crate relm;
+#[macro_use]
+extern crate relm_derive;
+
+extern crate gio;
 extern crate crossbeam;
 extern crate pulse_simple;
 extern crate simplemad;
+
+extern crate gstreamer as gst;
+extern crate gstreamer_player as gst_player;
 
 use std::rc::Rc;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use gio::glib;
-
 use gtk::prelude::*;
-use gtk::{Adjustment, Application, ApplicationWindow, Box, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, Scale, SeparatorToolItem};
 
+use gtk::{
+	Button,
+	Inhibit,
+	Label,
+	Window,
+	WindowType,
+	prelude::ButtonExt,
+	prelude::ContainerExt,
+	prelude::LabelExt,
+	prelude::WidgetExt,
+};
+use gtk::Orientation::Vertical;
+use relm_derive::Msg;
+use relm::{connect, Relm, Update, Widget, WidgetTest};
+
+pub mod playlist;
 use playlist::Playlist;
+mod toolbar;
 use crate::toolbar::MusicToolbar;
 
-extern crate gstreamer as gst;
-extern crate gstreamer_player as gst_player;
+struct Model {
+	counter: i32,
+}
 
+#[derive(Msg)]
+enum Msg {
+	Decrement,
+	Increment,
+	Quit,
+}
+
+// Create the structure that holds the widgets used in the view.
 #[derive(Clone)]
-struct UI {
-	toolbar: MusicToolbar,
-	cover: Image,
-	adjustment: Adjustment,
-	duration_label: Label,
-	window: ApplicationWindow,
-	play: Image,
-	pause: Image,
+struct Widgets {
+	counter_label: Label,
+	minus_button: Button,
+	plus_button: Button,
+	window: Window,
 }
 
-struct MusicApp {
-	ui: UI,
-	playlist: Rc<Playlist>,
-	is_playing: Arc<Mutex<bool>>,
+struct Win {
+	model: Model,
+	widgets: Widgets,
 }
 
-unsafe impl Sync for MusicApp {}
+impl Update for Win {
+	// Specify the model used for this widget.
+	type Model = Model;
+	// Specify the model parameter used to init the model.
+	type ModelParam = ();
+	// Specify the type of the messages sent to the update function.
+	type Msg = Msg;
+	
+	fn model(_: &Relm<Self>, _: ()) -> Model {
+		Model {
+			counter: 0,
+		}
+	}
+	
+	fn update(&mut self, event: Msg) {
+		let label = &self.widgets.counter_label;
+		
+		match event {
+			Msg::Decrement => {
+				self.model.counter -= 1;
+				// Manually update the view.
+				label.set_text(&self.model.counter.to_string());
+			},
+			Msg::Increment => {
+				self.model.counter += 1;
+				label.set_text(&self.model.counter.to_string());
+			},
+			Msg::Quit => gtk::main_quit(),
+		}
+	}
+}
 
-impl MusicApp {
-	fn new(app: &Application) -> Self {
-		let playlist = Rc::new(Playlist::new());
+impl Widget for Win {
+	// Specify the type of the root widget.
+	type Root = Window;
+	
+	// Return the root widget.
+	fn root(&self) -> Self::Root {
+		self.widgets.window.clone()
+	}
+	
+	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
+		// Create the view using the normal GTK+ method calls.
+		let vbox = gtk::Box::new(Vertical, 0);
 		
-		// We create the main window.
-		let window = ApplicationWindow::builder()
-			.application(app)
-			.title("Rust music player")
-			.build();
+		let plus_button = Button::with_label("+");
+		vbox.add(&plus_button);
 		
-		let main_container = Box::new(gtk::Orientation::Vertical, 3);
-		let toolbar = MusicToolbar::new();
+		let counter_label = Label::new(Some("0"));
+		vbox.add(&counter_label);
 		
-		let cover = Image::new();
+		let minus_button = Button::with_label("-");
+		vbox.add(&minus_button);
 		
-		let duration_label = Label::new(Some("0 / 0"));
-		let adjustment = Adjustment::new(0.0, 0.0, 10.0, 0.0, 0.0, 0.0);
-		let scale = Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
-		scale.set_draw_value(false);
-		scale.set_hexpand(true);
+		let window = Window::new(WindowType::Toplevel);
 		
-		let pause = Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar);
-		let play = Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar);
+		window.add(&vbox);
 		
-		let hbox = Box::new(gtk::Orientation::Horizontal, 3);
-		hbox.add(&SeparatorToolItem::new());
-		hbox.add(&scale);
-		hbox.add(&duration_label);
-		hbox.add(&SeparatorToolItem::new());
-		
-		main_container.add(&toolbar.container);
-		main_container.add(&cover);
-		main_container.add(&hbox);
-		main_container.add(playlist.view());
-		
-		window.add(&main_container);
 		window.show_all();
 		
-		let ui = UI {
-			toolbar,
-			cover,
-			adjustment,
-			duration_label,
-			window,
-			play,
-			pause,
-		};
+		// Send the message Increment when the button is clicked.
+		connect!(relm, plus_button, connect_clicked(_), Msg::Increment);
+		connect!(relm, minus_button, connect_clicked(_), Msg::Decrement);
+		connect!(relm, window, connect_delete_event(_, _), return (Some(Msg::Quit), Inhibit(false)));
 		
-		MusicApp {
-			ui,
-			playlist,
-			is_playing: Arc::new(Mutex::new(false)),
+		Win {
+			model,
+			widgets: Widgets {
+				counter_label,
+				minus_button,
+				plus_button,
+				window,
+			},
 		}
-	}
-	
-	fn connect_open(&self) {
-		let playlist = self.playlist.clone();
-		let window = self.ui.window.clone();
-		
-		self.ui.toolbar.open_button.connect_clicked(move |_| {
-			for file in MusicApp::show_open_dialog(&window) {
-				playlist.add(&file);
-			}
-		});
-	}
-	
-	fn connect_save(&self) {
-		let playlist = self.playlist.clone();
-		let window = self.ui.window.clone();
-		
-		self.ui.toolbar.save_button.connect_clicked(move |_| {
-			MusicApp::show_save_dialog(&window, &playlist);
-		});
-	}
-	
-	fn connect_next(&self) {
-		let playlist = self.playlist.clone();
-		let cover = self.ui.cover.clone();
-		let is_playing = self.is_playing.clone();
-		self.ui.toolbar.next_button.connect_clicked(move |_| {
-			playlist.next_song();
-			// Force player to play new song
-			*is_playing.lock().unwrap() = playlist.play(&false);
-			if *is_playing.lock().unwrap() {
-				MusicApp::set_cover(&playlist, &cover);
-			}
-		});
-	}
-	
-	fn connect_previous(&self) {
-		let playlist = self.playlist.clone();
-		let cover = self.ui.cover.clone();
-		let is_playing = self.is_playing.clone();
-		self.ui.toolbar.previous_button.connect_clicked(move |_| {
-			playlist.previous_song();
-			// Force player to play new song
-			*is_playing.lock().unwrap() = playlist.play(&false);
-			if *is_playing.lock().unwrap() {
-				MusicApp::set_cover(&playlist, &cover);
-			}
-		});
-	}
-	
-	fn connect_remove(&self) {
-		let playlist = self.playlist.clone();
-		let cover = self.ui.cover.clone();
-		let is_playing = self.is_playing.clone();
-		self.ui.toolbar.remove_button.connect_clicked(move |_| {
-			let state = *is_playing.lock().unwrap();
-			*is_playing.lock().unwrap() = playlist.remove_selection(&state);
-			MusicApp::set_cover(&playlist, &cover);
-		});
-	}
-	
-	fn connect_quit(&self) {
-		let window = self.ui.window.clone();
-		self.ui.toolbar.quit_button.connect_clicked(move |_| {
-			unsafe { window.destroy(); }
-		});
-	}
-	
-	fn connect_play(&self) {
-		let cover = self.ui.cover.clone();
-		let playlist = self.playlist.clone();
-		let is_playing = self.is_playing.clone();
-		
-		self.ui.toolbar.play_button.connect_clicked(move |_| {
-			let state = *is_playing.lock().unwrap();
-			*is_playing.lock().unwrap() = playlist.play(&state);
-			if *is_playing.lock().unwrap() {
-				MusicApp::set_cover(&playlist, &cover);
-			}
-		});
-		
-		let playlist = self.playlist.clone();
-		let ui = self.ui.clone();
-		let is_playing = self.is_playing.clone();
-		let cover = self.ui.cover.clone();
-		
-		glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
-			if *is_playing.lock().unwrap() {
-				let m_duration = playlist.duration();
-				let m_current_time = playlist.current_time();
-				
-				ui.adjustment.set_upper(m_duration as f64);
-				ui.adjustment.set_value(m_current_time as f64);
-				ui.duration_label.set_label(&format!("{} / {}", MusicApp::milli_to_string(m_current_time), MusicApp::milli_to_string(m_duration)));
-				ui.toolbar.play_button.set_image(Some(&ui.pause));
-			} else {
-				ui.toolbar.play_button.set_image(Some(&ui.play));
-				MusicApp::set_cover(&playlist, &cover);
-			}
-			Continue(true)
-		});
-	}
-	
-	fn milli_to_string(milli: u64) -> String {
-		let mut seconds = milli / 1000;
-		let minutes = seconds / 60;
-		seconds = seconds - minutes * 60;
-		format!("{}:{}", minutes, seconds)
-	}
-	
-	fn connect_stop(&self) {
-		let playlist = self.playlist.clone();
-		let cover = self.ui.cover.clone();
-		self.ui.toolbar.stop_button.connect_clicked(move |_| {
-			playlist.stop();
-			cover.hide();
-		});
-	}
-	
-	fn set_cover(playlist: &Playlist, cover: &Image) {
-		let res = playlist.get_pixbuf();
-		match res {
-			Ok(pix) => {
-				cover.set_from_pixbuf(Some(&pix));
-			}
-			Err(_) => {
-				cover.clear();
-			}
-		}
-		cover.show();
-	}
-	
-	fn show_open_dialog(parent: &ApplicationWindow) -> Vec<PathBuf> {
-		let mut files = vec![];
-		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
-		
-		let mp3_filter = FileFilter::new();
-		mp3_filter.add_mime_type("audio/mp3");
-		mp3_filter.set_name(Some("MP3 audio file"));
-		dialog.add_filter(&mp3_filter);
-		
-		let m3u_filter = FileFilter::new();
-		m3u_filter.add_mime_type("audio/m3u");
-		m3u_filter.set_name(Some("M3U audio playlist"));
-		dialog.add_filter(&m3u_filter);
-		
-		dialog.set_select_multiple(true);
-		dialog.add_button("Cancel", ResponseType::Cancel);
-		dialog.add_button("Accept", ResponseType::Accept);
-		let result = dialog.run();
-		
-		if result == ResponseType::Accept {
-			files = dialog.filenames();
-		}
-		unsafe { dialog.destroy(); }
-		files
-	}
-	
-	fn show_save_dialog(parent: &ApplicationWindow, playlist: &Rc<Playlist>) {
-		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
-		
-		dialog.set_action(FileChooserAction::Save);
-		dialog.add_button("Cancel", ResponseType::Cancel);
-		dialog.add_button("Accept", ResponseType::Accept);
-		let result = dialog.run();
-		
-		if result == ResponseType::Accept {
-			let path = dialog.filename().unwrap();
-			playlist.save_playlist(&path);
-		}
-		unsafe { dialog.destroy(); }
 	}
 }
 
-
 fn main() {
-	gst::init().expect("gstreamer initialization failed");
-	
-	let music_player = Application::builder()
-		.application_id("music-player")
-		.build();
-	
-	music_player.connect_activate(|app| {
-		let music_app = MusicApp::new(app);
-		music_app.connect_open();
-		music_app.connect_save();
-		music_app.connect_quit();
-		music_app.connect_play();
-		music_app.connect_remove();
-		music_app.connect_stop();
-		music_app.connect_next();
-		music_app.connect_previous();
-	});
-	
-	music_player.run();
+	Win::run(()).expect("Win::run failed");
 }

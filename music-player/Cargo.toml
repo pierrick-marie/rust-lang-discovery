@@ -7,10 +7,8 @@ edition = "2021"
 
 [dependencies]
 gio = "0.15.10"
-gtk = "0.15.4"
 gdk-pixbuf = "0.15.10"
 id3 = "1.0.2"
-gtk-sys = "0.15.3"
 crossbeam = "0.8.1"
 pulse-simple = "1.0.1"
 simplemad = "0.9.0"
@@ -18,3 +16,7 @@ m3u = "1.0.0"
 gstreamer = "0.18.6"
 gstreamer-player = "0.18.0"
 
+gtk = "^0.15.0"
+gtk-sys = "^0.15.0"
+relm = "^0.23.0"
+relm-derive = "^0.23.0"
