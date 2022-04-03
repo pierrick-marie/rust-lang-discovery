@@ -38,7 +38,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use gio::glib;
 
-use gtk::{Button, Inhibit, Image, Adjustment, Label, Window, WindowType, ApplicationWindow, FileChooserDialog, FileChooserAction, FileFilter, ResponseType, Scale, IconSize, SeparatorToolItem};
+use gtk::{Adjustment, ApplicationWindow, Button, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Inhibit, Label, ResponseType, Scale, SeparatorToolItem, Window, WindowType};
 use gtk::prelude::*;
 use gtk::prelude::{
 	ButtonExt,
@@ -52,43 +52,29 @@ use relm::{connect, Relm, Update, Widget, WidgetTest};
 
 pub mod playlist;
 use playlist::Playlist;
-mod toolbar;
 use crate::toolbar::MusicToolbar;
+mod toolbar;
+mod song;
+mod view;
+use view::View;
 
 struct Model {
 	playlist: Playlist,
-	// counter: i32,
+}
+
+struct MusicApp {
+	model: Model,
+	view: View,
 }
 
 #[derive(Msg)]
 enum Msg {
-	// Decrement,
-	// Increment,
 	Open,
+	Play,
 	Quit,
 }
 
-// Create the structure that holds the widgets used in the view.
-#[derive(Clone)]
-struct Widgets {
-	toolbar: MusicToolbar,
-	cover: Image,
-	adjustment: Adjustment,
-	duration_label: Label,
-	play: Image,
-	pause: Image,
-	// counter_label: Label,
-	// minus_button: Button,
-	// plus_button: Button,
-	window: Window,
-}
-
-struct Win {
-	model: Model,
-	widgets: Widgets,
-}
-
-impl Update for Win {
+impl Update for MusicApp {
 	// Specify the model used for this widget.
 	type Model = Model;
 	// Specify the model parameter used to init the model.
@@ -108,31 +94,49 @@ impl Update for Win {
 		
 		match event {
 			Msg::Open => {
-				for file in Widgets::show_open_dialog(&self.widgets.window) {
+				for file in self.show_open_dialog() {
 					self.model.playlist.add(&file);
 				}
 			}
-			// Msg::Decrement => {
-			// 	self.model.counter -= 1;
-			// 	// Manually update the view.
-			// 	label.set_text(&self.model.counter.to_string());
-			// },
-			// Msg::Increment => {
-			// 	self.model.counter += 1;
-			// 	label.set_text(&self.model.counter.to_string());
-			// },
+			Msg::Play => {
+				self.view.is_playing = self.model.playlist.play(&self.view.is_playing);
+				if self.view.is_playing {
+					MusicApp::update_cover(&self.view.cover, &self.model.playlist);
+				}
+				
+				let playlist = &self.model.playlist;
+				let widgets = &self.view;
+				let is_playing = &self.view.is_playing;
+				let cover = &self.view.cover;
+				
+				// glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
+				// 	if *is_playing {
+				// 		let m_duration = playlist.duration();
+				// 		let m_current_time = playlist.current_time();
+				//
+				// 		widgets.adjustment.set_upper(m_duration as f64);
+				// 		widgets.adjustment.set_value(m_current_time as f64);
+				// 		widgets.duration_label.set_label(&format!("{} / {}", Win::milli_to_string(m_current_time), Win::milli_to_string(m_duration)));
+				// 		widgets.toolbar.play_button.set_image(Some(&widgets.pause));
+				// 	} else {
+				// 		widgets.toolbar.play_button.set_image(Some(&widgets.play));
+				// 		Win::update_cover(&cover, &playlist);
+				// 	}
+				// 	Continue(true)
+				// });
+			}
 			Msg::Quit => gtk::main_quit(),
 		}
 	}
 }
 
-impl Widget for Win {
+impl Widget for MusicApp {
 	// Specify the type of the root widget.
 	type Root = Window;
 	
 	// Return the root widget.
 	fn root(&self) -> Self::Root {
-		self.widgets.window.clone()
+		self.view.window.clone()
 	}
 	
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
@@ -174,12 +178,13 @@ impl Widget for Win {
 		// Send the message Increment when the button is clicked.
 		// connect!(relm, plus_button, connect_clicked(_), Msg::Increment);
 		// connect!(relm, minus_button, connect_clicked(_), Msg::Decrement);
+		connect!(relm, toolbar.play_button, connect_clicked(_), Msg::Play);
 		connect!(relm, toolbar.open_button, connect_clicked(_), Msg::Open);
 		connect!(relm, window, connect_delete_event(_, _), return (Some(Msg::Quit), Inhibit(false)));
 		
-		Win {
+		MusicApp {
 			model,
-			widgets: Widgets {
+			view: View {
 				toolbar,
 				cover,
 				adjustment,
@@ -187,15 +192,16 @@ impl Widget for Win {
 				play,
 				pause,
 				window,
+				is_playing: false,
 			},
 		}
 	}
 }
 
-impl Widgets {
-	fn show_open_dialog(parent: &Window) -> Vec<PathBuf> {
+impl MusicApp {
+	fn show_open_dialog(&self) -> Vec<PathBuf> {
 		let mut files = vec![];
-		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(parent), FileChooserAction::Open);
+		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(&self.view.window), FileChooserAction::Open);
 		
 		let mp3_filter = FileFilter::new();
 		mp3_filter.add_mime_type("audio/mp3");
@@ -218,8 +224,28 @@ impl Widgets {
 		unsafe { dialog.destroy(); }
 		files
 	}
+	
+	fn update_cover(cover: &Image, playlist: &Playlist) {
+		let res = playlist.get_pixbuf();
+		match res {
+			Ok(pix) => {
+				cover.set_from_pixbuf(Some(&pix));
+			}
+			Err(_) => {
+				cover.clear();
+			}
+		}
+		cover.show();
+	}
+	
+	fn milli_to_string(milli: u64) -> String {
+		let mut seconds = milli / 1000;
+		let minutes = seconds / 60;
+		seconds = seconds - minutes * 60;
+		format!("{}:{}", minutes, seconds)
+	}
 }
 
 fn main() {
-	Win::run(()).expect("Win::run failed");
+	MusicApp::run(()).expect("Win::run failed");
 }
