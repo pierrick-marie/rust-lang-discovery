@@ -191,7 +191,7 @@ impl Playlist {
 	}
 	
 	pub fn play(&self, state: &bool) -> bool {
-		let mut path;
+		let path;
 		let res_path = self.selected_path();
 		match res_path {
 			Ok(res) => { path = format!("{}{}", URI, res); }
@@ -345,7 +345,7 @@ impl Playlist {
 		}
 		let path = path.to_str().unwrap_or_default();
 		
-		let mut paths = self.paths.clone();
+		let paths = self.paths.clone();
 		paths.lock().unwrap().push(path.to_string());
 		
 		self.model.set_value(&row, PATH_COLUMN, &path.to_value());

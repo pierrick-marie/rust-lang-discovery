@@ -25,7 +25,6 @@ extern crate crossbeam;
 extern crate pulse_simple;
 extern crate simplemad;
 
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
