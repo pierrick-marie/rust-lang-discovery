@@ -1,8 +1,0 @@
-2022-03-11 09h 31m : points = 52 lines = 3
-2022-03-11 09h 31m : points = 42 lines = 6
-2022-03-11 09h 31m : points = 32 lines = 12
-2022-03-11 09h 37m : points = 25 lines = 12
-2022-03-11 09h 33m : points = 9 lines = 7
-2022-03-11 09h 37m : points = 0 lines = 0
-2022-03-11 09h 34m : points = 0 lines = 0
-2022-03-11 09h 34m : points = 0 lines = 0
