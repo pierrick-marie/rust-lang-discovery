@@ -50,13 +50,17 @@ use gtk::Orientation::Vertical;
 use relm_derive::Msg;
 use relm::{connect, Relm, Update, Widget, WidgetTest};
 
-pub mod playlist;
-use playlist::Playlist;
-use crate::toolbar::MusicToolbar;
-mod toolbar;
-mod song;
+mod model;
 mod view;
-use view::View;
+
+use crate::view::main_window;
+use crate::view::playlist;
+use crate::view::toolbar;
+
+use playlist::Playlist;
+use main_window::MusicWindow;
+use toolbar::MusicToolbar;
+use crate::model::Song;
 
 struct Model {
 	playlist: Playlist,
@@ -64,7 +68,7 @@ struct Model {
 
 struct MusicApp {
 	model: Model,
-	view: View,
+	view: MusicWindow,
 }
 
 #[derive(Msg)]
@@ -95,7 +99,9 @@ impl Update for MusicApp {
 		match event {
 			Msg::Open => {
 				for file in self.show_open_dialog() {
-					self.model.playlist.add(&file);
+					// self.model.playlist.add(&file);
+					let song = Song::new(file.as_path());
+					println!("{:#?}", song);
 				}
 			}
 			Msg::Play => {
@@ -140,7 +146,7 @@ impl Widget for MusicApp {
 	}
 	
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
-		// Create the view using the normal GTK+ method calls.
+		// Create the music_window using the normal GTK+ method calls.
 		let main_container = gtk::Box::new(Vertical, 3);
 		
 		let toolbar = MusicToolbar::new();
@@ -184,7 +190,7 @@ impl Widget for MusicApp {
 		
 		MusicApp {
 			model,
-			view: View {
+			view: MusicWindow {
 				toolbar,
 				cover,
 				adjustment,
