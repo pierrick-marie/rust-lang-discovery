@@ -113,6 +113,8 @@ enum Msg {
 	Stop,
 	Remove,
 	UpView,
+	Next,
+	Prev,
 }
 
 impl Model {
@@ -215,6 +217,18 @@ impl Update for MusicApp {
 				self.model.stop();
 				self.view.stop();
 			}
+			Msg::Next => {
+				self.view.next_selected_music();
+				self.model.current_song.song = None;
+				self.model.current_song.state = Stopped;
+				self.update(Msg::Play);
+			}
+			Msg::Prev => {
+				self.view.prev_selected_music();
+				self.model.current_song.song = None;
+				self.model.current_song.state = Stopped;
+				self.update(Msg::Play);
+			}
 			Msg::UpView => {
 				match self.model.current_song.state {
 					Playing => {
@@ -250,6 +264,8 @@ impl Widget for MusicApp {
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
 		let view = MainWindow::new();
 		
+		connect!(relm, view.toolbar.previous_button, connect_clicked(_), Msg::Prev);
+		connect!(relm, view.toolbar.next_button, connect_clicked(_), Msg::Next);
 		connect!(relm, view.toolbar.remove_button, connect_clicked(_), Msg::Remove);
 		connect!(relm, view.toolbar.stop_button, connect_clicked(_), Msg::Stop);
 		connect!(relm, view.toolbar.play_button, connect_clicked(_), Msg::Play);

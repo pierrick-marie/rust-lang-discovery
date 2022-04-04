@@ -137,6 +137,24 @@ impl MainWindow {
 		}
 	}
 	
+	pub fn next_selected_music(&self) {
+		let selection = self.treeview.selection();
+		if let Some((_, iter)) = selection.selected() {
+			if self.model.iter_next(&iter) {
+				selection.select_iter(&iter);
+			}
+		}
+	}
+	
+	pub fn prev_selected_music(&self) {
+		let selection = self.treeview.selection();
+		if let Some((_, iter)) = selection.selected() {
+			if self.model.iter_previous(&iter) {
+				selection.select_iter(&iter);
+			}
+		}
+	}
+	
 	fn create_columns(treeview: &TreeView) {
 		Self::add_pixbuf_column(treeview, THUMBNAIL_COLUMN as i32, Visible);
 		Self::add_text_column(treeview, "Title", TITLE_COLUMN as i32);
