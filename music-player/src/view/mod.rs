@@ -124,12 +124,6 @@ impl MainWindow {
 		}
 	}
 	
-	pub fn resize_window(&self) {
-		self.treeview.queue_resize();
-		self.scrolled_window.queue_resize();
-		self.window.queue_resize();
-	}
-	
 	pub fn add_music(&self, music: &Music) {
 		let row = self.model.append();
 		

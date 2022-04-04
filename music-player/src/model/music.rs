@@ -44,7 +44,7 @@ pub struct Music {
 
 impl Music {
 	
-	pub fn new(path: &Path) -> Self {
+	pub fn parse_file(path: &Path) -> Option<Music> {
 		let uri = format!("{}{}", URI, path.clone().to_string_lossy().to_string());
 		
 		if let Ok(tag) = Tag::read_from_path(path.clone()) {
@@ -58,7 +58,7 @@ impl Music {
 			let track_value = format!("{} / {}", track, total_tracks);
 			let covers = Music::get_pixbuf(&tag);
 			
-			return Music {
+			return Some(Music {
 				album,
 				artist,
 				cover: covers.clone().0,
@@ -68,20 +68,10 @@ impl Music {
 				track: track_value,
 				uri,
 				year,
-			};
+			});
 		}
 		// else
-		return Music {
-			album: "".to_string(),
-			artist: "".to_string(),
-			cover: None,
-			genre: "".to_string(),
-			thumbnail: None,
-			title: path.to_str().unwrap_or("(no title)").to_string(),
-			track: "".to_string(),
-			uri,
-			year: "".to_string(),
-		};
+		return None;
 	}
 	
 	/*

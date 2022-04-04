@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 mod model;
+use std::path::PathBuf;
 use crate::model::*;
 use crate::model::music;
 use model::State::*;
@@ -63,6 +64,33 @@ pub enum Msg {
 	Prev,
 }
 
+impl MusicApp {
+	
+	fn add_mp3(&mut self, music: &Music) {
+		self.view.add_music(&music);
+		self.model.add_music(&music);
+	}
+	
+	fn add_m3u(&mut self, path: &PathBuf) {
+		let filename = path.to_string_lossy().to_string();
+		if let Ok(mut reader) = m3u::Reader::open(filename) {
+			let read_playlist: Vec<_> = reader.entries().map(|entry| entry.unwrap()).collect();
+			for song in read_playlist {
+				match song {
+					m3u::Entry::Path(path) => {
+						if let Some(music) = Music::parse_file(path.as_path()) {
+							self.add_mp3(&music);
+						}
+					}
+					_ => {}
+				}
+			}
+		} else {
+			// It's not a m3u file
+		}
+	}
+}
+
 impl Update for MusicApp {
 	// Specify the song used for this widget.
 	type Model = MusicModel;
@@ -83,11 +111,16 @@ impl Update for MusicApp {
 		match event {
 			Msg::Open => {
 				for file in self.view.show_open_dialog() {
-					let music = Music::new(file.as_path());
-					self.view.add_music(&music);
-					self.model.add_music(&music);
+					if file.to_string_lossy().to_string().ends_with(".mp3") {
+						if let Some(music) = Music::parse_file(file.as_path()) {
+							self.add_mp3(&music);
+						}
+					} else {
+						if file.to_string_lossy().to_string().ends_with(".m3u") {
+							self.add_m3u(&file);
+						}
+					}
 				}
-				self.view.resize_window();
 			}
 			Msg::Play => {
 				if let Ok(uri) = self.view.get_selected_music() {
