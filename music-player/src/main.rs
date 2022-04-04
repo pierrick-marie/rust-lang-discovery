@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 mod model;
-use std::path::PathBuf;
+
 use crate::model::*;
 use crate::model::music;
 use model::State::*;
@@ -26,16 +26,23 @@ use music::Music;
 mod view;
 use view::MainWindow;
 
+use std::io::Write;
+use std::fs;
+use std::fs::File;
+use std::path::PathBuf;
+
 extern crate gtk;
 extern crate gtk_sys;
 use gtk::{
 	Window,
 };
+use gtk::gdk::keys::constants::Music;
 use gtk::prelude::*;
 use gtk::prelude::{
 	ButtonExt,
 	WidgetExt,
 };
+use m3u::Entry::Path;
 
 extern crate relm;
 extern crate relm_derive;
@@ -62,6 +69,7 @@ pub enum Msg {
 	UpView,
 	Next,
 	Prev,
+	Save,
 }
 
 impl MusicApp {
@@ -87,6 +95,22 @@ impl MusicApp {
 			}
 		} else {
 			// It's not a m3u file
+		}
+	}
+	
+	pub fn save_playlist(&self, path: &PathBuf) {
+		let mut file = File::create(path.to_string_lossy().to_string()).unwrap();
+		file.write_all(b"").expect("Failed to clean content of the playlist file");
+		let mut writer = m3u::Writer::new(&mut file);
+		let mut entries = vec![];
+		
+		for song in self.model.songs() {
+			let path = &song.0.replace(music::URI, "");
+			entries.push(m3u::path_entry(fs::canonicalize(path).unwrap()));
+		}
+		
+		for entry in &entries {
+			writer.write_entry(entry).unwrap();
 		}
 	}
 }
@@ -120,6 +144,14 @@ impl Update for MusicApp {
 							self.add_m3u(&file);
 						}
 					}
+				}
+			}
+			Msg::Save => {
+				if let Some(path) = self.view.show_save_dialog() {
+					self.save_playlist(&path);
+					self.view.show_msg_dialog(&"Playlist saved".to_string());
+				} else {
+					self.view.show_error_dialog(&"Impossible to save playlist".to_string());
 				}
 			}
 			Msg::Play => {
@@ -187,6 +219,7 @@ impl Widget for MusicApp {
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
 		let view = MainWindow::new();
 		
+		connect!(relm, view.toolbar().save_button(), connect_clicked(_), Msg::Save);
 		connect!(relm, view.toolbar().previous_button(), connect_clicked(_), Msg::Prev);
 		connect!(relm, view.toolbar().next_button(), connect_clicked(_), Msg::Next);
 		connect!(relm, view.toolbar().remove_button(), connect_clicked(_), Msg::Remove);

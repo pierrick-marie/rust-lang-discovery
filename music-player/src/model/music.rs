@@ -26,7 +26,7 @@ use gtk::prelude::*;
 
 const THUMBNAIL_SIZE: i32 = 64;
 const IMAGE_SIZE: i32 = 256;
-const URI: &str = "file://";
+pub const URI: &str = "file://";
 const INTERP_HYPER: InterpType = InterpType::Hyper;
 
 #[derive(Debug, Clone)]

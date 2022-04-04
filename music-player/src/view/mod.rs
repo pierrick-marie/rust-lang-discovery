@@ -21,7 +21,7 @@ use gdk_pixbuf::{
 	Pixbuf,
 };
 use gtk::prelude::*;
-use gtk::{Adjustment, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, SeparatorToolItem, Window, WindowType, CellRendererPixbuf, CellRendererText, ListStore, TreeView, TreeViewColumn, ScrolledWindow};
+use gtk::{Adjustment, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, SeparatorToolItem, Window, WindowType, CellRendererPixbuf, CellRendererText, ListStore, TreeView, TreeViewColumn, ScrolledWindow, MessageDialog, DialogFlags, MessageType, ButtonsType};
 use std::path::{PathBuf};
 use gio::glib::value::{ValueTypeMismatchOrNoneError};
 
@@ -219,6 +219,38 @@ impl MainWindow {
 		view_column.pack_start(&cell, true);
 		view_column.add_attribute(&cell, "text", column);
 		treeview.append_column(&view_column);
+	}
+	
+	pub fn show_save_dialog(&self) -> Option<PathBuf> {
+		let mut file = None;
+		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(&self.window), FileChooserAction::Open);
+		
+		dialog.set_action(FileChooserAction::Save);
+		dialog.add_button("Cancel", ResponseType::Cancel);
+		dialog.add_button("Accept", ResponseType::Accept);
+		let result = dialog.run();
+		
+		if result == ResponseType::Accept {
+			file = dialog.filename();
+		}
+		unsafe { dialog.destroy(); }
+		file
+	}
+	
+	pub fn show_msg_dialog(&self, msg: &String) {
+		let dialog = MessageDialog::new(Some(&self.window), DialogFlags::MODAL, MessageType::Info, ButtonsType::Ok, msg);
+		
+		dialog.run();
+		
+		unsafe { dialog.destroy(); }
+	}
+	
+	pub fn show_error_dialog(&self, msg: &String) {
+		let dialog = MessageDialog::new(Some(&self.window), DialogFlags::MODAL, MessageType::Error, ButtonsType::Ok, msg);
+		
+		dialog.run();
+		
+		unsafe { dialog.destroy(); }
 	}
 	
 	pub fn show_open_dialog(&self) -> Vec<PathBuf> {
