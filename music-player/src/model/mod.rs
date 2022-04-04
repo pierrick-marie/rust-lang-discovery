@@ -23,7 +23,6 @@ extern crate pulse_simple;
 extern crate simplemad;
 
 use std::collections::HashMap;
-use gio::glib::SeekType::Cur;
 use gtk::prelude::*;
 
 pub mod music;

@@ -17,7 +17,6 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 mod model;
 
-use crate::model::*;
 use crate::model::music;
 use model::State::*;
 use model::MusicModel;
@@ -36,13 +35,11 @@ extern crate gtk_sys;
 use gtk::{
 	Window,
 };
-use gtk::gdk::keys::constants::Music;
 use gtk::prelude::*;
 use gtk::prelude::{
 	ButtonExt,
 	WidgetExt,
 };
-use m3u::Entry::Path;
 
 extern crate relm;
 extern crate relm_derive;

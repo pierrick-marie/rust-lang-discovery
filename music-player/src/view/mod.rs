@@ -21,7 +21,7 @@ use gdk_pixbuf::{
 	Pixbuf,
 };
 use gtk::prelude::*;
-use gtk::{Adjustment, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, SeparatorToolItem, Window, WindowType, CellRendererPixbuf, CellRendererText, ListStore, TreeView, TreeViewColumn, ScrolledWindow, MessageDialog, DialogFlags, MessageType, ButtonsType};
+use gtk::{Adjustment, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, SeparatorToolItem, Window, WindowType, CellRendererPixbuf, CellRendererText, ListStore, TreeView, TreeViewColumn, MessageDialog, DialogFlags, MessageType, ButtonsType};
 use std::path::{PathBuf};
 use gio::glib::value::{ValueTypeMismatchOrNoneError};
 
@@ -46,7 +46,6 @@ pub struct MainWindow {
 	play: Image,
 	pause: Image,
 	treeview: TreeView,
-	scrolled_window: ScrolledWindow,
 	model: ListStore,
 	window: Window,
 }
@@ -118,7 +117,6 @@ impl MainWindow {
 			play,
 			toolbar,
 			model,
-			scrolled_window,
 			treeview,
 			window,
 		}
@@ -284,10 +282,6 @@ impl MainWindow {
 		let minutes = seconds / 60;
 		seconds = seconds - minutes * 60;
 		format!("{}:{:02}", minutes, seconds)
-	}
-	
-	pub fn treeview(&self) -> &TreeView {
-		&self.treeview
 	}
 	
 	pub fn window(&self) -> &Window {
