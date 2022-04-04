@@ -1,12 +1,25 @@
-use crate::{Music, MusicToolbar};
-use crate::Playlist;
+/* Copyright 2022 Pierrick MARIE
+
+This file is part of rust-discovery
+
+LCS is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Rust-discovery is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use gdk_pixbuf::{
 	InterpType,
 	Pixbuf,
 	PixbufLoader,
 };
-
 use gtk::prelude::*;
 use gtk::{Adjustment, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, ScrollablePolicy, SeparatorToolItem, Window, WindowType};
 use gtk::{
@@ -17,10 +30,12 @@ use gtk::{
 	TreeView,
 	TreeViewColumn
 };
-
 use std::path::{Path, PathBuf};
-
 use gio::glib::value::{ValueTypeMismatchOrNoneError};
+
+use crate::view::MusicToolbar;
+use crate::model::music::Music;
+use crate::model;
 
 use self::Visibility::*;
 
@@ -120,14 +135,14 @@ impl MainWindow {
 	pub fn add_music(&self, music: &Music) {
 		let row = self.model.append();
 		
-		self.model.set_value(&row, TITLE_COLUMN, &music.title.to_value());
-		self.model.set_value(&row, ARTIST_COLUMN, &music.artist.to_value());
-		self.model.set_value(&row, ALBUM_COLUMN, &music.album.to_value());
-		self.model.set_value(&row, GENRE_COLUMN, &music.genre.to_value());
-		self.model.set_value(&row, YEAR_COLUMN, &music.year.to_value());
-		self.model.set_value(&row, TRACK_COLUMN, &music.track.to_value());
+		self.model.set_value(&row, TITLE_COLUMN, &music.title().to_value());
+		self.model.set_value(&row, ARTIST_COLUMN, &music.artist().to_value());
+		self.model.set_value(&row, ALBUM_COLUMN, &music.album().to_value());
+		self.model.set_value(&row, GENRE_COLUMN, &music.genre().to_value());
+		self.model.set_value(&row, YEAR_COLUMN, &music.year().to_value());
+		self.model.set_value(&row, TRACK_COLUMN, &music.track().to_value());
 		self.model.set_value(&row, URI_COLUMN, &music.uri().to_value());
-		self.model.set_value(&row, THUMBNAIL_COLUMN, &music.thumbnail.as_ref().unwrap().to_value());
+		self.model.set_value(&row, THUMBNAIL_COLUMN, &music.thumbnail().as_ref().unwrap().to_value());
 	}
 	
 	pub fn remove_selected_music(&self) {
@@ -167,7 +182,7 @@ impl MainWindow {
 	
 	pub fn play(&self, music: &Music) {
 		self.toolbar.play_button.set_image(Some(&self.pause));
-		self.cover.set_from_pixbuf(music.cover.as_ref());
+		self.cover.set_from_pixbuf(music.cover().as_ref());
 		self.cover.show();
 	}
 	

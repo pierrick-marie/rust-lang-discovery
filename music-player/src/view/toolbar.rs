@@ -67,6 +67,8 @@ impl MusicToolbar {
 
 		let quit_button = Button::from_icon_name(Some("gtk-quit"), IconSize::LargeToolbar);
 		toolbar.add(&quit_button);
+		
+		toolbar.add(&SeparatorToolItem::new());
 
 		MusicToolbar {
 			open_button,

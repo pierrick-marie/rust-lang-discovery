@@ -19,16 +19,12 @@ extern crate gdk_pixbuf;
 extern crate id3;
 
 use std::fs::File;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{fs};
 
-use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
-
-use gio::glib::value::{ValueTypeMismatchOrNoneError};
-
-use crate::gtk::prelude::*;
-use gtk::{CellRendererPixbuf, CellRendererText, ListStore, TreeIter, TreeView, TreeViewColumn};
+// extern crate gtk;
+// extern crate gtk_sys;
+// use crate::gtk::prelude::*;
 
 use id3::{Tag, TagLike};
 
@@ -37,6 +33,24 @@ use gst::ClockTime;
 
 extern crate gstreamer as gst;
 extern crate gstreamer_player as gst_player;
+
+use gdk_pixbuf::{
+	InterpType,
+	Pixbuf,
+	PixbufLoader,
+};
+use gtk::prelude::*;
+use gtk::{Adjustment, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, ScrollablePolicy, SeparatorToolItem, Window, WindowType};
+use gtk::{
+	CellRendererPixbuf,
+	CellRendererText,
+	ListStore,
+	TreeIter,
+	TreeView,
+	TreeViewColumn
+};
+use std::path::{Path, PathBuf};
+use gio::glib::value::{ValueTypeMismatchOrNoneError};
 
 const THUMBNAIL_COLUMN: u32 = 0;
 const TITLE_COLUMN: u32 = 1;

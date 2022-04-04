@@ -15,6 +15,22 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
+
+
+mod view;
+mod model;
+
+
+use crate::model::music;
+use model::State::*;
+use model::MusicModel;
+use model::CurrentSong;
+use music::Music;
+
+use crate::view::{main_window, playlist, toolbar};
+use view::main_window::MainWindow;
+
+
 #[feature(proc_macro)]
 extern crate gtk;
 extern crate gtk_sys;
@@ -29,19 +45,8 @@ extern crate crossbeam;
 extern crate pulse_simple;
 extern crate simplemad;
 
-extern crate gstreamer as gst;
-extern crate gstreamer_player as gst_player;
-use std::collections::HashMap;
-use gst::ClockTime;
-
-use std::rc::Rc;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use gio::ffi::g_socket_set_keepalive;
 use gio::glib;
-use gst::StreamStatusType::Stop;
-
 use gtk::{
 	Adjustment,
 	ApplicationWindow,
@@ -68,45 +73,15 @@ use gtk::prelude::{
 };
 use gtk::Orientation::Vertical;
 use relm_derive::Msg;
-use relm::{connect, Relm, Update, Widget, WidgetTest, interval};
+use relm::{connect, interval, Relm, Update, Widget, WidgetTest};
 
-mod model;
-mod view;
-
-use crate::view::main_window;
-use crate::view::toolbar;
-use crate::view::playlist;
-
-use playlist::Playlist;
-use main_window::MainWindow;
-use toolbar::MusicToolbar;
-use crate::model::Music;
-use self::State::*;
-
-enum State {
-	Playing,
-	Paused,
-	Stopped,
-}
-
-struct CurrentSong {
-	song: Option<Music>,
-	state: State,
-}
-
-struct Model {
-	songs: HashMap<String, Music>,
-	current_song: CurrentSong,
-	player: gst_player::Player,
-}
-
-struct MusicApp {
-	model: Model,
+pub struct MusicApp {
+	model: MusicModel,
 	view: MainWindow,
 }
 
 #[derive(Msg)]
-enum Msg {
+pub enum Msg {
 	Open,
 	Play,
 	Quit,
@@ -117,65 +92,16 @@ enum Msg {
 	Prev,
 }
 
-impl Model {
-	pub fn play(&mut self, uri: &String) {
-		match self.current_song.state {
-			Playing => {
-				self.player.pause();
-				self.current_song.state = Paused;
-			}
-			Paused => {
-				self.player.play();
-				self.current_song.state = Playing
-			}
-			Stopped => {
-				self.player.set_uri(Some(uri.as_str()));
-				self.player.play();
-				self.current_song = CurrentSong {
-					song: Some(self.songs.get(uri.as_str()).unwrap().clone()),
-					state: Playing,
-				}
-			}
-		}
-	}
-	
-	pub fn stop(&mut self) {
-		self.player.stop();
-		self.current_song.state = Stopped;
-	}
-	
-	pub fn remove(&mut self, uri: String) {
-		if let Some(song) = self.songs.remove(uri.as_str()) {
-			if let Some(player_uri) = self.player.uri() {
-				if song.uri() == player_uri.as_str() {
-					self.player.stop();
-					self.current_song.song = None;
-					self.current_song.state = Stopped;
-				}
-			}
-		}
-	}
-}
-
 impl Update for MusicApp {
-	// Specify the model used for this widget.
-	type Model = Model;
-	// Specify the model parameter used to init the model.
+	// Specify the song used for this widget.
+	type Model = MusicModel;
+	// Specify the song parameter used to init the song.
 	type ModelParam = ();
 	// Specify the type of the messages sent to the update function.
 	type Msg = Msg;
 	
-	fn model(_: &Relm<Self>, _: ()) -> Model {
-		let dispatcher = gst_player::PlayerGMainContextSignalDispatcher::new(None);
-		let player = gst_player::Player::new(None, Some(&dispatcher.upcast::<gst_player::PlayerSignalDispatcher>()));
-		Model {
-			songs: HashMap::new(),
-			current_song: CurrentSong {
-				song: None,
-				state: Stopped,
-			},
-			player,
-		}
+	fn model(_: &Relm<Self>, _: ()) -> MusicModel {
+		MusicModel::new()
 	}
 	
 	fn subscriptions(&mut self, relm: &Relm<Self>) {
@@ -188,7 +114,7 @@ impl Update for MusicApp {
 				for file in self.view.show_open_dialog() {
 					let music = Music::new(file.as_path());
 					self.view.add_music(&music);
-					self.model.songs.insert(music.uri(), music);
+					self.model.add_music(&music);
 				}
 				self.view.treeview.queue_resize();
 				self.view.window.queue_resize();
@@ -196,9 +122,9 @@ impl Update for MusicApp {
 			Msg::Play => {
 				if let Ok(uri) = self.view.get_selected_music() {
 					self.model.play(&uri);
-					match self.model.current_song.state {
+					match self.model.current_song().state() {
 						Playing => {
-							self.view.play(self.model.current_song.song.as_ref().unwrap());
+							self.view.play(self.model.current_song().song().unwrap());
 						}
 						Paused => {
 							self.view.pause();
@@ -209,7 +135,7 @@ impl Update for MusicApp {
 			}
 			Msg::Remove => {
 				if let Ok(uri) = self.view.get_selected_music() {
-					self.model.remove(uri);
+					self.model.remove_music(uri);
 					self.view.remove_selected_music();
 				}
 			}
@@ -219,30 +145,26 @@ impl Update for MusicApp {
 			}
 			Msg::Next => {
 				self.view.next_selected_music();
-				self.model.current_song.song = None;
-				self.model.current_song.state = Stopped;
+				self.model.current_song().set_song(None);
+				self.model.current_song().set_state(Stopped);
 				self.update(Msg::Play);
 			}
 			Msg::Prev => {
 				self.view.prev_selected_music();
-				self.model.current_song.song = None;
-				self.model.current_song.state = Stopped;
+				self.model.current_song().set_song(None);
+				self.model.current_song().set_state(Stopped);
 				self.update(Msg::Play);
 			}
 			Msg::UpView => {
-				match self.model.current_song.state {
+				match self.model.current_song().state() {
 					Playing => {
-						if let Some(durration) = self.model.player.duration() {
-							if let Some(current_time) = self.model.player.position() {
-								self.view.update_duration(current_time.mseconds(), durration.mseconds());
-							}
-						}
+						self.view.update_duration(self.model.position(), self.model.duration());
 					}
 					Stopped => {
 						self.view.update_duration(0, 0);
 						self.view.stop();
 					}
-					_ => { }
+					_ => {}
 				}
 			}
 			Msg::Quit => {

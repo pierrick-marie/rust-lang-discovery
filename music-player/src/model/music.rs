@@ -1,3 +1,20 @@
+/* Copyright 2022 Pierrick MARIE
+
+This file is part of rust-discovery
+
+LCS is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Rust-discovery is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
+
 extern crate gdk_pixbuf;
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
 
@@ -7,10 +24,11 @@ use id3::{Tag, TagLike};
 use std::fs::File;
 use std::path::Path;
 use std::{fs};
+use std::os::unix::raw::time_t;
 
 use gtk::Image;
 
-use crate::gtk::prelude::*;
+use gtk::prelude::*;
 
 const THUMBNAIL_SIZE: i32 = 64;
 const IMAGE_SIZE: i32 = 256;
@@ -19,18 +37,19 @@ const INTERP_HYPER: InterpType = InterpType::Hyper;
 
 #[derive(Debug, Clone)]
 pub struct Music {
-	pub title: String,
-	pub artist: String,
-	pub album: String,
-	pub genre: String,
-	pub year: String,
-	pub track: String,
+	title: String,
+	artist: String,
+	album: String,
+	genre: String,
+	year: String,
+	track: String,
 	uri: String,
-	pub thumbnail: Option<Pixbuf>,
-	pub cover: Option<Pixbuf>,
+	thumbnail: Option<Pixbuf>,
+	cover: Option<Pixbuf>,
 }
 
 impl Music {
+	
 	pub fn new(path: &Path) -> Self {
 		let uri = format!("{}{}", URI, path.clone().to_string_lossy().to_string());
 		
@@ -90,7 +109,39 @@ impl Music {
 		(None, None)
 	}
 	
-	pub fn uri(&self) -> String {
-		self.uri.clone()
+	pub fn uri(&self) -> &String {
+		&self.uri
+	}
+	
+	pub fn title(&self) -> &String {
+		&self.title
+	}
+	
+	pub fn artist(&self) -> &String {
+		&self.artist
+	}
+	
+	pub fn album(&self) -> &String {
+		&self.album
+	}
+	
+	pub fn genre(&self) -> &String {
+		&self.genre
+	}
+	
+	pub fn year(&self) -> &String {
+		&self.year
+	}
+	
+	pub fn track(&self) -> &String {
+		&self.track
+	}
+	
+	pub fn thumbnail(&self) -> &Option<Pixbuf> {
+		&self.thumbnail
+	}
+	
+	pub fn cover(&self) -> &Option<Pixbuf> {
+		&self.cover
 	}
 }
