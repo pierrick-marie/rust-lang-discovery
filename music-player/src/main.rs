@@ -110,6 +110,7 @@ enum Msg {
 	Open,
 	Play,
 	Quit,
+	Stop,
 	UpDuration,
 }
 
@@ -133,6 +134,11 @@ impl Model {
 				}
 			}
 		}
+	}
+	
+	pub fn stop(&mut self) {
+		self.player.stop();
+		self.current_song.state = Stopped;
 	}
 }
 
@@ -184,6 +190,10 @@ impl Update for MusicApp {
 					}
 				}
 			}
+			Msg::Stop => {
+				self.model.stop();
+				self.view.stop();
+			}
 			Msg::UpDuration => {
 				match self.model.current_song.state {
 					Playing => {
@@ -193,7 +203,10 @@ impl Update for MusicApp {
 							}
 						}
 					}
-					_ => {}
+					Stopped => {
+						self.view.update_duration(0, 0);
+					}
+					_ => { }
 				}
 			}
 			Msg::Quit => {
@@ -215,7 +228,8 @@ impl Widget for MusicApp {
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
 		let view = MainWindow::new();
 		
-		// Send the message Increment when the button is clicked.
+		
+		connect!(relm, view.toolbar.stop_button, connect_clicked(_), Msg::Stop);
 		connect!(relm, view.toolbar.play_button, connect_clicked(_), Msg::Play);
 		connect!(relm, view.toolbar.open_button, connect_clicked(_), Msg::Open);
 		connect!(relm, view.toolbar.quit_button, connect_clicked(_), Msg::Quit);
