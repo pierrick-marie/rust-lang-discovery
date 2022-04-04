@@ -19,7 +19,7 @@ extern crate gdk_pixbuf;
 extern crate id3;
 
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{fs};
 
@@ -47,6 +47,7 @@ const YEAR_COLUMN: u32 = 5;
 const TRACK_COLUMN: u32 = 6;
 const PATH_COLUMN: u32 = 7;
 const PIXBUF_COLUMN: u32 = 8;
+
 const IMAGE_SIZE: i32 = 256;
 const THUMBNAIL_SIZE: i32 = 64;
 

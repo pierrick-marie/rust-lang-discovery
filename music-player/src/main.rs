@@ -31,14 +31,34 @@ extern crate simplemad;
 
 extern crate gstreamer as gst;
 extern crate gstreamer_player as gst_player;
+use std::collections::HashMap;
+use gst::ClockTime;
 
 use std::rc::Rc;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use gio::ffi::g_socket_set_keepalive;
 use gio::glib;
+use gst::StreamStatusType::Stop;
 
-use gtk::{Adjustment, ApplicationWindow, Button, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Inhibit, Label, ResponseType, Scale, SeparatorToolItem, Window, WindowType};
+use gtk::{
+	Adjustment,
+	ApplicationWindow,
+	Button,
+	FileChooserAction,
+	FileChooserDialog,
+	FileFilter,
+	IconSize,
+	Image,
+	Inhibit,
+	Label,
+	ResponseType,
+	Scale,
+	SeparatorToolItem,
+	Window,
+	WindowType,
+};
 use gtk::prelude::*;
 use gtk::prelude::{
 	ButtonExt,
@@ -48,27 +68,41 @@ use gtk::prelude::{
 };
 use gtk::Orientation::Vertical;
 use relm_derive::Msg;
-use relm::{connect, Relm, Update, Widget, WidgetTest};
+use relm::{connect, Relm, Update, Widget, WidgetTest, interval};
 
 mod model;
 mod view;
 
 use crate::view::main_window;
-use crate::view::playlist;
 use crate::view::toolbar;
+use crate::view::playlist;
 
 use playlist::Playlist;
-use main_window::MusicWindow;
+use main_window::MainWindow;
 use toolbar::MusicToolbar;
-use crate::model::Song;
+use crate::model::Music;
+use self::State::*;
+
+enum State {
+	Playing,
+	Paused,
+	Stopped,
+}
+
+struct CurrentSong {
+	song: Option<Music>,
+	state: State,
+}
 
 struct Model {
-	playlist: Playlist,
+	songs: HashMap<String, Music>,
+	current_song: CurrentSong,
+	player: gst_player::Player,
 }
 
 struct MusicApp {
 	model: Model,
-	view: MusicWindow,
+	view: MainWindow,
 }
 
 #[derive(Msg)]
@@ -76,6 +110,30 @@ enum Msg {
 	Open,
 	Play,
 	Quit,
+	UpDuration,
+}
+
+impl Model {
+	pub fn play(&mut self, uri: &String) {
+		match self.current_song.state {
+			Playing => {
+				self.player.pause();
+				self.current_song.state = Paused;
+			}
+			Paused => {
+				self.player.play();
+				self.current_song.state = Playing
+			}
+			Stopped => {
+				self.player.set_uri(Some(uri.as_str()));
+				self.player.play();
+				self.current_song = CurrentSong {
+					song: Some(self.songs.get(uri.as_str()).unwrap().clone()),
+					state: Playing,
+				}
+			}
+		}
+	}
 }
 
 impl Update for MusicApp {
@@ -87,51 +145,60 @@ impl Update for MusicApp {
 	type Msg = Msg;
 	
 	fn model(_: &Relm<Self>, _: ()) -> Model {
+		let dispatcher = gst_player::PlayerGMainContextSignalDispatcher::new(None);
+		let player = gst_player::Player::new(None, Some(&dispatcher.upcast::<gst_player::PlayerSignalDispatcher>()));
 		Model {
-			playlist: Playlist::new(),
-			// counter: 0,
+			songs: HashMap::new(),
+			current_song: CurrentSong {
+				song: None,
+				state: Stopped,
+			},
+			player,
 		}
 	}
 	
+	fn subscriptions(&mut self, relm: &Relm<Self>) {
+		interval(relm.stream(), 1000, || Msg::UpDuration);
+	}
+	
 	fn update(&mut self, event: Msg) {
-		// let label = &self.widgets.counter_label;
-		
 		match event {
 			Msg::Open => {
-				for file in self.show_open_dialog() {
-					// self.model.playlist.add(&file);
-					let song = Song::new(file.as_path());
-					println!("{:#?}", song);
+				for file in self.view.show_open_dialog() {
+					let music = Music::new(file.as_path());
+					self.view.add_music(&music);
+					self.model.songs.insert(music.uri(), music);
 				}
 			}
 			Msg::Play => {
-				self.view.is_playing = self.model.playlist.play(&self.view.is_playing);
-				if self.view.is_playing {
-					MusicApp::update_cover(&self.view.cover, &self.model.playlist);
+				if let Ok(uri) = self.view.get_selected_music() {
+					self.model.play(&uri);
+					match self.model.current_song.state {
+						Playing => {
+							self.view.play(self.model.current_song.song.as_ref().unwrap());
+						}
+						Paused => {
+							self.view.pause();
+						}
+						_ => {}
+					}
 				}
-				
-				let playlist = &self.model.playlist;
-				let widgets = &self.view;
-				let is_playing = &self.view.is_playing;
-				let cover = &self.view.cover;
-				
-				// glib::timeout_add_local(Duration::new(0, 100_000_000), move || {
-				// 	if *is_playing {
-				// 		let m_duration = playlist.duration();
-				// 		let m_current_time = playlist.current_time();
-				//
-				// 		widgets.adjustment.set_upper(m_duration as f64);
-				// 		widgets.adjustment.set_value(m_current_time as f64);
-				// 		widgets.duration_label.set_label(&format!("{} / {}", Win::milli_to_string(m_current_time), Win::milli_to_string(m_duration)));
-				// 		widgets.toolbar.play_button.set_image(Some(&widgets.pause));
-				// 	} else {
-				// 		widgets.toolbar.play_button.set_image(Some(&widgets.play));
-				// 		Win::update_cover(&cover, &playlist);
-				// 	}
-				// 	Continue(true)
-				// });
 			}
-			Msg::Quit => gtk::main_quit(),
+			Msg::UpDuration => {
+				match self.model.current_song.state {
+					Playing => {
+						if let Some(durration) = self.model.player.duration() {
+							if let Some(current_time) = self.model.player.position() {
+								self.view.update_duration(current_time.mseconds(), durration.mseconds());
+							}
+						}
+					}
+					_ => {}
+				}
+			}
+			Msg::Quit => {
+				gtk::main_quit();
+			}
 		}
 	}
 }
@@ -146,109 +213,18 @@ impl Widget for MusicApp {
 	}
 	
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
-		// Create the music_window using the normal GTK+ method calls.
-		let main_container = gtk::Box::new(Vertical, 3);
-		
-		let toolbar = MusicToolbar::new();
-		
-		let cover = Image::new();
-		
-		let duration_label = Label::new(Some("0 / 0"));
-		let adjustment = Adjustment::new(0.0, 0.0, 10.0, 0.0, 0.0, 0.0);
-		let scale = gtk::Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
-		scale.set_draw_value(false);
-		scale.set_hexpand(true);
-		
-		let pause = Image::from_icon_name(Some("gtk-media-pause"), IconSize::LargeToolbar);
-		let play = Image::from_icon_name(Some("gtk-media-play"), IconSize::LargeToolbar);
-		
-		let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 3);
-		hbox.add(&SeparatorToolItem::new());
-		hbox.add(&scale);
-		hbox.add(&duration_label);
-		hbox.add(&SeparatorToolItem::new());
-		
-		main_container.add(&toolbar.container);
-		main_container.add(&cover);
-		main_container.add(&hbox);
-		main_container.add(model.playlist.view());
-		
-		main_container.add(&toolbar.container);
-		
-		let window = Window::new(WindowType::Toplevel);
-		
-		window.add(&main_container);
-		
-		window.show_all();
+		let view = MainWindow::new();
 		
 		// Send the message Increment when the button is clicked.
-		// connect!(relm, plus_button, connect_clicked(_), Msg::Increment);
-		// connect!(relm, minus_button, connect_clicked(_), Msg::Decrement);
-		connect!(relm, toolbar.play_button, connect_clicked(_), Msg::Play);
-		connect!(relm, toolbar.open_button, connect_clicked(_), Msg::Open);
-		connect!(relm, window, connect_delete_event(_, _), return (Some(Msg::Quit), Inhibit(false)));
+		connect!(relm, view.toolbar.play_button, connect_clicked(_), Msg::Play);
+		connect!(relm, view.toolbar.open_button, connect_clicked(_), Msg::Open);
+		connect!(relm, view.toolbar.quit_button, connect_clicked(_), Msg::Quit);
+		connect!(relm, view.window, connect_delete_event(_, _), return (Some(Msg::Quit), Inhibit(false)));
 		
 		MusicApp {
 			model,
-			view: MusicWindow {
-				toolbar,
-				cover,
-				adjustment,
-				duration_label,
-				play,
-				pause,
-				window,
-				is_playing: false,
-			},
+			view,
 		}
-	}
-}
-
-impl MusicApp {
-	fn show_open_dialog(&self) -> Vec<PathBuf> {
-		let mut files = vec![];
-		let dialog = FileChooserDialog::new(Some("Select an MP3 audio file"), Some(&self.view.window), FileChooserAction::Open);
-		
-		let mp3_filter = FileFilter::new();
-		mp3_filter.add_mime_type("audio/mp3");
-		mp3_filter.set_name(Some("MP3 audio file"));
-		dialog.add_filter(&mp3_filter);
-		
-		let m3u_filter = FileFilter::new();
-		m3u_filter.add_mime_type("audio/m3u");
-		m3u_filter.set_name(Some("M3U audio playlist"));
-		dialog.add_filter(&m3u_filter);
-		
-		dialog.set_select_multiple(true);
-		dialog.add_button("Cancel", ResponseType::Cancel);
-		dialog.add_button("Accept", ResponseType::Accept);
-		let result = dialog.run();
-		
-		if result == ResponseType::Accept {
-			files = dialog.filenames();
-		}
-		unsafe { dialog.destroy(); }
-		files
-	}
-	
-	fn update_cover(cover: &Image, playlist: &Playlist) {
-		let res = playlist.get_pixbuf();
-		match res {
-			Ok(pix) => {
-				cover.set_from_pixbuf(Some(&pix));
-			}
-			Err(_) => {
-				cover.clear();
-			}
-		}
-		cover.show();
-	}
-	
-	fn milli_to_string(milli: u64) -> String {
-		let mut seconds = milli / 1000;
-		let minutes = seconds / 60;
-		seconds = seconds - minutes * 60;
-		format!("{}:{}", minutes, seconds)
 	}
 }
 

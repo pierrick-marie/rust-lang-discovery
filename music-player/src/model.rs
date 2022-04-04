@@ -17,21 +17,20 @@ const IMAGE_SIZE: i32 = 256;
 const URI: &str = "file://";
 const INTERP_HYPER: InterpType = InterpType::Hyper;
 
-#[derive(Debug)]
-pub struct Song {
-	title: String,
-	artist: String,
-	album: String,
-	genre: String,
-	year: String,
-	track: String,
+#[derive(Debug, Clone)]
+pub struct Music {
+	pub title: String,
+	pub artist: String,
+	pub album: String,
+	pub genre: String,
+	pub year: String,
+	pub track: String,
 	uri: String,
-	duration: u64,
-	thumbnail: Image,
-	cover: Image,
+	pub thumbnail: Option<Pixbuf>,
+	pub cover: Option<Pixbuf>,
 }
 
-impl Song {
+impl Music {
 	pub fn new(path: &Path) -> Self {
 		let uri = format!("{}{}", URI, path.clone().to_string_lossy().to_string());
 		
@@ -44,15 +43,14 @@ impl Song {
 			let track = tag.track().map(|track| track.to_string()).unwrap_or("??".to_string());
 			let total_tracks = tag.total_tracks().map(|total_tracks| total_tracks.to_string()).unwrap_or("??".to_string());
 			let track_value = format!("{} / {}", track, total_tracks);
-			let covers = Song::get_pixbuf(&tag);
+			let covers = Music::get_pixbuf(&tag);
 			
-			return Song {
+			return Music {
 				album,
 				artist,
-				cover: Image::from_pixbuf(Some(&covers.clone().unwrap().0)),
-				duration: 0,
+				cover: covers.clone().0,
 				genre,
-				thumbnail: Image::from_pixbuf(Some(&covers.clone().unwrap().1)),
+				thumbnail: covers.clone().1,
 				title,
 				track: track_value,
 				uri,
@@ -60,13 +58,12 @@ impl Song {
 			};
 		}
 		// else
-		return Song {
+		return Music {
 			album: "".to_string(),
 			artist: "".to_string(),
-			cover: Image::new(),
-			duration: 0,
+			cover: None,
 			genre: "".to_string(),
-			thumbnail: Image::new(),
+			thumbnail: None,
 			title: path.to_str().unwrap_or("(no title)").to_string(),
 			track: "".to_string(),
 			uri,
@@ -77,19 +74,23 @@ impl Song {
 	/*
 	 * returns Option<(Cover, Thumbnail)>
 	 */
-	fn get_pixbuf(tag: &Tag) -> Option<(Pixbuf, Pixbuf)> {
+	fn get_pixbuf(tag: &Tag) -> (Option<Pixbuf>, Option<Pixbuf>) {
 		if let Some(picture) = tag.pictures().next() {
 			let pixbuf_loader = PixbufLoader::new();
 			pixbuf_loader.set_size(IMAGE_SIZE, IMAGE_SIZE);
 			pixbuf_loader.write(&picture.data).unwrap();
 			
 			if let Some(pixbuf) = pixbuf_loader.pixbuf() {
-				let thumbnail = pixbuf.scale_simple(THUMBNAIL_SIZE, THUMBNAIL_SIZE, INTERP_HYPER).unwrap();
+				let thumbnail = pixbuf.scale_simple(THUMBNAIL_SIZE, THUMBNAIL_SIZE, INTERP_HYPER);
 				pixbuf_loader.close().unwrap();
-				return Some((pixbuf, thumbnail));
+				return (Some(pixbuf), thumbnail);
 			}
 			pixbuf_loader.close().unwrap();
 		}
-		None
+		(None, None)
+	}
+	
+	pub fn uri(&self) -> String {
+		self.uri.clone()
 	}
 }
