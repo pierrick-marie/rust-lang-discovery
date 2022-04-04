@@ -131,6 +131,10 @@ impl MusicModel {
 				self.current_song.state = Paused;
 			}
 			Paused => {
+				if uri != self.current_song.song.as_ref().unwrap().uri() {
+					self.player.set_uri(Some(uri.as_str()));
+					self.current_song.song = Some(self.songs.get(uri.as_str()).unwrap().clone());
+				}
 				self.player.play();
 				self.current_song.state = Playing
 			}
