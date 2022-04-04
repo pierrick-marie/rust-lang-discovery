@@ -111,7 +111,8 @@ enum Msg {
 	Play,
 	Quit,
 	Stop,
-	UpDuration,
+	Remove,
+	UpView,
 }
 
 impl Model {
@@ -140,6 +141,18 @@ impl Model {
 		self.player.stop();
 		self.current_song.state = Stopped;
 	}
+	
+	pub fn remove(&mut self, uri: String) {
+		if let Some(song) = self.songs.remove(uri.as_str()) {
+			if let Some(player_uri) = self.player.uri() {
+				if song.uri() == player_uri.as_str() {
+					self.player.stop();
+					self.current_song.song = None;
+					self.current_song.state = Stopped;
+				}
+			}
+		}
+	}
 }
 
 impl Update for MusicApp {
@@ -164,7 +177,7 @@ impl Update for MusicApp {
 	}
 	
 	fn subscriptions(&mut self, relm: &Relm<Self>) {
-		interval(relm.stream(), 1000, || Msg::UpDuration);
+		interval(relm.stream(), 100, || Msg::UpView);
 	}
 	
 	fn update(&mut self, event: Msg) {
@@ -175,6 +188,8 @@ impl Update for MusicApp {
 					self.view.add_music(&music);
 					self.model.songs.insert(music.uri(), music);
 				}
+				self.view.treeview.queue_resize();
+				self.view.window.queue_resize();
 			}
 			Msg::Play => {
 				if let Ok(uri) = self.view.get_selected_music() {
@@ -190,11 +205,17 @@ impl Update for MusicApp {
 					}
 				}
 			}
+			Msg::Remove => {
+				if let Ok(uri) = self.view.get_selected_music() {
+					self.model.remove(uri);
+					self.view.remove_selected_music();
+				}
+			}
 			Msg::Stop => {
 				self.model.stop();
 				self.view.stop();
 			}
-			Msg::UpDuration => {
+			Msg::UpView => {
 				match self.model.current_song.state {
 					Playing => {
 						if let Some(durration) = self.model.player.duration() {
@@ -205,6 +226,7 @@ impl Update for MusicApp {
 					}
 					Stopped => {
 						self.view.update_duration(0, 0);
+						self.view.stop();
 					}
 					_ => { }
 				}
@@ -228,7 +250,7 @@ impl Widget for MusicApp {
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
 		let view = MainWindow::new();
 		
-		
+		connect!(relm, view.toolbar.remove_button, connect_clicked(_), Msg::Remove);
 		connect!(relm, view.toolbar.stop_button, connect_clicked(_), Msg::Stop);
 		connect!(relm, view.toolbar.play_button, connect_clicked(_), Msg::Play);
 		connect!(relm, view.toolbar.open_button, connect_clicked(_), Msg::Open);

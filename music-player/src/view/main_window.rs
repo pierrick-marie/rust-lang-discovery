@@ -8,19 +8,7 @@ use gdk_pixbuf::{
 };
 
 use gtk::prelude::*;
-use gtk::{
-	Adjustment,
-	FileChooserAction,
-	FileChooserDialog,
-	FileFilter,
-	IconSize,
-	Image,
-	Label,
-	ResponseType,
-	SeparatorToolItem,
-	Window,
-	WindowType,
-};
+use gtk::{Adjustment, FileChooserAction, FileChooserDialog, FileFilter, IconSize, Image, Label, ResponseType, ScrollablePolicy, SeparatorToolItem, Window, WindowType};
 use gtk::{
 	CellRendererPixbuf,
 	CellRendererText,
@@ -74,8 +62,10 @@ impl MainWindow {
 		
 		let cover = Image::new();
 		
-		let duration_label = Label::new(Some("0 / 0"));
+		let duration_label = Label::new(Some("0:00 / 0:00"));
 		let adjustment = Adjustment::new(0.0, 0.0, 10.0, 0.0, 0.0, 0.0);
+		adjustment.set_upper(0 as f64);
+		adjustment.set_value(0 as f64);
 		let scale = gtk::Scale::new(gtk::Orientation::Horizontal, Some(&adjustment));
 		scale.set_draw_value(false);
 		scale.set_hexpand(true);
@@ -112,6 +102,7 @@ impl MainWindow {
 		let window = Window::new(WindowType::Toplevel);
 		window.add(&main_container);
 		window.show_all();
+		cover.hide();
 		
 		MainWindow {
 			adjustment,
@@ -139,6 +130,13 @@ impl MainWindow {
 		self.model.set_value(&row, THUMBNAIL_COLUMN, &music.thumbnail.as_ref().unwrap().to_value());
 	}
 	
+	pub fn remove_selected_music(&self) {
+		let selection = self.treeview.selection();
+		if let Some((_, iter)) = selection.selected() {
+			self.model.remove(&iter);
+		}
+	}
+	
 	fn create_columns(treeview: &TreeView) {
 		Self::add_pixbuf_column(treeview, THUMBNAIL_COLUMN as i32, Visible);
 		Self::add_text_column(treeview, "Title", TITLE_COLUMN as i32);
@@ -161,7 +159,7 @@ impl MainWindow {
 	
 	pub fn stop(&self) {
 		self.toolbar.play_button.set_image(Some(&self.play));
-		self.cover.set_from_pixbuf(Image::new().pixbuf().as_ref());
+		self.cover.clear();
 	}
 	
 	pub fn get_selected_music(&self) -> Result<String, ValueTypeMismatchOrNoneError> {
