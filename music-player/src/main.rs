@@ -15,65 +15,36 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-
-
-mod view;
 mod model;
-
-
+use crate::model::*;
 use crate::model::music;
 use model::State::*;
 use model::MusicModel;
-use model::CurrentSong;
 use music::Music;
 
-use crate::view::{main_window, playlist, toolbar};
-use view::main_window::MainWindow;
+mod view;
+use view::MainWindow;
 
-
-#[feature(proc_macro)]
 extern crate gtk;
 extern crate gtk_sys;
+use gtk::{
+	Window,
+};
+use gtk::prelude::*;
+use gtk::prelude::{
+	ButtonExt,
+	WidgetExt,
+};
 
-#[macro_use]
 extern crate relm;
-#[macro_use]
 extern crate relm_derive;
+use relm_derive::Msg;
+use relm::{connect, interval, Relm, Update, Widget};
 
 extern crate gio;
 extern crate crossbeam;
 extern crate pulse_simple;
 extern crate simplemad;
-
-use std::path::PathBuf;
-use gio::glib;
-use gtk::{
-	Adjustment,
-	ApplicationWindow,
-	Button,
-	FileChooserAction,
-	FileChooserDialog,
-	FileFilter,
-	IconSize,
-	Image,
-	Inhibit,
-	Label,
-	ResponseType,
-	Scale,
-	SeparatorToolItem,
-	Window,
-	WindowType,
-};
-use gtk::prelude::*;
-use gtk::prelude::{
-	ButtonExt,
-	ContainerExt,
-	LabelExt,
-	WidgetExt,
-};
-use gtk::Orientation::Vertical;
-use relm_derive::Msg;
-use relm::{connect, interval, Relm, Update, Widget, WidgetTest};
 
 pub struct MusicApp {
 	model: MusicModel,
@@ -116,8 +87,7 @@ impl Update for MusicApp {
 					self.view.add_music(&music);
 					self.model.add_music(&music);
 				}
-				self.view.treeview.queue_resize();
-				self.view.window.queue_resize();
+				self.view.resize_window();
 			}
 			Msg::Play => {
 				if let Ok(uri) = self.view.get_selected_music() {
@@ -145,14 +115,12 @@ impl Update for MusicApp {
 			}
 			Msg::Next => {
 				self.view.next_selected_music();
-				self.model.current_song().set_song(None);
-				self.model.current_song().set_state(Stopped);
+				self.model.reset_current_song();
 				self.update(Msg::Play);
 			}
 			Msg::Prev => {
 				self.view.prev_selected_music();
-				self.model.current_song().set_song(None);
-				self.model.current_song().set_state(Stopped);
+				self.model.reset_current_song();
 				self.update(Msg::Play);
 			}
 			Msg::UpView => {
@@ -180,20 +148,20 @@ impl Widget for MusicApp {
 	
 	// Return the root widget.
 	fn root(&self) -> Self::Root {
-		self.view.window.clone()
+		self.view.window().clone()
 	}
 	
 	fn view(relm: &Relm<Self>, model: Self::Model) -> Self {
 		let view = MainWindow::new();
 		
-		connect!(relm, view.toolbar.previous_button, connect_clicked(_), Msg::Prev);
-		connect!(relm, view.toolbar.next_button, connect_clicked(_), Msg::Next);
-		connect!(relm, view.toolbar.remove_button, connect_clicked(_), Msg::Remove);
-		connect!(relm, view.toolbar.stop_button, connect_clicked(_), Msg::Stop);
-		connect!(relm, view.toolbar.play_button, connect_clicked(_), Msg::Play);
-		connect!(relm, view.toolbar.open_button, connect_clicked(_), Msg::Open);
-		connect!(relm, view.toolbar.quit_button, connect_clicked(_), Msg::Quit);
-		connect!(relm, view.window, connect_delete_event(_, _), return (Some(Msg::Quit), Inhibit(false)));
+		connect!(relm, view.toolbar().previous_button(), connect_clicked(_), Msg::Prev);
+		connect!(relm, view.toolbar().next_button(), connect_clicked(_), Msg::Next);
+		connect!(relm, view.toolbar().remove_button(), connect_clicked(_), Msg::Remove);
+		connect!(relm, view.toolbar().stop_button(), connect_clicked(_), Msg::Stop);
+		connect!(relm, view.toolbar().play_button(), connect_clicked(_), Msg::Play);
+		connect!(relm, view.toolbar().open_button(), connect_clicked(_), Msg::Open);
+		connect!(relm, view.toolbar().quit_button(), connect_clicked(_), Msg::Quit);
+		connect!(relm, view.window(), connect_delete_event(_, _), return (Some(Msg::Quit), Inhibit(false)));
 		
 		MusicApp {
 			model,

@@ -22,16 +22,12 @@ extern crate crossbeam;
 extern crate pulse_simple;
 extern crate simplemad;
 
-use gst::ClockTime;
-use std::time::Duration;
-use std::path::PathBuf;
-use gio::glib;
 use std::collections::HashMap;
-use std::borrow::Borrow;
+use gio::glib::SeekType::Cur;
 use gtk::prelude::*;
 
-use music::Music;
 pub mod music;
+use music::Music;
 
 use self::State::*;
 
@@ -70,14 +66,6 @@ impl CurrentSong {
 	pub fn state(&self) -> State {
 		self.state.clone()
 	}
-	
-	pub fn set_song(&mut self, song: Option<Music>) {
-		self.song = song
-	}
-	
-	pub fn set_state(&mut self, state: State) {
-		self.state = state;
-	}
 }
 
 impl MusicModel {
@@ -99,6 +87,10 @@ impl MusicModel {
 	
 	pub fn current_song(&self) -> CurrentSong {
 		self.current_song.clone()
+	}
+	
+	pub fn reset_current_song(&mut self)  {
+		self.current_song = CurrentSong::new();
 	}
 	
 	pub fn add_music(&mut self, music: &Music) {

@@ -19,15 +19,9 @@ extern crate gdk_pixbuf;
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufLoader};
 
 extern crate id3;
+
 use id3::{Tag, TagLike};
-
-use std::fs::File;
 use std::path::Path;
-use std::{fs};
-use std::os::unix::raw::time_t;
-
-use gtk::Image;
-
 use gtk::prelude::*;
 
 const THUMBNAIL_SIZE: i32 = 64;

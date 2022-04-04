@@ -23,18 +23,19 @@ use gtk::{Button, Box, IconSize, SeparatorToolItem};
 
 #[derive(Clone)]
 pub struct MusicToolbar {
-	pub open_button: Button,
-	pub save_button: Button,
-	pub next_button: Button,
-	pub play_button: Button,
-	pub previous_button: Button,
-	pub quit_button: Button,
-	pub remove_button: Button,
-	pub stop_button: Button,
-	pub container: Box,
+	open_button: Button,
+	save_button: Button,
+	next_button: Button,
+	play_button: Button,
+	previous_button: Button,
+	quit_button: Button,
+	remove_button: Button,
+	stop_button: Button,
+	container: Box,
 }
 
 impl MusicToolbar {
+	
 	pub fn new() -> Self {
 		let toolbar = Box::new(gtk::Orientation::Horizontal, 3);
 
@@ -81,5 +82,41 @@ impl MusicToolbar {
 			stop_button,
 			container: toolbar,
 		}
+	}
+	
+	pub fn open_button(&self) -> &Button {
+		&self.open_button
+	}
+	
+	pub fn save_button(&self) -> &Button {
+		&self.save_button
+	}
+	
+	pub fn next_button(&self) -> &Button {
+		&self.next_button
+	}
+	
+	pub fn previous_button(&self) -> &Button {
+		&self.previous_button
+	}
+	
+	pub fn stop_button(&self) -> &Button {
+		&self.stop_button
+	}
+	
+	pub fn remove_button(&self) -> &Button {
+		&self.remove_button
+	}
+	
+	pub fn quit_button(&self) -> &Button {
+		&self.quit_button
+	}
+	
+	pub fn play_button(&self) -> &Button {
+		&self.play_button
+	}
+	
+	pub fn container(&self) -> &Box {
+		&self.container
 	}
 }
