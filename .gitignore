@@ -6,4 +6,7 @@ tetris/assets/score.txt
 target/
 .idea/
 out/
+
+# Sub projects
 tetris
+hello_world
