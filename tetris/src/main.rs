@@ -1,8 +1,7 @@
 mod model;
 mod view;
 
-use model::score::*;
-use model::game::*;
+use model::*;
 use model::tetrimino::*;
 use crate::model::tetrimino;
 use crate::view::*;
