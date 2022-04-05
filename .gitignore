@@ -7,6 +7,3 @@ target/
 .idea/
 out/
 
-# Sub folders
-tetris
-music-player
