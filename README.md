@@ -89,3 +89,10 @@ Installer les paquest suivants (Gnu\Linux) :
 * libgstrtspserver-1.0-dev
 * libges-1.0-dev
 * libgstreamer-plugins-bad1.0-dev
+
+## Présentation
+
+Le lecteur utilise dans sa version finale la bibliothèque Gstreamer pour lire les fichiers audio.
+Pour la partie graphique, le lecteur utilise la bibliothèque Relm (https://github.com/antoyo/relm) basée sur GTK.
+
+![Lecteur de music en rust](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/music-player/music-player.jpg)
