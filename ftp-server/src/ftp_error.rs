@@ -15,67 +15,72 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display, Formatter, write};
 use std::result;
 use std::str::Utf8Error;
 use std::error;
 use std::io::ErrorKind;
 
 use tokio::io;
+use crate::protocol_codes::ClientCommand;
 
-use self::FTP_Error::*;
-
-pub enum FTP_Error {
-	/// Input / Output error
-	Io(ErrorKind),
-	/// Incomplete or malformed message
-	Msg(String),
-	/// UTF_8 error
-	Utf8(Utf8Error),
-	/// Unknown
-	Unknown(String),
+pub enum FtpError {
+	TimeOut(String, String),
+	SocketWriteError(String, String),
+	Disconnected(String, String),
+	Utf8(String, String),
+	ParseMessage(String, String),
+	UnknownCommand(String, String),
+	UnexpectedCommand(String, String, String),
+	SocketReadError(String, String),
+	NotLogged(String, String),
 }
 
-pub type Result<T> = result::Result<T, FTP_Error>;
+pub type FtpResult<T> = result::Result<T, FtpError>;
 
-impl Display for FTP_Error {
+impl Display for FtpError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			FTP_Error::Io(error) => {write!(f, "IO error {:?}", error)}
-			FTP_Error::Msg(error) => {write!(f, "Msg error {}", error)}
-			FTP_Error::Utf8(error) => {write!(f, "UTF_8 error {:?}", error)}
-			FTP_Error::Unknown(error) => {write!(f, "Unknown error {:?}", error)}
+			FtpError::TimeOut(from, msg) => { write!(f, "!!Error!! Time out connection ==> {} --> {}", from, msg) }
+			FtpError::NotLogged(from, msg) => { write!(f, "!!Error!! Client not logged ==> {} --> {}", from, msg) }
+			FtpError::SocketWriteError(from, msg) => { write!(f, "!!Error!! Connection closed ==> {} --> {}", from, msg) }
+			FtpError::Utf8(from, msg) => { write!(f, "!!Error!! UTF_8 error ==> {} --> {}", from, msg) }
+			FtpError::ParseMessage(from, msg) => { write!(f, "!!Error!! Wrong data, impossible to parse message ==> {} --> {}", from, msg) }
+			FtpError::UnknownCommand(from, msg) => { write!(f, "!!Error!! Unknown command ==> {} --> {}", from, msg) }
+			FtpError::Disconnected(from, msg) => { write!(f, "!!Error!! Disconnected ==> {} --> {}", from, msg) }
+			FtpError::SocketReadError(from, msg) => { write!(f, "!!Error!! Client does not answer ==> {} --> {}", from, msg) }
+			FtpError::UnexpectedCommand(from, expected, found) => { write!(f, "!!Error!! Unexpected command ==> {} --> expected {:?}, found {:?}", from, expected, found) }
 		}
 	}
 }
 
-impl error::Error for FTP_Error { }
+impl error::Error for FtpError {}
 
-impl Debug for FTP_Error {
+impl Debug for FtpError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self)
 	}
 }
 
-impl From<io::Error> for FTP_Error {
+impl From<io::Error> for FtpError {
 	fn from(error: io::Error) -> Self {
 		format!("Input / Output error : {:?}", error).into()
 	}
 }
 
-impl<'a> From<&'a str> for FTP_Error {
+impl<'a> From<&'a str> for FtpError {
 	fn from(error: &'a str) -> Self {
 		error.to_string().into()
 	}
 }
 
-impl From<Utf8Error> for FTP_Error {
+impl From<Utf8Error> for FtpError {
 	fn from(error: Utf8Error) -> Self {
 		format!("UTF_8 error : {:?}", error).into()
 	}
 }
 
-impl From<String> for FTP_Error {
+impl From<String> for FtpError {
 	fn from(error: String) -> Self {
 		error.into()
 	}

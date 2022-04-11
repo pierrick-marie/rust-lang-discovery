@@ -15,177 +15,109 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::future::Future;
-use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use crate::protocol_codes::*;
-use crate::connection::*;
-use std::io::{Error, ErrorKind, Result};
-use std::str::Utf8Error;
-use bytes::{Buf, BytesMut};
-use futures::future::err;
-use regex::{Captures, Regex};
+use std::io::{ErrorKind, Result};
+use bytes::{BytesMut};
+use regex::{Regex};
 
 use std::time::Duration;
 use async_std::io as async_io;
-use log::{debug, info, warn};
-use crate::{ftp_error};
-use crate::ftp_error::FTP_Error::{Io, Msg};
+use log::{debug, error, info, warn};
+use crate::{Server, ftp_error, protocol_codes};
+use crate::connection::Connection;
+use crate::ftp_error::{FtpError, FtpResult};
 
 pub struct Client {
-	stream: TcpStream,
-	buf: BytesMut,
+	connection: Connection,
 }
 
 impl Client {
-	pub fn new(connection: TcpStream) -> Self {
+	pub fn new(connection: Connection) -> Self {
 		Client {
-			stream: connection,
-			buf: BytesMut::new(),
+			connection,
 		}
 	}
 	
-	async fn write(&mut self, response: ServerResponse) {
-		println!(" -->> {}", response);
-		match self.stream.write_all(response.to_string().as_bytes()).await {
-			Ok(_) => {}
-			Err(e) => { eprintln!("Failed to write message {:?}", e) }
-		}
-	}
-	
-	// async fn sync_read(&mut self) -> Result<()> {
-	//
-	//
-	// 	if let Ok(n) =  {
-	// 		if 0 < n {
-	// 			return self.parse_command(buf);
-	// 		}
-	// 	}
-	// 	// return Err(error::Error::Io(ErrorKind::ConnectionAborted));
-	// }
-	
-	async fn read(&mut self) -> Result<()> {
-		let mut attempt = 2;
-		loop {
-			info!("Waiting for client command, attempt: {}", attempt);
-			match async_io::timeout(Duration::from_secs(5), async {
-				self.stream.read_buf(&mut self.buf).await
-			}).await {
-				Ok(_) => { return Ok(()); }
-				Err(e) => {
-					if attempt > 0 {
-						attempt -= 1;
-					} else {
-						eprintln!("Time out -> exit");
-						return Err(e.into());
-					}
+	fn parse_command(&self, msg: String) -> FtpResult<ClientCommand> {
+		let re = Regex::new(r"([[:upper:]]{3,4})( .+)*").unwrap();
+		if let Some(cap) = re.captures(msg.as_str()) {
+			if let Some(cmd) = cap.get(1) {
+				if let Some(args) = cap.get(2) {
+					return self.get_command(cmd.as_str(), args.as_str());
+				} else {
+					return self.get_command(cmd.as_str(), "");
 				}
 			}
 		}
+		return Err(FtpError::ParseMessage("client::parse_command".to_string(), format!("failed to parse message: {:?}", msg)));
 	}
 	
-	fn parse_command(&self) -> ftp_error::Result<ClientCommand> {
-		let re = Regex::new(
-			r"([[:upper:]]+) (.*)"
-		).unwrap();
-		match &String::from_utf8(self.buf.to_vec()) {
-			Ok(command) => {
-				println!(" <<-- {}", command);
-				match re.captures(command) {
-					Some(cap) => {
-						// there are 2 patterns in the regex + the text itself
-						if 3 == cap.len() {
-							if let Some(cmd) = cap.get(1) {
-								if let Some(args) = cap.get(2) {
-									return self.get_command(cmd.as_str(), args.as_str());
-								}
-							}
-						}
-						return Err(ftp_error::FTP_Error::Io(ErrorKind::InvalidData));
-					}
-					None => return Err(ftp_error::FTP_Error::Io(ErrorKind::InvalidInput))
-				}
-			}
-			Err(e) => return Err(ftp_error::FTP_Error::Utf8(e.utf8_error()))
-		}
-	}
-	
-	fn get_command(&self, command: &str, args: &str) -> ftp_error::Result<ClientCommand> {
+	fn get_command(&self, command: &str, args: &str) -> FtpResult<ClientCommand> {
 		match command {
-			USER => Ok(ClientCommand::User(args.to_string())),
-			_ => Err(ftp_error::FTP_Error::Msg("Unknown command".to_string()))
+			protocol_codes::USER => Ok(ClientCommand::User(args.to_string())),
+			protocol_codes::PWD => Ok(ClientCommand::Pwd),
+			_ => Err(FtpError::UnknownCommand("client::get_command".to_string(), command.to_string()))
 		}
 	}
 	
 	
 	pub async fn run(&mut self) {
-		println!("Lest's start a new client !");
-		
-		// let res = async_io::timeout(Duration::from_secs(10), async {
-		// 	self.user().await
-		// }).await;
-		// match res {
-		// 	Ok(_) => { println!("Connected") }
-		// 	Err(e) => { eprintln!("Not connected {:?}", e) }
-		// }
-		
-		if let Ok(_) = self.user().await {
-			println!("Logged !");
-		} else {
-			eprintln!("Pas logged :(");
+		match self.user().await {
+			Ok(_) => {
+				info!("Logged !");
+			}
+			Err(e) => {
+				error!("{}", e);
+			}
 		}
 	}
 	
-	async fn user(&mut self) -> ftp_error::Result<()> {
+	async fn user(&mut self) -> FtpResult<()> {
 		let mut attempt = 3;
-		
 		loop {
-			self.write(ServerResponse::ServiceReadyForNewUser).await;
-			match self.read().await {
-				Ok(_) => {
-					match self.parse_command() {
+			if attempt <= 0 {
+				self.connection.close().await;
+				return Err(FtpError::NotLogged("client::user".to_string(), "3 attempts left".to_string()));
+			}
+			if let Err(e) = self.connection.write(ServerResponse::ServiceReadyForNewUser.to_string()).await {
+				return Err(FtpError::Disconnected("client::user".to_string(), e.to_string()));
+			}
+			match self.connection.read().await {
+				Ok(msg ) => {
+					match self.parse_command(msg) {
 						Ok(command) => {
-							println!(" <<-- {}", command);
 							match command {
 								ClientCommand::User(ref args) => {
-									println!("OK !!! {:?}", command);
+									info!("OK !!! {:?}", command);
 									return Ok(());
 								}
 								_ => {
-									if attempt > 0 {
-										eprintln!("ask user again, atemp: {}", attempt);
-										attempt -= 1;
-									} else {
-										eprintln!("not logged in, connection aborted");
-										self.write(ServerResponse::NotLoggedIn).await;
-										return Err(Io(ErrorKind::ConnectionAborted.into()));
-									}
+									warn!("Unexpected command: {}", command);
+									attempt -= 1;
 								}
 							}
 						}
 						Err(e) => {
-							if attempt > 0 {
-								eprintln!("ask user again, atemp: {}", attempt);
-								attempt -= 1;
-							} else {
-								eprintln!("{:?} not logged in, connection aborted", e);
-								self.write(ServerResponse::NotLoggedIn).await;
-								return Err(e);
-							}
+							attempt -= 1;
+							warn!("{}", e);
 						}
 					}
 				}
 				Err(e) => {
-					eprintln!("Read Error");
-					return Err(Io(ErrorKind::TimedOut.into()));
+					match e {
+						FtpError::Utf8(_, _) => {
+							attempt -= 1;
+							warn!("{}", e);
+						},
+						_ => {
+							self.connection.close().await;
+							return Err(FtpError::Disconnected("client::user".to_string(), e.to_string()));
+						}
+					}
 				}
 			}
 		}
 	}
-
-// fn user_cmd(&mut self, user_name: String) {
-// 	let user = user_name;
-// 	self.io.write(ServerCommand::new(ServerResponse::UserNameOkayNeedPassword, "Password required"));
-// }
 }

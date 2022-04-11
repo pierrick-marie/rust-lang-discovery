@@ -15,57 +15,47 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-mod server;
-use std::alloc::System;
-use std::future::Future;
-use std::time::SystemTime;
 use tokio::net::TcpListener;
-use tokio_io::io::read_until;
-use crate::server::Server;
+use tokio::sync::oneshot;
+use log::{debug, error, info};
+use regex::{Regex};
 
 mod protocol_codes;
 mod client;
 mod ftp_error;
-mod message;
-mod connection;
+mod server;
 mod ftp_logger;
-
-use tokio::sync::oneshot;
+mod connection;
 use crate::client::Client;
-use crate::connection::Connection;
-
-use log::{debug, error, info};
-
+use crate::server::Server;
 
 async fn wait_ctrl_c() {
-	
+	info!("Wainting for Ctrl-C");
 	match tokio::signal::ctrl_c().await {
 		Ok(()) => {
-			println!("\nCtrl-C received -> end of server");
+			info!("Ctrl-C received -> end of server");
 		}
 		Err(err) => {
-			eprintln!("Unable to listen for shutdown signal: {}", err);
+			error!("Unable to listen for shutdown signal: {}", err);
 			// we also shut down in case of error
 		}
 	}
-	println!("Exit");
-	std::process::exit(0);
 }
-
 
 
 #[tokio::main]
 async fn main() {
-	
 	ftp_logger::init();
 	
-	debug!("Coucou");
-	
 	let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+	let mut server = Server::new(listener);
 	
-	tokio::spawn(async move {
-		Connection::new(listener).run().await;
-	});
+	tokio::select! {
+            _ = server.run() => { },
+		_ = wait_ctrl_c() => {
+                  server.close_connections().await;
+		}
+	}
 	
-	wait_ctrl_c().await;
+	info!("Exit");
 }

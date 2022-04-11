@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 extern crate num;
-use std::fmt::{Display, Formatter, write};
+use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
 use self::ServerResponse::*;

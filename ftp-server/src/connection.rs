@@ -13,94 +13,79 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>.
-*/
+along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-/*
-This file comes from the project tokio-rs/mini-redis (Licence MIT) : https://raw.githubusercontent.com/tokio-rs/mini-redis/master/src/connection.rs
-I modified some parts of it.
-*/
-
-use std::borrow::Borrow;
-use crate::message::*;
-
-use bytes::{Buf, BytesMut};
-use std::io::{self, Cursor};
+use bytes::{BytesMut};
+use tokio::net::TcpStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::io::{Error, ErrorKind, Result};
+use std::str::Utf8Error;
+use std::string::FromUtf8Error;
+use log::{debug, error, info, warn};
 use std::time::Duration;
-use futures::task::SpawnExt;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, AsyncBufReadExt, AsyncBufRead, BufStream, BufReader, BufWriter, ReadHalf, WriteHalf};
-use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::time;
-use crate::{Client, ftp_error};
+use async_std::io as async_io;
 
-use crate::ftp_error::*;
-use crate::message::Message::Response;
-use crate::protocol_codes::ServerResponse;
+use crate::ftp_error::{FtpError, FtpResult};
+use crate::ftp_error::FtpError::{SocketWriteError, Utf8};
 
-/// Send and receive `Message` values from a remote peer.
-///
-/// When sending message, the frame is first encoded into the write buffer.
-/// The contents of the write buffer are then written to the socket.
-///
-#[derive(Debug)]
 pub struct Connection {
-	listener: TcpListener,
+	buf: BytesMut,
+	stream: TcpStream,
 }
 
 impl Connection {
-	/// Create a new `Connection`, backed by `socket`. Read and write buffers are initialized.
-	pub fn new(socket: TcpListener) -> Connection {
+	pub fn new(stream: TcpStream) -> Self {
 		Connection {
-			listener: socket
+			buf: BytesMut::new(),
+			stream,
 		}
 	}
 	
-	pub async fn run(&mut self) {
-		loop {
-			match self.accept().await {
-				Ok(stream) => {
-					Client::new(stream).run().await;
+	pub async fn read(&mut self) -> FtpResult<String> {
+		self.buf.clear();
+		match async_io::timeout(Duration::from_secs(50), async {
+			self.stream.read_buf(&mut self.buf).await
+		}).await {
+			Ok(n) => {
+				if n > 0 {
+					if let Ok(msg) = String::from_utf8(self.buf.to_vec()) {
+						let message = msg.trim();
+						info!(" <<<< {}", message);
+						return Ok(message.to_string());
+					}
 				}
-				Err(e) => {
-					eprintln!("Failed to accept new connection {:?}", e);
-				}
+				return Err(FtpError::Utf8("connection::read".to_string(), format!("UTF_8 error, buffer={:?}", self.buf)));
+			}
+			Err(e) => {
+				return Err(FtpError::SocketReadError("connection::read".to_string(), e.to_string()));
 			}
 		}
 	}
 	
-	/// Accept an inbound connection.
-	///
-	/// Errors are handled by backing off and retrying. An exponential backoff
-	/// strategy is used. After the first failure, the task waits for 1 second.
-	/// After the second failure, the task waits for 2 seconds. Each subsequent
-	/// failure doubles the wait time. If accepting fails on the 6th try after
-	/// waiting for 64 seconds, then this function returns with an error.
-	async fn accept(&mut self) -> ftp_error::Result<TcpStream> {
-		let mut backoff = 1;
-		
-		// Try to accept a few times
+	pub async fn write(&mut self, msg: String) -> FtpResult<String> {
+		let mut attempt = 2;
 		loop {
-			// Perform the accept operation. If a socket is successfully
-			// accepted, return it. Otherwise, save the error.
-			match self.listener.accept().await {
-				Ok((socket, _)) => {
-					println!("New connection established");
-					return Ok(socket);
+			match async_io::timeout(Duration::from_secs(5), async {
+				self.stream.write_all(msg.as_bytes()).await
+			}).await {
+				Ok(_) => {
+					info!(" >>>> {}", msg);
+					return Ok(msg);
 				}
-				Err(err) => {
-					if backoff > 64 {
-						// Accept has failed too many times. Return the error.
-						return Err(err.into());
+				Err(e) => {
+					if attempt > 0 {
+						attempt -= 1;
+						warn!("Failed to send message: {}", msg);
+					} else {
+						return Err(FtpError::SocketWriteError("connection::write".to_string(), e.to_string()));
 					}
 				}
 			}
-			
-			// Pause execution until the back off period elapses.
-			time::sleep(Duration::from_secs(backoff)).await;
-			
-			// Double the back off
-			backoff *= 2;
 		}
+	}
+	
+	pub async fn close(&mut self) {
+		self.stream.shutdown().await;
+		info!("Connection closed");
 	}
 }
