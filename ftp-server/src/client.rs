@@ -15,17 +15,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 use crate::protocol_codes::*;
-use std::io::{ErrorKind, Result};
-use bytes::{BytesMut};
 use regex::{Regex};
 
-use std::time::Duration;
-use async_std::io as async_io;
-use log::{debug, error, info, warn};
-use crate::{Server, ftp_error, protocol_codes};
+use log::{error, info, warn};
+use crate::protocol_codes;
 use crate::connection::Connection;
 use crate::ftp_error::{FtpError, FtpResult};
 
@@ -62,8 +56,15 @@ impl Client {
 		}
 	}
 	
+	pub async fn stop(&mut self) {
+		info!("Stop client");
+		if let Err(e) = self.connection.write(ServerResponse::ConnectionClosed.to_string()).await {
+			error!("Failed to close connection with client: {:?}", e);
+		}
+		self.connection.close().await;
+	}
 	
-	pub async fn run(&mut self) {
+	pub async fn run(&mut self) -> std::io::Result<()>{
 		match self.user().await {
 			Ok(_) => {
 				info!("Logged !");
@@ -72,6 +73,8 @@ impl Client {
 				error!("{}", e);
 			}
 		}
+		
+		Ok(())
 	}
 	
 	async fn user(&mut self) -> FtpResult<()> {
@@ -85,7 +88,7 @@ impl Client {
 				return Err(FtpError::Disconnected("client::user".to_string(), e.to_string()));
 			}
 			match self.connection.read().await {
-				Ok(msg ) => {
+				Ok(msg) => {
 					match self.parse_command(msg) {
 						Ok(command) => {
 							match command {
@@ -110,7 +113,7 @@ impl Client {
 						FtpError::Utf8(_, _) => {
 							attempt -= 1;
 							warn!("{}", e);
-						},
+						}
 						_ => {
 							self.connection.close().await;
 							return Err(FtpError::Disconnected("client::user".to_string(), e.to_string()));

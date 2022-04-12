@@ -15,14 +15,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::fmt::{Debug, Display, Formatter, write};
+use std::fmt::{Debug, Display, Formatter};
 use std::result;
 use std::str::Utf8Error;
 use std::error;
-use std::io::ErrorKind;
 
 use tokio::io;
-use crate::protocol_codes::ClientCommand;
 
 pub enum FtpError {
 	TimeOut(String, String),

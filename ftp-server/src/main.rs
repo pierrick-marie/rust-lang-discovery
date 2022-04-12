@@ -15,10 +15,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use tokio::net::TcpListener;
-use tokio::sync::oneshot;
-use log::{debug, error, info};
-use regex::{Regex};
+use log::{error, info};
+
+use async_shutdown::Shutdown;
 
 mod protocol_codes;
 mod client;
@@ -27,35 +26,80 @@ mod server;
 mod ftp_logger;
 mod connection;
 use crate::client::Client;
-use crate::server::Server;
 
-async fn wait_ctrl_c() {
-	info!("Wainting for Ctrl-C");
-	match tokio::signal::ctrl_c().await {
-		Ok(()) => {
-			info!("Ctrl-C received -> end of server");
+pub const ADDR: &str = "127.0.0.1:8080";
+
+async fn wait_ctrl_c(shutdown: Shutdown) {
+	
+	// Spawn a task to wait for CTRL+C and trigger a shutdown.
+	tokio::spawn({
+		async move {
+			if let Err(e) = tokio::signal::ctrl_c().await {
+				error!("Failed to wait for CTRL+C: {}", e);
+				std::process::exit(1);
+			} else {
+				info!("Received interrupt signal. Shutting down server...");
+				shutdown.shutdown();
+			}
 		}
-		Err(err) => {
-			error!("Unable to listen for shutdown signal: {}", err);
-			// we also shut down in case of error
-		}
-	}
+	});
 }
-
 
 #[tokio::main]
 async fn main() {
-	ftp_logger::init();
 	
-	let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
-	let mut server = Server::new(listener);
-	
-	tokio::select! {
-            _ = server.run() => { },
-		_ = wait_ctrl_c() => {
-                  server.close_connections().await;
-		}
+	if let Err(e) = ftp_logger::init() {
+		error!("Failed to init logger: {:?}", e);
 	}
 	
-	info!("Exit");
+	// Create a new shutdown object.
+	// We will clone it into all tasks that need it.
+	let shutdown = Shutdown::new();
+	
+	wait_ctrl_c(shutdown.clone()).await;
+	
+	// Run the server and set a non-zero exit code if we had an error.
+	let exit_code = match server::run(shutdown.clone()).await {
+		Ok(()) => 0,
+		Err(e) => {
+			error!("Server task finished with an error: {}", e);
+			1
+		}
+	};
+	
+	// Wait for clients to run their cleanup code, then exit.
+	// Without this, background tasks could be killed before they can run their cleanup code.
+	shutdown.wait_shutdown_complete().await;
+	
+	std::process::exit(exit_code);
+	
+	// OLD
+	// let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
+	// let mut server = Server::new(listener, rx.clone());
+	//
+	// let mut ok = true;
+	//
+	// tokio::spawn( async move {
+	// 	while rx.changed().await.is_ok() {
+	// 		match &*rx.borrow() {
+	// 			SocketMessage::OpenSocket => {}
+	// 			SocketMessage::CloseSocket => {
+	// 				// self.close();
+	// 				info!("CLOSE main");
+	// 				ok = false;
+	// 			}
+	// 		}
+	// 	}
+	// });
+	//
+	// tokio::spawn( async move {
+	// 	server.run().await;
+	// });
+	//
+	// wait_ctrl_c().await;
+	// tx.send(SocketMessage::CloseSocket);
+	//
+	// info!("Exit");
 }
+
+

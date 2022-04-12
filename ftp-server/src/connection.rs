@@ -18,15 +18,11 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 use bytes::{BytesMut};
 use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::io::{Error, ErrorKind, Result};
-use std::str::Utf8Error;
-use std::string::FromUtf8Error;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use std::time::Duration;
 use async_std::io as async_io;
 
 use crate::ftp_error::{FtpError, FtpResult};
-use crate::ftp_error::FtpError::{SocketWriteError, Utf8};
 
 pub struct Connection {
 	buf: BytesMut,
@@ -85,7 +81,9 @@ impl Connection {
 	}
 	
 	pub async fn close(&mut self) {
-		self.stream.shutdown().await;
+		if let Err(e) = self.stream.shutdown().await {
+			error!("Failed to shutdown connection {:?}", e);
+		}
 		info!("Connection closed");
 	}
 }
