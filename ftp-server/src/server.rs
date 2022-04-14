@@ -28,9 +28,11 @@ use crate::connection::Connection;
 use async_shutdown::Shutdown;
 use std::net::SocketAddr;
 
+
 pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
+	
 	let server = TcpListener::bind(ADDR).await?;
-	info!("Server listening on {}", ADDR);
+	info!("Server listening on {:?}", server.local_addr().unwrap());
 	
 	// Simply use `wrap_cancel` for everything, since we do not need clean-up for the listening socket.
 	// See `handle_client` for a case where a future is given the time to perform logging after the shutdown was triggered.

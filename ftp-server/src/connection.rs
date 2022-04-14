@@ -15,12 +15,15 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
+use std::net::IpAddr;
 use bytes::{BytesMut};
 use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use log::{debug, error, info, warn};
 use std::time::Duration;
 use async_std::io as async_io;
+
+use std::net::SocketAddr;
 
 use crate::ftp_error::{FtpError, FtpResult};
 
@@ -32,11 +35,16 @@ pub struct Connection {
 }
 
 impl Connection {
+	
 	pub fn new(stream: TcpStream) -> Self {
 		Connection {
 			buf: BytesMut::new(),
 			stream,
 		}
+	}
+	
+	pub fn addr(&self) -> SocketAddr {
+		return self.stream.local_addr().unwrap();
 	}
 	
 	pub async fn read(&mut self) -> Option<String> {

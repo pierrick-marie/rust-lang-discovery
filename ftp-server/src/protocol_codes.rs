@@ -88,7 +88,7 @@ impl Display for ServerResponse {
 			ServiceClosingControlConnection => { write!(f, "{} Closing control connection \r\n", ServiceClosingControlConnection as i32) },
 			DataConnectionOpen => { write!(f, "{} Data connection open \r\n", DataConnectionOpen as i32) },
 			ClosingDataConnection => { write!(f, "{} Closing data connection \r\n", ClosingDataConnection as i32) },
-			EnteringPassiveMode => { write!(f, "{} Entering passiv mode \r\n", EnteringPassiveMode as i32) },
+			EnteringPassiveMode => { write!(f, "{} Entering Passive Mode \r\n", EnteringPassiveMode as i32) },
 			UserLoggedIn => { write!(f, "{} User logged in \r\n", UserLoggedIn as i32) },
 			RequestedFileActionOkay => { write!(f, "{} Request file action ok \r\n", RequestedFileActionOkay as i32) },
 			PATHNAMECreated => { write!(f, "{} Path created \r\n", PATHNAMECreated as i32) },
@@ -141,6 +141,7 @@ pub const AUTH: &str = "AUTH";
 pub const CWD: &str = "CWD";
 pub const LIST: &str = "LIST";
 pub const PASS: &str = "PASS";
+pub const PASV: &str = "PASV";
 pub const PORT: &str = "PORT";
 pub const PWD: &str = "PWD";
 pub const QUIT: &str = "QUIT";
@@ -165,6 +166,7 @@ pub enum ClientCommand {
 	NoOp,
 	Port(u16),
 	Pass(String),
+	Pasv,
 	Pwd,
 	Quit,
 	Retr(PathBuf),
@@ -187,6 +189,7 @@ impl ClientCommand {
 			PASS => Pass(arg.to_string()),
 			PORT => Port(arg.to_string().parse::<u16>().unwrap()),
 			PWD => Pwd,
+			PASV => Pasv,
 			QUIT => Quit,
 			RETR => Retr(PathBuf::from(arg.to_string())),
 			STOR => Stor(PathBuf::from(arg.to_string())),
@@ -217,6 +220,7 @@ impl Display for ClientCommand {
 			Pass(arg) => write!(f, "{} xxxx", PASS),
 			Port(arg) => write!(f, "{} {}", PORT, arg),
 			Pwd => write!(f, "{}", PWD),
+			Pasv => write!(f, "{}", PASV),
 			Quit => write!(f, "{}", QUIT),
 			Retr(arg) => write!(f, "{} {}", RETR, arg.as_path().to_str().unwrap()),
 			Stor(arg) => write!(f, "{} {}", STOR, arg.as_path().to_str().unwrap()),
