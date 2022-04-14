@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use log::{error, info};
+use log::{error, info, Level};
 
 use async_shutdown::Shutdown;
 
@@ -28,6 +28,8 @@ mod connection;
 use crate::client::Client;
 
 pub const ADDR: &str = "127.0.0.1:8080";
+
+pub const LEVEL: Level = Level::Info;
 
 async fn wait_ctrl_c(shutdown: Shutdown) {
 	

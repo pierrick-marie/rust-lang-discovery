@@ -15,45 +15,92 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
+use std::str::FromStr;
 use crate::protocol_codes::*;
-use regex::{Regex};
+use regex::{Match, Regex};
 
 use log::{debug, error, info, warn};
 use crate::protocol_codes;
 use crate::connection::Connection;
+use crate::ftp_error::FtpResult;
+
+struct User {
+	login: String,
+	// password: String, // Do not save the passwaord
+}
+
+impl Display for User {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		write!(f, "FTP User: {}", self.login)
+	}
+}
 
 pub struct Client {
 	connection: Connection,
+	user: Option<User>,
 }
 
 impl Client {
 	pub fn new(connection: Connection) -> Self {
 		Client {
 			connection,
+			user: None,
 		}
 	}
 	
 	pub async fn run(&mut self) -> std::io::Result<()> {
-		match self.user().await {
-			Some(name) => {
-				info!("Logged: {}", name);
-			}
-			_ => {
-				self.close_connection().await;
-				return Err(Error::new(ErrorKind::NotConnected, "client::run ==> Failed to log in"));
-			}
+		
+		if let Err(e) = self.connection.write(ServerResponse::ServiceReadyForNewUser.to_string()).await {
+			return Err(Error::new(ErrorKind::NotConnected, e.to_string()));
 		}
+		
+		if let Some(user) = self.connect().await {
+			self.user = Some(user);
+			info!("Connected {}", self.user.as_ref().unwrap());
+		}
+		
 		self.close_connection().await;
 		Ok(())
 	}
 	
+	async fn connect(&mut self) -> Option<User> {
+		loop {
+			match self.user().await {
+				Some(login) => {
+					info!("Login: {}", login);
+					if let Err(e) = self.connection.write(ServerResponse::UserNameOkayNeedPassword.to_string()).await {
+						error!("Not connected {:?}", e);
+						return None;
+					}
+					match self.password().await {
+						Some(pass) => {
+							info!("Password: {}", pass);
+							return Some(User {
+								login,
+							});
+						}
+						_ => {
+							if let Err(e) = self.connection.write(ServerResponse::NotLoggedIn.to_string()).await {
+								error!("Not connected {:?}", e);
+								return None;
+							}
+						}
+					}
+				}
+				_ => {
+					if let Err(e) = self.connection.write(ServerResponse::NotLoggedIn.to_string()).await {
+						error!("Not connected {:?}", e);
+						return None;
+					}
+				}
+			}
+		}
+	}
+	
 	async fn user(&mut self) -> Option<String> {
 		debug!("client::user");
-		if let Err(e) = self.connection.write(ServerResponse::ServiceReadyForNewUser.to_string()).await {
-			error!("{:?}", e);
-			return None;
-		}
 		let msg = self.connection.read().await?;
 		return match self.parse_command(msg.clone())? {
 			ClientCommand::User(ref args) => {
@@ -72,32 +119,40 @@ impl Client {
 		};
 	}
 	
+	async fn password(&mut self) -> Option<String> {
+		debug!("client::password");
+		let msg = self.connection.read().await?;
+		return match self.parse_command(msg.clone())? {
+			ClientCommand::Pasv(ref args) => {
+				if self.check_username(args) {
+					info!("PASSWORD xxx");
+					Some(args.clone())
+				} else {
+					error!("Password error: {}", args);
+					None
+				}
+			}
+			_ => {
+				error!("Unexpected command: {}", msg);
+				None
+			}
+		};
+	}
+	
 	fn parse_command(&self, msg: String) -> Option<ClientCommand> {
 		debug!("client::parse_command {}", msg);
 		let re = Regex::new(r"([[:upper:]]{3,4})( .+)*").ok()?;
 		let cap = re.captures(msg.as_str())?;
 		return if let Some(cmd) = cap.get(1) {
 			if let Some(args) = cap.get(2) {
-				self.get_command(cmd.as_str(), args.as_str().to_string().trim())
+				Some(ClientCommand::new(cmd.as_str(), args.as_str().to_string().trim()))
 			} else {
-				self.get_command(cmd.as_str(), "")
+				Some(ClientCommand::new(cmd.as_str(), ""))
 			}
 		} else {
 			error!("failed to parse message: {}", msg);
 			None
 		};
-	}
-	
-	fn get_command(&self, command: &str, args: &str) -> Option<ClientCommand> {
-		debug!("client::get_command");
-		match command {
-			protocol_codes::USER => Some(ClientCommand::User(args.to_string())),
-			protocol_codes::PWD => Some(ClientCommand::Pwd),
-			_ => {
-				error!("Command not found: {:?}", command);
-				return None;
-			}
-		}
 	}
 	
 	fn check_username(&self, username: &String) -> bool {

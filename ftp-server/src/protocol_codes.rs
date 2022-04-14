@@ -18,6 +18,8 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 extern crate num;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
+use std::str::FromStr;
+use crate::ftp_error::FtpError;
 
 use self::ServerResponse::*;
 use self::ClientCommand::*;
@@ -25,13 +27,12 @@ use self::ClientCommand::*;
 #[derive(Debug, Clone, Copy)]
 #[repr(u32)]
 #[allow(dead_code)]
-// num::FromPrimitive::from_i32(code);
 pub enum ServerResponse {
 	RestartMarkerReply = 110,
 	ServiceReadInXXXMinutes = 120,
 	DataConnectionAlreadyOpen = 125,
 	FileStatusOk = 150,
-	Ok = 200,
+	OK = 200,
 	CommandNotImplementedSuperfluousAtThisSite = 202,
 	SystemStatus = 211,
 	DirectoryStatus = 212,
@@ -75,7 +76,7 @@ impl Display for ServerResponse {
 			ServiceReadInXXXMinutes => { write!(f, "{} Service ready later \r\n", ServiceReadInXXXMinutes as i32) },
 			DataConnectionAlreadyOpen => { write!(f, "{} Data connection already open \r\n", DataConnectionAlreadyOpen as i32) },
 			FileStatusOk => { write!(f, "{} File status OK \r\n", FileStatusOk as i32) },
-			Ok => { write!(f, "{} Ok \r\n", Ok as i32) },
+			OK => { write!(f, "{} Ok \r\n", OK as i32) },
 			CommandNotImplementedSuperfluousAtThisSite => { write!(f, "{} Command not implemented \r\n", CommandNotImplementedSuperfluousAtThisSite as i32) },
 			SystemStatus => { write!(f, "{} System status \r\n", SystemStatus as i32) },
 			DirectoryStatus => { write!(f, "{} Directory status \r\n", DirectoryStatus as i32) },
@@ -90,7 +91,7 @@ impl Display for ServerResponse {
 			UserLoggedIn => { write!(f, "{} User logged in \r\n", UserLoggedIn as i32) },
 			RequestedFileActionOkay => { write!(f, "{} Request file action ok \r\n", RequestedFileActionOkay as i32) },
 			PATHNAMECreated => { write!(f, "{} Path created \r\n", PATHNAMECreated as i32) },
-			UserNameOkayNeedPassword => { write!(f, "{} User ok, need password \r\n", UserNameOkayNeedPassword as i32) },
+			UserNameOkayNeedPassword => { write!(f, "{} Please specify the password \r\n", UserNameOkayNeedPassword as i32) },
 			NeedAccountForLogin => { write!(f, "{} Need account for login \r\n", NeedAccountForLogin as i32) },
 			RequestedFileActionPendingFurtherInformation => { write!(f, "{} Request further information \r\n", RequestedFileActionPendingFurtherInformation as i32) },
 			ServiceNotAvailable => { write!(f, "{} Service not available \r\n", ServiceNotAvailable as i32) },
@@ -104,7 +105,7 @@ impl Display for ServerResponse {
 			CommandNotImplemented => { write!(f, "{} Not implemented yet \r\n", CommandNotImplemented as i32) },
 			BadSequenceOfCommands => { write!(f, "{} Bad command \r\n", BadSequenceOfCommands as i32) },
 			CommandNotImplementedForThatParameter => { write!(f, "{} Not implemented for thet parameter \r\n", CommandNotImplementedForThatParameter as i32) },
-			NotLoggedIn => { write!(f, "{} Not logged in \r\n", NotLoggedIn as i32) },
+			NotLoggedIn => { write!(f, "{} Please login with USER and PASS \r\n", NotLoggedIn as i32) },
 			NeedAccountForStoringFiles => { write!(f, "{} need account for storing files \r\n", NeedAccountForStoringFiles as i32) },
 			FileNotFound => { write!(f, "{} File not found \r\n", FileNotFound as i32) },
 			PageTypeUnknown => { write!(f, "{} Page type unknown \r\n", PageTypeUnknown as i32) },
@@ -113,6 +114,10 @@ impl Display for ServerResponse {
 		}
 	}
 }
+
+pub const ASCII: &str = "Ascii";
+pub const IMAGE: &str = "Image";
+pub const UNKNOWN: &str = "Unknown";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TransferType {
@@ -129,28 +134,6 @@ impl Display for TransferType {
 			TransferType::Unknown => { write!(f, "Unknown") }
 		}
 	}
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)]
-pub enum ClientCommand {
-	Auth,
-	Cwd(PathBuf),
-	List(Option<PathBuf>),
-	Mkd(PathBuf),
-	NoOp,
-	Port(u16),
-	Pasv,
-	Pwd,
-	Quit,
-	Retr(PathBuf),
-	Rmd(PathBuf),
-	Stor(PathBuf),
-	Syst,
-	Type(TransferType),
-	CdUp,
-	Unknown(String),
-	User(String),
 }
 
 pub const AUTH: &str = "AUTH";
@@ -171,13 +154,66 @@ pub const RMD: &str = "RMD";
 pub const NOOP: &str = "NOOP";
 pub const UNKN: &str = "UNKN";
 
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+pub enum ClientCommand {
+	Auth,
+	Cwd(PathBuf),
+	List(PathBuf),
+	Mkd(PathBuf),
+	NoOp,
+	Port(u16),
+	Pasv(String),
+	Pwd,
+	Quit,
+	Retr(PathBuf),
+	Rmd(PathBuf),
+	Stor(PathBuf),
+	Syst,
+	Type(TransferType),
+	CdUp,
+	Unknown(String),
+	User(String),
+}
+
+impl ClientCommand {
+	
+	pub fn new(input: &str, arg: &str) -> ClientCommand {
+		match input {
+			AUTH => Auth,
+			CWD => Cwd(PathBuf::from(arg.to_string())),
+			LIST => List(PathBuf::from(arg.to_string())),
+			PASV => Pasv(arg.to_string()),
+			PORT => Port(arg.to_string().parse::<u16>().unwrap()),
+			PWD => Pwd,
+			QUIT => Quit,
+			RETR => Retr(PathBuf::from(arg.to_string())),
+			STOR => Stor(PathBuf::from(arg.to_string())),
+			SYST => Syst,
+			TYPE => {
+				match arg {
+					ASCII => Type(TransferType::Ascii),
+					IMAGE => Type(TransferType::Image),
+					_ => Type(TransferType::Unknown),
+				}
+			},
+			USER => User(arg.to_string()),
+			CDUP => CdUp,
+			MKD => Mkd(PathBuf::from(arg.to_string())),
+			RMD => Rmd(PathBuf::from(arg.to_string())),
+			NOOP => NoOp,
+			_ => Unknown(arg.to_string()),
+		}
+	}
+}
+
 impl Display for ClientCommand {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Auth => write!(f, "{}", AUTH),
 			Cwd(arg) => write!(f, "{} {}", CWD, arg.as_path().to_str().unwrap()),
-			List(arg) => write!(f, "{} {}", LIST, arg.clone().unwrap().as_path().to_str().unwrap()),
-			Pasv => write!(f, "{}", PASV),
+			List(arg) => write!(f, "{} {}", LIST, arg.as_path().to_str().unwrap()),
+			Pasv(arg) => write!(f, "{} xxxx", PASV),
 			Port(arg) => write!(f, "{} {}", PORT, arg),
 			Pwd => write!(f, "{}", PWD),
 			Quit => write!(f, "{}", QUIT),
@@ -194,45 +230,3 @@ impl Display for ClientCommand {
 		}
 	}
 }
-
-// pub struct ServerCommand {
-// 	code: ServerResponse,
-// 	args: String,
-// }
-//
-// impl ServerCommand {
-//
-// 	pub fn new(code: ServerResponse, args: &str) -> Self {
-// 		ServerCommand {
-// 			code,
-// 			args: args.to_string()
-// 		}
-// 	}
-//
-// 	pub fn code(&self) -> ServerResponse {
-// 		self.code
-// 	}
-//
-// 	pub fn args(&self) -> &str {
-// 		self.args.as_str()
-// 	}
-// }
-
-// impl CommandCode {
-	
-	
-	// fn exec(&self) {
-	// 	let element = num::FromPrimitive::from_i32(self.code);
-	// 	match element {
-	// 		Some(ResponseCode::Ok) => {
-	// 			println!("OK command with args: {}", self.args)
-	// 		}
-	// 		Some(ResponseCode::UnknownCommand) => {
-	// 			println!("Unknown command with args: {}", self.args)
-	// 		}
-	// 		_ => {
-	// 			println!("Empty command")
-	// 		}
-	// 	}
-	// }
-// }

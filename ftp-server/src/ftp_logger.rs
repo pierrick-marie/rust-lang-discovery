@@ -19,12 +19,9 @@ use log::{Level, Record, Metadata, SetLoggerError, LevelFilter};
 
 struct SimpleLogger;
 
-const MAX_LEVEL: Level = Level::Info;
-const MAX_FILTER_LEVEL:LevelFilter = LevelFilter::Info;
-
 impl log::Log for SimpleLogger {
 	fn enabled(&self, metadata: &Metadata) -> bool {
-		metadata.level() <= MAX_LEVEL
+		metadata.level() <= crate::LEVEL
 	}
 	
 	fn log(&self, record: &Record) {
@@ -40,5 +37,5 @@ static LOGGER: SimpleLogger = SimpleLogger;
 
 pub fn init() -> Result<(), SetLoggerError> {
 	log::set_logger(&LOGGER)
-		.map(|()| log::set_max_level(MAX_FILTER_LEVEL))
+		.map(|()| log::set_max_level(crate::LEVEL.to_level_filter()))
 }
