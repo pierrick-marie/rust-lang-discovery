@@ -58,6 +58,9 @@ impl Client {
 		
 		if let Some(user) = self.connect().await {
 			self.user = Some(user);
+			if let Err(e) = self.connection.write(ServerResponse::UserLoggedIn.to_string()).await {
+				return Err(Error::new(ErrorKind::NotConnected, e.to_string()));
+			}
 			info!("Connected {}", self.user.as_ref().unwrap());
 		}
 		
@@ -123,7 +126,7 @@ impl Client {
 		debug!("client::password");
 		let msg = self.connection.read().await?;
 		return match self.parse_command(msg.clone())? {
-			ClientCommand::Pasv(ref args) => {
+			ClientCommand::Pass(ref args) => {
 				if self.check_username(args) {
 					info!("PASSWORD xxx");
 					Some(args.clone())

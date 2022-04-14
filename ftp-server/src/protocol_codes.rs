@@ -139,7 +139,7 @@ impl Display for TransferType {
 pub const AUTH: &str = "AUTH";
 pub const CWD: &str = "CWD";
 pub const LIST: &str = "LIST";
-pub const PASV: &str = "PASV";
+pub const PASS: &str = "PASS";
 pub const PORT: &str = "PORT";
 pub const PWD: &str = "PWD";
 pub const QUIT: &str = "QUIT";
@@ -163,7 +163,7 @@ pub enum ClientCommand {
 	Mkd(PathBuf),
 	NoOp,
 	Port(u16),
-	Pasv(String),
+	Pass(String),
 	Pwd,
 	Quit,
 	Retr(PathBuf),
@@ -183,7 +183,7 @@ impl ClientCommand {
 			AUTH => Auth,
 			CWD => Cwd(PathBuf::from(arg.to_string())),
 			LIST => List(PathBuf::from(arg.to_string())),
-			PASV => Pasv(arg.to_string()),
+			PASS => Pass(arg.to_string()),
 			PORT => Port(arg.to_string().parse::<u16>().unwrap()),
 			PWD => Pwd,
 			QUIT => Quit,
@@ -213,7 +213,7 @@ impl Display for ClientCommand {
 			Auth => write!(f, "{}", AUTH),
 			Cwd(arg) => write!(f, "{} {}", CWD, arg.as_path().to_str().unwrap()),
 			List(arg) => write!(f, "{} {}", LIST, arg.as_path().to_str().unwrap()),
-			Pasv(arg) => write!(f, "{} xxxx", PASV),
+			Pass(arg) => write!(f, "{} xxxx", PASS),
 			Port(arg) => write!(f, "{} {}", PORT, arg),
 			Pwd => write!(f, "{}", PWD),
 			Quit => write!(f, "{}", QUIT),
