@@ -21,7 +21,7 @@ This file comes from the project tokio-rs/mini-redis (Licence MIT) : https://raw
 I modified some parts of it.
 */
 
-use log::{error, info};
+use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
 use crate::{ADDR, Client};
 use crate::connection::Connection;
@@ -56,7 +56,7 @@ async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAdd
 	// Here it is easier to use a token though.
 	let _delay_token = match shutdown.delay_shutdown_token() {
 		Ok(token) => {
-			info!("TOKEN DELAY SHUTDOWN");
+			debug!("Token delay shutdown");
 			token
 		}
 		Err(_) => {
@@ -70,11 +70,11 @@ async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAdd
 	
 	// Now run the echo loop, but cancel it when the shutdown is triggered.
 	match shutdown.wrap_cancel(client.run()).await {
-		Some(Err(e)) => error!("Error in connection {}: {}", address, e),
+		Some(Err(e)) => error!("Error in connection {}: {:?}", address, e),
 		Some(Ok(())) => info!("Connection closed by {}", address),
 		None => {
 			info!("Shutdown triggered, closing connection with {}", address);
-			client.stop().await;
+			client.close_connection().await;
 		}
 	}
 	

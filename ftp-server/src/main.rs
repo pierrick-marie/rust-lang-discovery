@@ -72,34 +72,6 @@ async fn main() {
 	shutdown.wait_shutdown_complete().await;
 	
 	std::process::exit(exit_code);
-	
-	// OLD
-	// let listener = TcpListener::bind("127.0.0.1:8080").await.unwrap();
-	// let mut server = Server::new(listener, rx.clone());
-	//
-	// let mut ok = true;
-	//
-	// tokio::spawn( async move {
-	// 	while rx.changed().await.is_ok() {
-	// 		match &*rx.borrow() {
-	// 			SocketMessage::OpenSocket => {}
-	// 			SocketMessage::CloseSocket => {
-	// 				// self.close();
-	// 				info!("CLOSE main");
-	// 				ok = false;
-	// 			}
-	// 		}
-	// 	}
-	// });
-	//
-	// tokio::spawn( async move {
-	// 	server.run().await;
-	// });
-	//
-	// wait_ctrl_c().await;
-	// tx.send(SocketMessage::CloseSocket);
-	//
-	// info!("Exit");
 }
 
 

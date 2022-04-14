@@ -18,11 +18,13 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 use bytes::{BytesMut};
 use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::time::Duration;
 use async_std::io as async_io;
 
 use crate::ftp_error::{FtpError, FtpResult};
+
+const TIME_OUT: u64 = 50;
 
 pub struct Connection {
 	buf: BytesMut,
@@ -37,53 +39,56 @@ impl Connection {
 		}
 	}
 	
-	pub async fn read(&mut self) -> FtpResult<String> {
+	pub async fn read(&mut self) -> Option<String> {
+		debug!("connection::read");
 		self.buf.clear();
-		match async_io::timeout(Duration::from_secs(50), async {
+		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
 			self.stream.read_buf(&mut self.buf).await
 		}).await {
 			Ok(n) => {
 				if n > 0 {
-					if let Ok(msg) = String::from_utf8(self.buf.to_vec()) {
-						let message = msg.trim();
-						info!(" <<<< {}", message);
-						return Ok(message.to_string());
+					match String::from_utf8(self.buf.to_vec()) {
+						Ok(msg) => {
+							let message = msg.trim();
+							info!(" <<<< {}", message);
+							return Some(message.to_string());
+						}
+						Err(e) => {
+							error!("UTF_8 error, {:?}", e);
+						}
 					}
+				} else {
+					error!("Client disconnected");
 				}
-				return Err(FtpError::Utf8("connection::read".to_string(), format!("UTF_8 error, buffer={:?}", self.buf)));
 			}
 			Err(e) => {
-				return Err(FtpError::SocketReadError("connection::read".to_string(), e.to_string()));
+				error!("{:?}", e);
 			}
 		}
+		return None;
 	}
 	
-	pub async fn write(&mut self, msg: String) -> FtpResult<String> {
-		let mut attempt = 2;
-		loop {
-			match async_io::timeout(Duration::from_secs(5), async {
-				self.stream.write_all(msg.as_bytes()).await
-			}).await {
-				Ok(_) => {
-					info!(" >>>> {}", msg);
-					return Ok(msg);
-				}
-				Err(e) => {
-					if attempt > 0 {
-						attempt -= 1;
-						warn!("Failed to send message: {}", msg);
-					} else {
-						return Err(FtpError::SocketWriteError("connection::write".to_string(), e.to_string()));
-					}
-				}
+	pub async fn write(&mut self, msg: String) -> FtpResult<()> {
+		debug!("connection::write");
+		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
+			self.stream.write_all(msg.as_bytes()).await
+		}).await {
+			Ok(_) => {
+				info!(" >>>> {}", msg);
+				return Ok(());
+			}
+			Err(e) => {
+				error!("Failed to send message: {}, {:?}", msg, e);
+				return Err(FtpError::SocketWriteError);
 			}
 		}
 	}
 	
 	pub async fn close(&mut self) {
+		debug!("connection::close");
 		if let Err(e) = self.stream.shutdown().await {
 			error!("Failed to shutdown connection {:?}", e);
 		}
-		info!("Connection closed");
+		info!("Connection closed by server");
 	}
 }

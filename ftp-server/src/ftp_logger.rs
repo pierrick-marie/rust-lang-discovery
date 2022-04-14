@@ -19,8 +19,8 @@ use log::{Level, Record, Metadata, SetLoggerError, LevelFilter};
 
 struct SimpleLogger;
 
-const MAX_LEVEL: Level = Level::Trace;
-const MAX_FILTER_LEVEL:LevelFilter = LevelFilter::Trace;
+const MAX_LEVEL: Level = Level::Info;
+const MAX_FILTER_LEVEL:LevelFilter = LevelFilter::Info;
 
 impl log::Log for SimpleLogger {
 	fn enabled(&self, metadata: &Metadata) -> bool {

@@ -15,13 +15,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
+use std::io::{Error, ErrorKind};
 use crate::protocol_codes::*;
 use regex::{Regex};
 
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use crate::protocol_codes;
 use crate::connection::Connection;
-use crate::ftp_error::{FtpError, FtpResult};
 
 pub struct Client {
 	connection: Connection,
@@ -34,93 +34,82 @@ impl Client {
 		}
 	}
 	
-	fn parse_command(&self, msg: String) -> FtpResult<ClientCommand> {
-		let re = Regex::new(r"([[:upper:]]{3,4})( .+)*").unwrap();
-		if let Some(cap) = re.captures(msg.as_str()) {
-			if let Some(cmd) = cap.get(1) {
-				if let Some(args) = cap.get(2) {
-					return self.get_command(cmd.as_str(), args.as_str());
-				} else {
-					return self.get_command(cmd.as_str(), "");
-				}
+	pub async fn run(&mut self) -> std::io::Result<()> {
+		match self.user().await {
+			Some(name) => {
+				info!("Logged: {}", name);
+			}
+			_ => {
+				self.close_connection().await;
+				return Err(Error::new(ErrorKind::NotConnected, "client::run ==> Failed to log in"));
 			}
 		}
-		return Err(FtpError::ParseMessage("client::parse_command".to_string(), format!("failed to parse message: {:?}", msg)));
+		self.close_connection().await;
+		Ok(())
 	}
 	
-	fn get_command(&self, command: &str, args: &str) -> FtpResult<ClientCommand> {
+	async fn user(&mut self) -> Option<String> {
+		debug!("client::user");
+		if let Err(e) = self.connection.write(ServerResponse::ServiceReadyForNewUser.to_string()).await {
+			error!("{:?}", e);
+			return None;
+		}
+		let msg = self.connection.read().await?;
+		return match self.parse_command(msg.clone())? {
+			ClientCommand::User(ref args) => {
+				if self.check_username(args) {
+					info!("USER: {}", args);
+					Some(args.clone())
+				} else {
+					error!("User name error: {}", args);
+					None
+				}
+			}
+			_ => {
+				error!("Unexpected command: {}", msg);
+				None
+			}
+		};
+	}
+	
+	fn parse_command(&self, msg: String) -> Option<ClientCommand> {
+		debug!("client::parse_command {}", msg);
+		let re = Regex::new(r"([[:upper:]]{3,4})( .+)*").ok()?;
+		let cap = re.captures(msg.as_str())?;
+		return if let Some(cmd) = cap.get(1) {
+			if let Some(args) = cap.get(2) {
+				self.get_command(cmd.as_str(), args.as_str().to_string().trim())
+			} else {
+				self.get_command(cmd.as_str(), "")
+			}
+		} else {
+			error!("failed to parse message: {}", msg);
+			None
+		};
+	}
+	
+	fn get_command(&self, command: &str, args: &str) -> Option<ClientCommand> {
+		debug!("client::get_command");
 		match command {
-			protocol_codes::USER => Ok(ClientCommand::User(args.to_string())),
-			protocol_codes::PWD => Ok(ClientCommand::Pwd),
-			_ => Err(FtpError::UnknownCommand("client::get_command".to_string(), command.to_string()))
+			protocol_codes::USER => Some(ClientCommand::User(args.to_string())),
+			protocol_codes::PWD => Some(ClientCommand::Pwd),
+			_ => {
+				error!("Command not found: {:?}", command);
+				return None;
+			}
 		}
 	}
 	
-	pub async fn stop(&mut self) {
-		info!("Stop client");
+	fn check_username(&self, username: &String) -> bool {
+		let re = Regex::new(r"^([[:word:]]+)$").unwrap();
+		re.captures(username.as_str()).is_some()
+	}
+	
+	pub async fn close_connection(&mut self) {
+		info!("Close client connection");
 		if let Err(e) = self.connection.write(ServerResponse::ConnectionClosed.to_string()).await {
 			error!("Failed to close connection with client: {:?}", e);
 		}
 		self.connection.close().await;
-	}
-	
-	pub async fn run(&mut self) -> std::io::Result<()>{
-		match self.user().await {
-			Ok(_) => {
-				info!("Logged !");
-			}
-			Err(e) => {
-				error!("{}", e);
-			}
-		}
-		
-		Ok(())
-	}
-	
-	async fn user(&mut self) -> FtpResult<()> {
-		let mut attempt = 3;
-		loop {
-			if attempt <= 0 {
-				self.connection.close().await;
-				return Err(FtpError::NotLogged("client::user".to_string(), "3 attempts left".to_string()));
-			}
-			if let Err(e) = self.connection.write(ServerResponse::ServiceReadyForNewUser.to_string()).await {
-				return Err(FtpError::Disconnected("client::user".to_string(), e.to_string()));
-			}
-			match self.connection.read().await {
-				Ok(msg) => {
-					match self.parse_command(msg) {
-						Ok(command) => {
-							match command {
-								ClientCommand::User(ref args) => {
-									info!("OK !!! {:?}", command);
-									return Ok(());
-								}
-								_ => {
-									warn!("Unexpected command: {}", command);
-									attempt -= 1;
-								}
-							}
-						}
-						Err(e) => {
-							attempt -= 1;
-							warn!("{}", e);
-						}
-					}
-				}
-				Err(e) => {
-					match e {
-						FtpError::Utf8(_, _) => {
-							attempt -= 1;
-							warn!("{}", e);
-						}
-						_ => {
-							self.connection.close().await;
-							return Err(FtpError::Disconnected("client::user".to_string(), e.to_string()));
-						}
-					}
-				}
-			}
-		}
 	}
 }

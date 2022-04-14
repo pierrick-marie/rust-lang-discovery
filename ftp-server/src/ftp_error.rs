@@ -19,19 +19,20 @@ use std::fmt::{Debug, Display, Formatter};
 use std::result;
 use std::str::Utf8Error;
 use std::error;
+use log::debug;
 
 use tokio::io;
 
 pub enum FtpError {
-	TimeOut(String, String),
-	SocketWriteError(String, String),
-	Disconnected(String, String),
-	Utf8(String, String),
-	ParseMessage(String, String),
-	UnknownCommand(String, String),
-	UnexpectedCommand(String, String, String),
-	SocketReadError(String, String),
-	NotLogged(String, String),
+	TimeOut,
+	SocketWriteError,
+	Disconnected,
+	Utf8,
+	ParseMessage,
+	UnknownCommand,
+	UnexpectedCommand,
+	SocketReadError,
+	NotLogged,
 }
 
 pub type FtpResult<T> = result::Result<T, FtpError>;
@@ -39,15 +40,15 @@ pub type FtpResult<T> = result::Result<T, FtpError>;
 impl Display for FtpError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			FtpError::TimeOut(from, msg) => { write!(f, "!!Error!! Time out connection ==> {} --> {}", from, msg) }
-			FtpError::NotLogged(from, msg) => { write!(f, "!!Error!! Client not logged ==> {} --> {}", from, msg) }
-			FtpError::SocketWriteError(from, msg) => { write!(f, "!!Error!! Connection closed ==> {} --> {}", from, msg) }
-			FtpError::Utf8(from, msg) => { write!(f, "!!Error!! UTF_8 error ==> {} --> {}", from, msg) }
-			FtpError::ParseMessage(from, msg) => { write!(f, "!!Error!! Wrong data, impossible to parse message ==> {} --> {}", from, msg) }
-			FtpError::UnknownCommand(from, msg) => { write!(f, "!!Error!! Unknown command ==> {} --> {}", from, msg) }
-			FtpError::Disconnected(from, msg) => { write!(f, "!!Error!! Disconnected ==> {} --> {}", from, msg) }
-			FtpError::SocketReadError(from, msg) => { write!(f, "!!Error!! Client does not answer ==> {} --> {}", from, msg) }
-			FtpError::UnexpectedCommand(from, expected, found) => { write!(f, "!!Error!! Unexpected command ==> {} --> expected {:?}, found {:?}", from, expected, found) }
+			FtpError::TimeOut => { write!(f, "!!Error!! Time out connection") }
+			FtpError::NotLogged => { write!(f, "!!Error!! Client not logged") }
+			FtpError::SocketWriteError => { write!(f, "!!Error!! Connection closed") }
+			FtpError::Utf8 => { write!(f, "!!Error!! UTF_8 error") }
+			FtpError::ParseMessage => { write!(f, "!!Error!! Wrong data, impossible to parse message") }
+			FtpError::UnknownCommand => { write!(f, "!!Error!! Unknown command") }
+			FtpError::Disconnected => { write!(f, "!!Error!! Disconnected") }
+			FtpError::SocketReadError => { write!(f, "!!Error!! Client does not answer") }
+			FtpError::UnexpectedCommand => { write!(f, "!!Error!! Unexpected command") }
 		}
 	}
 }
