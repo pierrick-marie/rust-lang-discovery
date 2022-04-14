@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 extern crate num;
+use std::env;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -82,7 +83,7 @@ impl Display for ServerResponse {
 			DirectoryStatus => { write!(f, "{} Directory status \r\n", DirectoryStatus as i32) },
 			FileStatus => { write!(f, "{} File status \r\n", FileStatus as i32) },
 			HelpMessage => { write!(f, "{} Help \r\n", HelpMessage as i32) },
-			SystemType => { write!(f, "{} System type \r\n", SystemType as i32) },
+			SystemType => { write!(f, "{} {} \r\n", SystemType as i32, env::consts::OS) },
 			ServiceReadyForNewUser => { write!(f, "{} Welcome to my rust ftp server. I'm waiting for your user name \r\n", ServiceReadyForNewUser as i32) },
 			ServiceClosingControlConnection => { write!(f, "{} Closing control connection \r\n", ServiceClosingControlConnection as i32) },
 			DataConnectionOpen => { write!(f, "{} Data connection open \r\n", DataConnectionOpen as i32) },

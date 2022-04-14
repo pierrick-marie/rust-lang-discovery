@@ -24,7 +24,7 @@ use regex::{Match, Regex};
 use log::{debug, error, info, warn};
 use crate::protocol_codes;
 use crate::connection::Connection;
-use crate::ftp_error::FtpResult;
+use crate::ftp_error::{FtpError, FtpResult};
 
 struct User {
 	login: String,
@@ -51,7 +51,6 @@ impl Client {
 	}
 	
 	pub async fn run(&mut self) -> std::io::Result<()> {
-		
 		if let Err(e) = self.connection.write(ServerResponse::ServiceReadyForNewUser.to_string()).await {
 			return Err(Error::new(ErrorKind::NotConnected, e.to_string()));
 		}
@@ -64,8 +63,47 @@ impl Client {
 			info!("Connected {}", self.user.as_ref().unwrap());
 		}
 		
+		self.command().await;
+		
 		self.close_connection().await;
 		Ok(())
+	}
+	
+	async fn command(&mut self) {
+		debug!("client::command");
+		loop {
+			let msg = self.connection.read().await.unwrap_or(FtpError::SocketReadError.to_string());
+			match self.parse_command(msg.clone()) {
+				ClientCommand::Auth => { unimplemented!() }
+				ClientCommand::Cwd(arg) => { unimplemented!() }
+				ClientCommand::List(arg) => { unimplemented!() }
+				ClientCommand::Mkd(arg) => { unimplemented!() }
+				ClientCommand::NoOp => { unimplemented!() }
+				ClientCommand::Port(arg) => { unimplemented!() }
+				ClientCommand::Pwd => { unimplemented!() }
+				ClientCommand::Quit => { unimplemented!() }
+				ClientCommand::Retr(arg) => { unimplemented!() }
+				ClientCommand::Rmd(arg) => { unimplemented!() }
+				ClientCommand::Stor(arg) => { unimplemented!() }
+				ClientCommand::Syst => {
+					if self.syst().await.is_err() {
+						error!("BREAK ?!?");
+						break;
+					}
+				}
+				ClientCommand::Type(arg) => { unimplemented!() }
+				ClientCommand::CdUp => { unimplemented!() }
+				_ => {
+					error!("Unknown command {}", msg);
+					break;
+				}
+			}
+		}
+	}
+	
+	async fn syst(&mut self) -> FtpResult<()> {
+		info!("SYST command");
+		self.connection.write(ServerResponse::SystemType.to_string()).await
 	}
 	
 	async fn connect(&mut self) -> Option<User> {
@@ -105,7 +143,7 @@ impl Client {
 	async fn user(&mut self) -> Option<String> {
 		debug!("client::user");
 		let msg = self.connection.read().await?;
-		return match self.parse_command(msg.clone())? {
+		return match self.parse_command(msg.clone()) {
 			ClientCommand::User(ref args) => {
 				if self.check_username(args) {
 					info!("USER: {}", args);
@@ -125,7 +163,7 @@ impl Client {
 	async fn password(&mut self) -> Option<String> {
 		debug!("client::password");
 		let msg = self.connection.read().await?;
-		return match self.parse_command(msg.clone())? {
+		return match self.parse_command(msg.clone()) {
 			ClientCommand::Pass(ref args) => {
 				if self.check_username(args) {
 					info!("PASSWORD xxx");
@@ -142,20 +180,21 @@ impl Client {
 		};
 	}
 	
-	fn parse_command(&self, msg: String) -> Option<ClientCommand> {
+	fn parse_command(&self, msg: String) -> ClientCommand {
 		debug!("client::parse_command {}", msg);
-		let re = Regex::new(r"([[:upper:]]{3,4})( .+)*").ok()?;
-		let cap = re.captures(msg.as_str())?;
-		return if let Some(cmd) = cap.get(1) {
-			if let Some(args) = cap.get(2) {
-				Some(ClientCommand::new(cmd.as_str(), args.as_str().to_string().trim()))
-			} else {
-				Some(ClientCommand::new(cmd.as_str(), ""))
+		if let Some(re) = Regex::new(r"([[:upper:]]{3,4})( .+)*").ok() {
+			if let Some(cap) = re.captures(msg.as_str()) {
+				if let Some(cmd) = cap.get(1) {
+					if let Some(args) = cap.get(2) {
+						return ClientCommand::new(cmd.as_str(), args.as_str().to_string().trim());
+					} else {
+						return ClientCommand::new(cmd.as_str(), "");
+					}
+				}
 			}
-		} else {
-			error!("failed to parse message: {}", msg);
-			None
-		};
+		}
+		error!("failed to parse message: {}", msg);
+		ClientCommand::Unknown(msg)
 	}
 	
 	fn check_username(&self, username: &String) -> bool {
