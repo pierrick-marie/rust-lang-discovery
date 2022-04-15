@@ -23,7 +23,7 @@ I modified some parts of it.
 
 use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
-use crate::{ADDR, Client};
+use crate::{ADDR, Client, PORT};
 use crate::connection::Connection;
 use async_shutdown::Shutdown;
 use std::net::SocketAddr;
@@ -31,7 +31,7 @@ use std::net::SocketAddr;
 
 pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	
-	let server = TcpListener::bind(ADDR).await?;
+	let server = TcpListener::bind(format!("{}:{}", ADDR, PORT)).await?;
 	info!("Server listening on {:?}", server.local_addr().unwrap());
 	
 	// Simply use `wrap_cancel` for everything, since we do not need clean-up for the listening socket.

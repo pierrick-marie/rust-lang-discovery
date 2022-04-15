@@ -22,26 +22,27 @@ use crate::protocol_codes::*;
 use regex::{Match, Regex};
 
 use log::{debug, error, info, warn};
-use tokio::net::TcpListener;
-use crate::protocol_codes;
+use tokio::net::{TcpListener, TcpStream};
+use crate::{protocol_codes, utils};
 use crate::connection::Connection;
 use crate::ftp_error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
+use crate::data_connection::DataConnection;
 
-struct User {
-	login: String,
-	// password: String, // Do not save the passwaord
-}
+use users::{get_user_by_name, User};
+use users::os::unix::UserExt;
+use crate::client::Transfert_Mod::{Active, Passive};
 
-impl Display for User {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		write!(f, "FTP User: {}", self.login)
-	}
+#[derive(PartialEq)]
+enum Transfert_Mod {
+	Passive,
+	Active,
 }
 
 pub struct Client {
 	ctrl_connection: Connection,
-	data_listener: Option<TcpListener>,
+	data_connection: DataConnection,
+	transfert_mode: Transfert_Mod,
 	user: Option<User>,
 }
 
@@ -49,31 +50,10 @@ impl Client {
 	pub fn new(connection: Connection) -> Self {
 		Client {
 			ctrl_connection: connection,
-			data_listener: None,
+			data_connection: DataConnection::new(),
+			transfert_mode: Active,
 			user: None,
 		}
-	}
-	
-	async fn new_data_listener(&mut self) -> Option<TcpListener> {
-		
-		let port: u16 = pick_unused_port().expect("No ports free");
-		let server = TcpListener::bind(format!("{}:{}", self.ctrl_connection.addr().ip(), port)).await.ok()?;
-		
-		info!("Server listening data on {:?}", server.local_addr().unwrap());
-		
-		let ip = server.local_addr().unwrap().ip().to_string().replace(".", ",");
-		let port = server.local_addr().unwrap().port();
-		let port1 = port / 256;
-		let port2 = port % 256;
-		
-		let message = format!("{} ({},{},{})\n\r", ServerResponse::EnteringPassiveMode.to_string().trim(), ip, port1, port2);
-		
-		if let Err(e) = self.ctrl_connection.write(message).await {
-			error!("Failed to send message {:?}", e);
-			return None;
-		}
-		
-		return Some(server);
 	}
 	
 	pub async fn run(&mut self) -> std::io::Result<()> {
@@ -81,13 +61,8 @@ impl Client {
 			return Err(Error::new(ErrorKind::NotConnected, e.to_string()));
 		}
 		
-		if let Some(user) = self.connect().await {
-			self.user = Some(user);
-			if let Err(e) = self.ctrl_connection.write(ServerResponse::UserLoggedIn.to_string()).await {
-				return Err(Error::new(ErrorKind::NotConnected, e.to_string()));
-			}
-			info!("Connected {}", self.user.as_ref().unwrap());
-		}
+		self.connect().await;
+		info!("Connected {}", self.user.as_ref().unwrap().name().to_str().unwrap());
 		
 		self.command().await;
 		
@@ -103,19 +78,22 @@ impl Client {
 			match self.parse_command(msg.clone()) {
 				ClientCommand::Auth => { unimplemented!() }
 				ClientCommand::Cwd(arg) => { unimplemented!() }
-				ClientCommand::List(arg) => { unimplemented!() }
+				ClientCommand::List(arg) => {
+					self.transmitData(utils::get_ls(self.user.as_ref().unwrap().home_dir())).await;
+				}
 				ClientCommand::Mkd(arg) => { unimplemented!() }
 				ClientCommand::NoOp => { unimplemented!() }
 				ClientCommand::Port(arg) => { unimplemented!() }
 				ClientCommand::Pwd => { unimplemented!() }
 				ClientCommand::Pasv => {
-					if let Some(listener) = self.new_data_listener().await {
-						self.data_listener = Some(listener);
-					} else {
-						break;
-					}
+					self.transfert_mode = Passive;
 				}
-				ClientCommand::Quit => { unimplemented!() }
+				ClientCommand::Quit => {
+					if let Err(e) = self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await {
+						error!("{:?}", e);
+					}
+					break;
+				}
 				ClientCommand::Retr(arg) => { unimplemented!() }
 				ClientCommand::Rmd(arg) => { unimplemented!() }
 				ClientCommand::Stor(arg) => { unimplemented!() }
@@ -134,41 +112,53 @@ impl Client {
 		}
 	}
 	
+	async fn transmitData(&mut self, data: Vec<String>) -> FtpResult<()> {
+	
+		if self.transfert_mode == Passive {
+			let msg = self.data_connection.open_passive_connection().await?;
+			let message = format!("{} {}\n\r", ServerResponse::EnteringPassiveMode.to_string(), msg);
+			self.ctrl_connection.write(message).await?;
+			
+			self.data_connection.connection_ready().await?;
+			self.data_connection.send(data);
+			
+			dbg!("Connection ready !!");
+		}
+		
+		Ok(())
+	}
+	
 	async fn syst(&mut self) -> FtpResult<()> {
 		info!("SYST command");
 		self.ctrl_connection.write(ServerResponse::SystemType.to_string()).await
 	}
 	
-	async fn connect(&mut self) -> Option<User> {
+	async fn connect(&mut self) {
 		loop {
 			match self.user().await {
 				Some(login) => {
 					info!("Login: {}", login);
 					if let Err(e) = self.ctrl_connection.write(ServerResponse::UserNameOkayNeedPassword.to_string()).await {
 						error!("Not connected {:?}", e);
-						return None;
+						break;
 					}
-					match self.password().await {
-						Some(pass) => {
-							info!("Password: {}", pass);
-							return Some(User {
-								login,
-							});
-						}
-						_ => {
-							if let Err(e) = self.ctrl_connection.write(ServerResponse::NotLoggedIn.to_string()).await {
+					if self.password().await.is_some() {
+						info!("Password: \"x\"");
+						let user = get_user_by_name(login.as_str());
+						if user.is_some() {
+							self.user = user;
+							if let Err(e) = self.ctrl_connection.write(ServerResponse::UserLoggedIn.to_string()).await {
 								error!("Not connected {:?}", e);
-								return None;
 							}
+							break;
 						}
 					}
 				}
-				_ => {
-					if let Err(e) = self.ctrl_connection.write(ServerResponse::NotLoggedIn.to_string()).await {
-						error!("Not connected {:?}", e);
-						return None;
-					}
-				}
+				_ => {}
+			}
+			if let Err(e) = self.ctrl_connection.write(ServerResponse::NotLoggedIn.to_string()).await {
+				error!("Not connected {:?}", e);
+				break;
 			}
 		}
 	}

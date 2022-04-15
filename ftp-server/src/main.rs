@@ -15,6 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
+use std::path::Path;
 use log::{error, info, Level};
 
 use async_shutdown::Shutdown;
@@ -25,9 +26,14 @@ mod ftp_error;
 mod server;
 mod ftp_logger;
 mod connection;
+mod data_connection;
+mod utils;
 use crate::client::Client;
 
-pub const ADDR: &str = "127.0.0.1:8080";
+
+
+pub const ADDR: &str = "127.0.0.1";
+pub const PORT: &str = "8080";
 
 pub const LEVEL: Level = Level::Info;
 
@@ -47,9 +53,8 @@ async fn wait_ctrl_c(shutdown: Shutdown) {
 	});
 }
 
-#[tokio::main]
-async fn main() {
-	
+
+async fn server() {
 	if let Err(e) = ftp_logger::init() {
 		error!("Failed to init logger: {:?}", e);
 	}
@@ -74,6 +79,12 @@ async fn main() {
 	shutdown.wait_shutdown_complete().await;
 	
 	std::process::exit(exit_code);
+}
+
+#[tokio::main]
+async fn main() {
+	
+	server().await;
 }
 
 

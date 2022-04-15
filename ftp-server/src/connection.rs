@@ -27,7 +27,7 @@ use std::net::SocketAddr;
 
 use crate::ftp_error::{FtpError, FtpResult};
 
-const TIME_OUT: u64 = 50;
+const TIME_OUT: u64 = 120;
 
 pub struct Connection {
 	buf: BytesMut,
