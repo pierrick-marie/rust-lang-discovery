@@ -24,15 +24,24 @@ use log::debug;
 use tokio::io;
 
 pub enum FtpError {
+	/// Time out to read message from FTP client
 	TimeOut,
+	/// Writ socket error
 	SocketWriteError,
+	/// FTP client disconnected
 	Disconnected,
+	/// UTF_8 error during reading message
 	Utf8,
+	/// Error during parsing incoming message from FTP client
 	ParseMessage,
+	/// FTP client send an unknown command
 	UnknownCommand,
-	UnexpectedCommand,
+	/// Read socket error
 	SocketReadError,
+	/// FTP client not logged
 	NotLogged,
+	/// Error while using tokio channel
+	InternalChannelError,
 }
 
 pub type FtpResult<T> = result::Result<T, FtpError>;
@@ -48,7 +57,7 @@ impl Display for FtpError {
 			FtpError::UnknownCommand => { write!(f, "!!Error!! Unknown command") }
 			FtpError::Disconnected => { write!(f, "!!Error!! Disconnected") }
 			FtpError::SocketReadError => { write!(f, "!!Error!! Client does not answer") }
-			FtpError::UnexpectedCommand => { write!(f, "!!Error!! Unexpected command") }
+			FtpError::InternalChannelError => { write!(f, "!!Error!! Internal channel error") }
 		}
 	}
 }

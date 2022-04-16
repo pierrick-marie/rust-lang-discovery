@@ -76,8 +76,8 @@ impl Display for ServerResponse {
 			RestartMarkerReply => { write!(f, "{} Restart \r\n", RestartMarkerReply as i32) },
 			ServiceReadInXXXMinutes => { write!(f, "{} Service ready later \r\n", ServiceReadInXXXMinutes as i32) },
 			DataConnectionAlreadyOpen => { write!(f, "{} Data connection already open \r\n", DataConnectionAlreadyOpen as i32) },
-			FileStatusOk => { write!(f, "{} File status OK \r\n", FileStatusOk as i32) },
-			OK => { write!(f, "{} Ok \r\n", OK as i32) },
+			FileStatusOk => { write!(f, "{}", FileStatusOk as i32) },
+			OK => { write!(f, "{} Ok", OK as i32) },
 			CommandNotImplementedSuperfluousAtThisSite => { write!(f, "{} Command not implemented \r\n", CommandNotImplementedSuperfluousAtThisSite as i32) },
 			SystemStatus => { write!(f, "{} System status \r\n", SystemStatus as i32) },
 			DirectoryStatus => { write!(f, "{} Directory status \r\n", DirectoryStatus as i32) },
@@ -87,7 +87,7 @@ impl Display for ServerResponse {
 			ServiceReadyForNewUser => { write!(f, "{} Welcome to my rust ftp server. I'm waiting for your user name \r\n", ServiceReadyForNewUser as i32) },
 			ServiceClosingControlConnection => { write!(f, "{} Goodbye \r\n", ServiceClosingControlConnection as i32) },
 			DataConnectionOpen => { write!(f, "{} Data connection open \r\n", DataConnectionOpen as i32) },
-			ClosingDataConnection => { write!(f, "{} Closing data connection \r\n", ClosingDataConnection as i32) },
+			ClosingDataConnection => { write!(f, "{}", ClosingDataConnection as i32) },
 			EnteringPassiveMode => { write!(f, "{} Entering Passive Mode", EnteringPassiveMode as i32) },
 			UserLoggedIn => { write!(f, "{} User logged in \r\n", UserLoggedIn as i32) },
 			RequestedFileActionOkay => { write!(f, "{} Request file action ok \r\n", RequestedFileActionOkay as i32) },
@@ -117,21 +117,21 @@ impl Display for ServerResponse {
 }
 
 pub const ASCII: &str = "Ascii";
-pub const IMAGE: &str = "Image";
+pub const Binary: &str = "Binary";
 pub const UNKNOWN: &str = "Unknown";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TransferType {
 	Ascii,
-	Image,
+	Binary,
 	Unknown,
 }
 
 impl Display for TransferType {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			TransferType::Ascii => { write!(f, "Ascii") }
-			TransferType::Image => { write!(f, "Image") }
+			TransferType::Ascii => { write!(f, "Ascii mod") }
+			TransferType::Binary => { write!(f, "Binary mod") }
 			TransferType::Unknown => { write!(f, "Unknown") }
 		}
 	}
@@ -196,8 +196,8 @@ impl ClientCommand {
 			SYST => Syst,
 			TYPE => {
 				match arg {
-					ASCII => Type(TransferType::Ascii),
-					IMAGE => Type(TransferType::Image),
+					"A" => Type(TransferType::Ascii),
+					Binary => Type(TransferType::Binary),
 					_ => Type(TransferType::Unknown),
 				}
 			},

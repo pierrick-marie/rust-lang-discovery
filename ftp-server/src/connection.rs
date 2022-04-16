@@ -43,9 +43,9 @@ impl Connection {
 		}
 	}
 	
-	pub fn addr(&self) -> SocketAddr {
-		return self.stream.local_addr().unwrap();
-	}
+	// pub fn addr(&self) -> SocketAddr {
+	// 	return self.stream.local_addr().unwrap();
+	// }
 	
 	pub async fn read(&mut self) -> Option<String> {
 		debug!("connection::read");
@@ -76,13 +76,31 @@ impl Connection {
 		return None;
 	}
 	
-	pub async fn write(&mut self, msg: String) -> FtpResult<()> {
+	pub async fn write_byte(&mut self, msg: String) -> FtpResult<()> {
 		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
 			self.stream.write_all(msg.as_bytes()).await
 		}).await {
 			Ok(_) => {
 				info!(" >>>> {}", msg);
+				self.stream.flush().await;
+				return Ok(());
+			}
+			Err(e) => {
+				error!("Failed to send message: {}, {:?}", msg, e);
+				return Err(FtpError::SocketWriteError);
+			}
+		}
+	}
+	
+	pub async fn write_ascii(&mut self, msg: String) -> FtpResult<()> {
+		debug!("connection::write");
+		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
+			self.stream.write_all(msg.as_bytes()).await
+		}).await {
+			Ok(_) => {
+				info!(" >>>> {}", msg);
+				self.stream.flush().await;
 				return Ok(());
 			}
 			Err(e) => {
@@ -96,7 +114,8 @@ impl Connection {
 		debug!("connection::close");
 		if let Err(e) = self.stream.shutdown().await {
 			error!("Failed to shutdown connection {:?}", e);
+		} else {
+			info!("Connection closed by server");
 		}
-		info!("Connection closed by server");
 	}
 }

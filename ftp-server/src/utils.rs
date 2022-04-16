@@ -62,7 +62,7 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 				
 				modification = DateTime::from(metadata.modified().unwrap());
 				
-				files_info.push(format!("{}{} {} {} {}      {} {}",
+				files_info.push(format!("{}{} {} {} {}      {} {} \n\r",
 				                        is_dir,
 				                        right,
 				                        metadata.uid(),
