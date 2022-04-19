@@ -45,7 +45,7 @@ pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	Ok(())
 }
 
-async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAddr) {
+async fn handle_client(shutdown: Shutdown, mut stream: TcpStream, address: SocketAddr) {
 	info!("Accepted new connection from {}", address);
 	
 	// Make sure the shutdown doesn't complete until the delay token is dropped.
@@ -67,7 +67,8 @@ async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAdd
 		}
 	};
 	
-	let connection = Connection::new(stream);
+	let (rx, tx) = stream.into_split();
+	let connection = Connection::new(rx, tx);
 	let mut client = Client::new(connection);
 	
 	// Now run the echo loop, but cancel it when the shutdown is triggered.

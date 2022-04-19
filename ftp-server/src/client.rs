@@ -17,8 +17,10 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
+use std::time::Duration;
+use futures::future::select_ok;
 use crate::protocol_codes::*;
 use regex::{Match, Regex};
 
@@ -30,11 +32,13 @@ use crate::ftp_error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::{RecvError, TryRecvError};
+use tokio::time::sleep;
 use crate::data_connection::DataConnection;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
 use crate::client::Transfert_Mod::{Active, Passive};
+use crate::protocol_codes::ClientCommand::Pass;
 
 #[derive(PartialEq)]
 enum Transfert_Mod {
@@ -62,12 +66,16 @@ impl Client {
 	}
 	
 	pub async fn run(&mut self) -> std::io::Result<()> {
-		if let Err(e) = self.ctrl_connection.write_byte(ServerResponse::ServiceReadyForNewUser.to_string()).await {
+		if let Err(e) = self.ctrl_connection.write(ServerResponse::ServiceReadyForNewUser.to_string()).await {
 			return Err(Error::new(ErrorKind::NotConnected, e.to_string()));
 		}
 		
-		self.connect().await;
-		info!("Connected {}", self.user.as_ref().unwrap().name().to_str().unwrap());
+		if self.connect().await {
+			info!("Connected {}", self.user.as_ref().unwrap().name().to_str().unwrap());
+		} else {
+			return Err(Error::new(ErrorKind::NotConnected, "Not connected".to_string()));
+		}
+		
 		
 		self.command().await;
 		
@@ -83,64 +91,71 @@ impl Client {
 				ClientCommand::Auth => { unimplemented!() }
 				ClientCommand::Cwd(arg) => { unimplemented!() }
 				ClientCommand::List(arg) => {
-					if self.transfert_mode == Passive {
-						
+					if self.data_connection.is_some() {
 						let mut data_connection = self.data_connection.take().unwrap();
+					
+						let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
+						self.ctrl_connection.write(msg).await?;
 						
-						let msg = format!("{} {} \r\n", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
-						self.ctrl_connection.write_byte(msg).await?;
-						// data_connection.write(msg).await?;
-						// self.ctrl_connection.write("plop".to_string()).await?;
-						
-						
+						// dbg!("SLEEP THREAD START");
+						// sleep(Duration::from_secs(60*5)).await;
+						// dbg!("SLEEP THREAD END");
 						for msg in utils::get_ls(self.user.as_ref().unwrap().home_dir()) {
-							data_connection.write_byte(msg).await?;
+							data_connection.write(msg).await?;
 						}
+						// data_connection.write_end().await?;
+						
 						data_connection.close().await;
-						
-						let msg = format!("{} {}  \r\n", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
-						self.ctrl_connection.write_byte(msg).await?;
-						// data_connection.write(msg).await?;
-						
-						
+						self.data_connection = None;
+					
+						let msg = format!("{} {}", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
+						self.ctrl_connection.write(msg).await?;
+					} else {
+						error!("Data connection not initialized");
 					}
 				}
 				ClientCommand::Mkd(arg) => { unimplemented!() }
 				ClientCommand::NoOp => { unimplemented!() }
-				ClientCommand::Port(arg) => { unimplemented!() }
+				ClientCommand::Port(arg) => {
+					if let Some(addr) = Client::parse_port(arg) {
+						let mut socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
+						let (rx, tx) = socket.into_split();
+						self.data_connection = Some(Connection::new(rx, tx));
+						
+						// dbg!("SLEEP THREAD START");
+						// sleep(Duration::from_secs(30)).await;
+						// dbg!("SLEEP THREAD END");
+						
+						let message = format!("{} PORT command successful. Consider using PASV", ServerResponse::OK.to_string());
+						self.ctrl_connection.write(message).await?;
+					} else {
+						break;
+					}
+				}
 				ClientCommand::Pwd => { unimplemented!() }
 				ClientCommand::Pasv => {
-					self.transfert_mode = Passive;
-					
-					let port: u16 = pick_unused_port().expect("No ports free");
-					let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
-					let socket_addr = listener.local_addr()?;
-					info!("Server listening data on {:?}", socket_addr);
-					
-					//
-					// if let Err(e) = data_connection.new_server(sender).await {
-					// 	error!("Failed to create a new data server {:?}", e);
-					// }
-					
-					let message = format!("{} {}.\n\r", ServerResponse::EnteringPassiveMode.to_string(), Client::get_addr_msg(socket_addr));
-					self.ctrl_connection.write_byte(message).await?;
-					
-					let (stream, addr) = listener.accept().await?;
-					info!("Data connection open with addr {:?}", addr);
-					self.data_connection = Some(Connection::new(stream));
-					
-					// });
-					
-					// match receiver.await {
-					// 	Ok(addr) => {
-					// 		println!("got = {:?}", addr);
-					
-					// 	},
-					// 	Err(_) => println!("the sender dropped"),
-					// }
+					if self.transfert_mode == Passive {
+						self.transfert_mode = Active;
+					} else {
+						self.transfert_mode = Passive;
+						
+						let port: u16 = pick_unused_port().expect("No ports free");
+						let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
+						let socket_addr = listener.local_addr()?;
+						info!("Server listening data on {:?}", socket_addr);
+						
+						let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), Client::get_addr_msg(socket_addr));
+						self.ctrl_connection.write(message).await?;
+						
+						
+						let (mut stream, addr) = listener.accept().await?;
+						info!("Data connection open with addr {:?}", addr);
+						let (rx, tx) = stream.into_split();
+						self.data_connection = Some(Connection::new(rx, tx));
+					}
 				}
 				ClientCommand::Quit => {
-					self.ctrl_connection.write_byte(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
+					self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
 				}
 				ClientCommand::Retr(arg) => { unimplemented!() }
 				ClientCommand::Rmd(arg) => { unimplemented!() }
@@ -150,8 +165,8 @@ impl Client {
 				}
 				ClientCommand::Type(arg) => {
 					self.transfert_type = arg;
-					let message = format!("{} {} {} \n\r", ServerResponse::OK.to_string(),"Swith to ", arg.to_string());
-					self.ctrl_connection.write_byte(message).await?;
+					let message = format!("{} {} {}", ServerResponse::OK.to_string(), "Swith to ", arg.to_string());
+					self.ctrl_connection.write(message).await?;
 				}
 				ClientCommand::CdUp => { unimplemented!() }
 				_ => {
@@ -163,6 +178,26 @@ impl Client {
 		Ok(())
 	}
 	
+	fn parse_port(msg: String) -> Option<(IpAddr, u16)> {
+		debug!("client::parse_port {}", msg);
+		let re = Regex::new(r"^([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3})$").ok()?;
+		let cap = re.captures(msg.as_str())?;
+		
+		dbg!(&cap);
+		let mut addr: [u8; 4] = [0; 4];
+		for i in 1..5 {
+			addr[i - 1] = cap.get(i).unwrap().as_str().to_string().parse::<u8>().ok()?;
+		}
+		
+		let port1 = cap.get(5).unwrap().as_str().to_string().parse::<u16>().ok()?;
+		let port2 = cap.get(6).unwrap().as_str().to_string().parse::<u16>().ok()?;
+		let port = port1 * 256 + port2;
+		
+		dbg!(port);
+		
+		Some((IpAddr::from(addr), port))
+	}
+	
 	fn get_addr_msg(addr: SocketAddr) -> String {
 		let ip = ADDR.replace(".", ",");
 		let port = addr.port();
@@ -172,63 +207,38 @@ impl Client {
 		format!("({},{},{})", ip, port1, port2)
 	}
 	
-	// async fn transmitData(&mut self, data: Vec<String>) -> FtpResult<()> {
-	//
-	//
-	// 		// let mut receiver = data_connection.get_receiver();
-	// 		//
-	//
-	// 			// let mut data_connection = DataConnection::new();
-	// 			// data_connection.send(sender, data).await;
-	//
-	// 		// if let Some(receiver) = receiver.take() {
-	// 		//
-	// 		// }
-	// 		// });
-	//
-	//
-	// 		// let msg = self.data_connection.open_passive_connection().await?;
-	// 		//
-	// 		// self.data_connection.connection_ready().await?;
-	//
-	//
-	// 		dbg!("Connection ready !!");
-	// 	}
-	//
-	// 	Ok(())
-	// }
-	
 	async fn syst(&mut self) -> FtpResult<()> {
 		info!("SYST command");
-		self.ctrl_connection.write_byte(ServerResponse::SystemType.to_string()).await
+		self.ctrl_connection.write(ServerResponse::SystemType.to_string()).await
 	}
 	
-	async fn connect(&mut self) {
+	async fn connect(&mut self) -> bool {
 		loop {
 			match self.user().await {
 				Some(login) => {
 					info!("Login: {}", login);
-					if let Err(e) = self.ctrl_connection.write_byte(ServerResponse::UserNameOkayNeedPassword.to_string()).await {
+					if let Err(e) = self.ctrl_connection.write(ServerResponse::UserNameOkayNeedPassword.to_string()).await {
 						error!("Not connected {:?}", e);
-						break;
+						return false;
 					}
 					if self.password().await.is_some() {
 						info!("Password: \"x\"");
 						let user = get_user_by_name(login.as_str());
 						if user.is_some() {
 							self.user = user;
-							if let Err(e) = self.ctrl_connection.write_byte(ServerResponse::UserLoggedIn.to_string()).await {
+							if let Err(e) = self.ctrl_connection.write(ServerResponse::UserLoggedIn.to_string()).await {
 								error!("Not connected {:?}", e);
+								return false;
 							}
-							break;
+							return true;
 						}
 					}
 				}
 				_ => {}
 			}
-			if let Err(e) = self.ctrl_connection.write_byte(ServerResponse::NotLoggedIn.to_string()).await {
+			if let Err(e) = self.ctrl_connection.write(ServerResponse::NotLoggedIn.to_string()).await {
 				error!("Not connected {:?}", e);
-				break;
+				return false;
 			}
 		}
 	}
@@ -236,18 +246,47 @@ impl Client {
 	async fn user(&mut self) -> Option<String> {
 		debug!("client::user");
 		let msg = self.ctrl_connection.read().await?;
-		return match self.parse_command(msg.clone()) {
-			ClientCommand::User(ref args) => {
-				if self.check_username(args) {
-					info!("USER: {}", args);
+		// dbg!("WTF 0");
+		let res = self.parse_command(msg.clone());
+		// dbg!("WTF 1");
+		// dbg!("RES = {} ", &res);
+		
+		
+		// match res.clone() {
+		// 	ClientCommand::Auth => { dbg!(ClientCommand::Auth); }
+		// 	ClientCommand::Cwd(c) => { dbg!(ClientCommand::Cwd(c)); }
+		// 	ClientCommand::List(c) => { dbg!(ClientCommand::List(c)); }
+		// 	ClientCommand::Mkd(c) => { dbg!(ClientCommand::Mkd(c)); }
+		// 	ClientCommand::NoOp => { dbg!(ClientCommand::NoOp); }
+		// 	ClientCommand::Port(c) => { dbg!(ClientCommand::Port(c)); }
+		// 	ClientCommand::Pass(c) => { dbg!(ClientCommand::Pass(c)); }
+		// 	ClientCommand::Pasv => { dbg!(ClientCommand::Pasv); }
+		// 	ClientCommand::Pwd => { dbg!(ClientCommand::Pwd); }
+		// 	ClientCommand::Quit => { dbg!(ClientCommand::Quit); }
+		// 	ClientCommand::Retr(c) => { dbg!(ClientCommand::Retr(c)); }
+		// 	ClientCommand::Rmd(c) => { dbg!(ClientCommand::Rmd(c)); }
+		// 	ClientCommand::Stor(c) => { dbg!(ClientCommand::Stor(c)); }
+		// 	ClientCommand::Syst => { dbg!(ClientCommand::Syst); }
+		// 	ClientCommand::Type(c) => { dbg!(ClientCommand::Type(c)); }
+		// 	ClientCommand::CdUp => { dbg!(ClientCommand::CdUp); }
+		// 	ClientCommand::Unknown(c) => { dbg!(ClientCommand::Unknown(c)); }
+		// 	ClientCommand::User(c) => { dbg!(ClientCommand::User(c)); }
+		// 	_ => { dbg!("JFHKFGHDFHGHFKJGHKGFJKJGH"); }
+		// }
+		
+		
+		return match res {
+			ClientCommand::User(args) => {
+				if self.check_username(args.clone()) {
+					// dbg!("USER: {}", args.clone());
 					Some(args.clone())
 				} else {
 					error!("User name error: {}", args);
 					None
 				}
 			}
-			_ => {
-				error!("Unexpected command: {}", msg);
+			err => {
+				error!("Unexpected command: {}", err);
 				None
 			}
 		};
@@ -257,8 +296,8 @@ impl Client {
 		debug!("client::password");
 		let msg = self.ctrl_connection.read().await?;
 		return match self.parse_command(msg.clone()) {
-			ClientCommand::Pass(ref args) => {
-				if self.check_username(args) {
+			ClientCommand::Pass(args) => {
+				if self.check_username(args.clone()) {
 					info!("PASSWORD xxx");
 					Some(args.clone())
 				} else {
@@ -274,8 +313,8 @@ impl Client {
 	}
 	
 	fn parse_command(&self, msg: String) -> ClientCommand {
-		debug!("client::parse_command {}", msg);
-		if let Some(re) = Regex::new(r"([[:upper:]]{3,4})( .+)*").ok() {
+		debug!("client::parse_command '{}'", msg);
+		if let Some(re) = Regex::new(r"^([[:upper:]]{3,4})( .+)*$").ok() {
 			if let Some(cap) = re.captures(msg.as_str()) {
 				if let Some(cmd) = cap.get(1) {
 					if let Some(args) = cap.get(2) {
@@ -286,18 +325,18 @@ impl Client {
 				}
 			}
 		}
-		error!("failed to parse message: {}", msg);
+		error!("failed to parse command: {}", msg);
 		ClientCommand::Unknown(msg)
 	}
 	
-	fn check_username(&self, username: &String) -> bool {
+	fn check_username(&self, username: String) -> bool {
 		let re = Regex::new(r"^([[:word:]]+)$").unwrap();
 		re.captures(username.as_str()).is_some()
 	}
 	
 	pub async fn close_connection(&mut self) {
 		info!("Close client connection");
-		if let Err(e) = self.ctrl_connection.write_byte(ServerResponse::ConnectionClosed.to_string()).await {
+		if let Err(e) = self.ctrl_connection.write(ServerResponse::ConnectionClosed.to_string()).await {
 			error!("Failed to close connection with client: {:?}", e);
 		}
 		self.ctrl_connection.close().await;

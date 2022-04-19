@@ -15,10 +15,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
+extern crate core;
+use std::net::IpAddr;
 use std::path::Path;
-use log::{error, info, Level};
+use log::{debug, error, info, Level};
 
 use async_shutdown::Shutdown;
+use regex::Regex;
 
 mod protocol_codes;
 mod client;
@@ -35,7 +38,7 @@ use crate::client::Client;
 pub const ADDR: &str = "127.0.0.1";
 pub const PORT: &str = "8080";
 
-pub const LEVEL: Level = Level::Info;
+pub const LEVEL: Level = Level::Debug;
 
 async fn wait_ctrl_c(shutdown: Shutdown) {
 	
@@ -55,10 +58,6 @@ async fn wait_ctrl_c(shutdown: Shutdown) {
 
 
 async fn server() {
-	if let Err(e) = ftp_logger::init() {
-		error!("Failed to init logger: {:?}", e);
-	}
-	
 	// Create a new shutdown object.
 	// We will clone it into all tasks that need it.
 	let shutdown = Shutdown::new();
@@ -83,6 +82,10 @@ async fn server() {
 
 #[tokio::main]
 async fn main() {
+	
+	if let Err(e) = ftp_logger::init() {
+		error!("Failed to init logger: {:?}", e);
+	}
 	
 	server().await;
 }

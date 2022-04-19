@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::net::IpAddr;
-use bytes::{BytesMut};
+use bytes::{BufMut, BytesMut};
 use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use log::{debug, error, info, warn};
@@ -24,66 +24,75 @@ use std::time::Duration;
 use async_std::io as async_io;
 
 use std::net::SocketAddr;
+use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
 
 use crate::ftp_error::{FtpError, FtpResult};
 
 const TIME_OUT: u64 = 120;
+const BUFFER_SIZE: usize = 1024;
 
 pub struct Connection {
-	buf: BytesMut,
-	stream: TcpStream,
+	buffer_reader: [u8; BUFFER_SIZE],
+	rx: OwnedReadHalf,
+	tx: OwnedWriteHalf,
 }
 
 impl Connection {
-	
-	pub fn new(stream: TcpStream) -> Self {
+	pub fn new(rx: OwnedReadHalf, tx: OwnedWriteHalf) -> Self {
 		Connection {
-			buf: BytesMut::new(),
-			stream,
+			buffer_reader: [0; BUFFER_SIZE],
+			rx,
+			tx,
 		}
 	}
-	
-	// pub fn addr(&self) -> SocketAddr {
-	// 	return self.stream.local_addr().unwrap();
-	// }
 	
 	pub async fn read(&mut self) -> Option<String> {
 		debug!("connection::read");
-		self.buf.clear();
-		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
-			self.stream.read_buf(&mut self.buf).await
-		}).await {
-			Ok(n) => {
-				if n > 0 {
-					match String::from_utf8(self.buf.to_vec()) {
-						Ok(msg) => {
-							let message = msg.trim();
-							info!(" <<<< {}", message);
-							return Some(message.to_string());
+		
+		let mut message: String = String::new();
+		
+		loop {
+			match async_io::timeout(Duration::from_secs(TIME_OUT), async {
+				self.buffer_reader = [0; BUFFER_SIZE];
+				self.rx.read(&mut self.buffer_reader).await
+			}).await {
+				Ok(n) => {
+					if n > 0 {
+						match String::from_utf8(self.buffer_reader[..n].to_vec()) {
+							Ok(msg) => {
+								message.push_str(msg.trim());
+								info!(" <<<< {}", message);
+								if n < BUFFER_SIZE {
+									return Some(message);
+								}
+							}
+							Err(e) => {
+								error!("UTF_8 error, {:?}", e);
+								return None;
+							}
 						}
-						Err(e) => {
-							error!("UTF_8 error, {:?}", e);
-						}
+					} else {
+						error!("Read: Client disconnected");
+						return None;
 					}
-				} else {
-					error!("Client disconnected");
+				}
+				Err(e) => {
+					error!("{:?}", e);
+					return None;
 				}
 			}
-			Err(e) => {
-				error!("{:?}", e);
-			}
 		}
-		return None;
 	}
 	
-	pub async fn write_byte(&mut self, msg: String) -> FtpResult<()> {
+	pub async fn write(&mut self, mut msg: String) -> FtpResult<()> {
 		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
-			self.stream.write_all(msg.as_bytes()).await
+			// self.tx.write_all_buf(&mut msg.as_bytes()).await
+			msg.push_str("\r\n");
+			self.tx.write(msg.as_bytes()).await
 		}).await {
 			Ok(_) => {
 				info!(" >>>> {}", msg);
-				self.stream.flush().await;
 				return Ok(());
 			}
 			Err(e) => {
@@ -93,18 +102,17 @@ impl Connection {
 		}
 	}
 	
-	pub async fn write_ascii(&mut self, msg: String) -> FtpResult<()> {
+	pub async fn write_end(&mut self) -> FtpResult<()> {
 		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
-			self.stream.write_all(msg.as_bytes()).await
+			self.tx.write_buf(&mut [0xff, 0x02].as_slice()).await
 		}).await {
 			Ok(_) => {
-				info!(" >>>> {}", msg);
-				self.stream.flush().await;
+				info!(" >>>> EOF");
 				return Ok(());
 			}
 			Err(e) => {
-				error!("Failed to send message: {}, {:?}", msg, e);
+				error!("Failed to send EOF {:?}", e);
 				return Err(FtpError::SocketWriteError);
 			}
 		}
@@ -112,10 +120,8 @@ impl Connection {
 	
 	pub async fn close(&mut self) {
 		debug!("connection::close");
-		if let Err(e) = self.stream.shutdown().await {
-			error!("Failed to shutdown connection {:?}", e);
-		} else {
-			info!("Connection closed by server");
-		}
+		
+		self.tx.shutdown().await;
+		info!("Connection closed by server");
 	}
 }
