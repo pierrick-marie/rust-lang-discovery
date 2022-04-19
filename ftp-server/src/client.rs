@@ -96,13 +96,9 @@ impl Client {
 						let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
 						self.ctrl_connection.write(msg).await?;
 						
-						// dbg!("SLEEP THREAD START");
-						// sleep(Duration::from_secs(60*5)).await;
-						// dbg!("SLEEP THREAD END");
 						for msg in utils::get_ls(self.user.as_ref().unwrap().home_dir()) {
 							data_connection.write(msg).await?;
 						}
-						// data_connection.write_end().await?;
 						
 						data_connection.close().await;
 						self.data_connection = None;
@@ -120,10 +116,6 @@ impl Client {
 						let mut socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
 						let (rx, tx) = socket.into_split();
 						self.data_connection = Some(Connection::new(rx, tx));
-						
-						// dbg!("SLEEP THREAD START");
-						// sleep(Duration::from_secs(30)).await;
-						// dbg!("SLEEP THREAD END");
 						
 						let message = format!("{} PORT command successful. Consider using PASV", ServerResponse::OK.to_string());
 						self.ctrl_connection.write(message).await?;
@@ -145,7 +137,6 @@ impl Client {
 						
 						let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), Client::get_addr_msg(socket_addr));
 						self.ctrl_connection.write(message).await?;
-						
 						
 						let (mut stream, addr) = listener.accept().await?;
 						info!("Data connection open with addr {:?}", addr);

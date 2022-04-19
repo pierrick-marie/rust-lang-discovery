@@ -37,7 +37,7 @@ use crate::client::Client;
 pub const ADDR: &str = "127.0.0.1";
 pub const PORT: &str = "8080";
 
-pub const LEVEL: Level = Level::Debug;
+pub const LEVEL: Level = Level::Info;
 
 async fn wait_ctrl_c(shutdown: Shutdown) {
 	

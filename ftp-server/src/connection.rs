@@ -102,22 +102,6 @@ impl Connection {
 		}
 	}
 	
-	pub async fn write_end(&mut self) -> FtpResult<()> {
-		debug!("connection::write");
-		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
-			self.tx.write_buf(&mut [0xff, 0x02].as_slice()).await
-		}).await {
-			Ok(_) => {
-				info!(" >>>> EOF");
-				return Ok(());
-			}
-			Err(e) => {
-				error!("Failed to send EOF {:?}", e);
-				return Err(FtpError::SocketWriteError);
-			}
-		}
-	}
-	
 	pub async fn close(&mut self) {
 		debug!("connection::close");
 		
