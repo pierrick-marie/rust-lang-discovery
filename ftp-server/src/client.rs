@@ -17,6 +17,7 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::io::{Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
+use std::path::{Path, PathBuf};
 use crate::protocol_codes::*;
 use regex::{Regex};
 
@@ -82,7 +83,7 @@ impl Client {
 				ClientCommand::Auth => { unimplemented!() }
 				ClientCommand::Cwd(arg) => { unimplemented!() }
 				ClientCommand::List(arg) => {
-					self.list().await?;
+					self.list(arg).await?;
 				}
 				ClientCommand::Mkd(arg) => { unimplemented!() }
 				ClientCommand::NoOp => { unimplemented!() }
@@ -156,17 +157,23 @@ impl Client {
 		Ok(())
 	}
 	
-	async fn list(&mut self) -> FtpResult<()> {
+	async fn list(&mut self, arg: PathBuf) -> FtpResult<()> {
+		
 		if self.data_connection.is_some() {
 			let mut data_connection = self.data_connection.take().unwrap();
 			
 			let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
 			self.ctrl_connection.write(msg).await?;
 			
-			for msg in utils::get_ls(self.user.as_ref().unwrap().home_dir()) {
-				data_connection.write(msg).await?;
+			if arg.to_str().unwrap().is_empty() {
+				for msg in utils::get_ls(self.user.as_ref().unwrap().home_dir()) {
+					data_connection.write(msg).await?;
+				}
+			} else {
+				for msg in utils::get_ls(arg.as_path()) {
+					data_connection.write(msg).await?;
+				}
 			}
-			
 			data_connection.close().await;
 			self.data_connection = None;
 			
