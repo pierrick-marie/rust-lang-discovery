@@ -45,7 +45,7 @@ pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	Ok(())
 }
 
-async fn handle_client(shutdown: Shutdown, mut stream: TcpStream, address: SocketAddr) {
+async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAddr) {
 	info!("Accepted new connection from {}", address);
 	
 	// Make sure the shutdown doesn't complete until the delay token is dropped.

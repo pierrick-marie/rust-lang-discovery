@@ -16,12 +16,9 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 extern crate num;
-use std::env;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
-use std::str::FromStr;
 use log::debug;
-use crate::ftp_error::FtpError;
 
 use self::ServerResponse::*;
 use self::ClientCommand::*;
@@ -118,7 +115,7 @@ impl Display for ServerResponse {
 }
 
 pub const ASCII: &str = "Ascii";
-pub const Binary: &str = "Binary";
+pub const BINARY: &str = "Binary";
 pub const UNKNOWN: &str = "Unknown";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -201,7 +198,7 @@ impl ClientCommand {
 			TYPE => {
 				match arg {
 					"A" => Type(TransferType::Ascii),
-					Binary => Type(TransferType::Binary),
+					BINARY => Type(TransferType::Binary),
 					_ => Type(TransferType::Unknown),
 				}
 			},
@@ -224,7 +221,7 @@ impl Display for ClientCommand {
 			Auth => write!(f, "{}", AUTH),
 			Cwd(arg) => write!(f, "{} {}", CWD, arg.as_path().to_str().unwrap()),
 			List(arg) => write!(f, "{} {}", LIST, arg.as_path().to_str().unwrap()),
-			Pass(arg) => write!(f, "{} xxxx", PASS),
+			Pass(_arg) => write!(f, "{} xxxx", PASS),
 			Port(arg) => write!(f, "{} {}", PORT, arg),
 			Pwd => write!(f, "{}", PWD),
 			Pasv => write!(f, "{}", PASV),

@@ -19,7 +19,6 @@ use std::fs;
 use std::fs::{File, Metadata};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
-use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
 
@@ -28,13 +27,13 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 	
 	let mut filename; //  = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
 	let mut is_dir;
-	let mut right: String = String::new();
+	let mut right: String;
 	let mut modification: DateTime<Utc>; //: DateTime<Utc> = DateTime::from(metadata.modified().unwrap());
 	
 	let mut file: File;
 	let mut metadata: Metadata;
 	let mut mode;
-	let mut octal_right: String = String::new();
+	let mut octal_right;
 	
 	if path.is_dir() {
 		let paths = fs::read_dir(path).unwrap();

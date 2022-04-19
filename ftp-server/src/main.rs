@@ -16,12 +16,9 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 extern crate core;
-use std::net::IpAddr;
-use std::path::Path;
 use log::{debug, error, info, Level};
 
 use async_shutdown::Shutdown;
-use regex::Regex;
 
 mod protocol_codes;
 mod client;

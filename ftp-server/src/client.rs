@@ -15,32 +15,24 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
-use std::str::FromStr;
-use std::time::Duration;
-use futures::future::select_ok;
 use crate::protocol_codes::*;
-use regex::{Match, Regex};
+use regex::{Regex};
 
 use log::{debug, error, info, warn};
 use tokio::net::{TcpListener, TcpStream};
-use crate::{ADDR, protocol_codes, utils};
+use crate::{ADDR, utils};
 use crate::connection::Connection;
 use crate::ftp_error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
-use tokio::sync::oneshot;
-use tokio::sync::oneshot::error::{RecvError, TryRecvError};
-use tokio::time::sleep;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
-use crate::client::Transfert_Mod::{Active, Passive};
-use crate::protocol_codes::ClientCommand::Pass;
+use crate::client::TransfertMod::{Active, Passive};
 
 #[derive(PartialEq)]
-enum Transfert_Mod {
+enum TransfertMod {
 	Passive,
 	Active,
 }
@@ -48,7 +40,7 @@ enum Transfert_Mod {
 pub struct Client {
 	ctrl_connection: Connection,
 	data_connection: Option<Connection>,
-	transfert_mode: Transfert_Mod,
+	transfert_mode: TransfertMod,
 	transfert_type: TransferType,
 	user: Option<User>,
 }
@@ -71,7 +63,9 @@ impl Client {
 		
 		if self.connect().await {
 			info!("Connected {}", self.user.as_ref().unwrap().name().to_str().unwrap());
-			self.command().await;
+			if let Err(e) = self.command().await {
+				error!("{}", e);
+			}
 		} else {
 			error!("Not connected");
 		}
@@ -88,59 +82,16 @@ impl Client {
 				ClientCommand::Auth => { unimplemented!() }
 				ClientCommand::Cwd(arg) => { unimplemented!() }
 				ClientCommand::List(arg) => {
-					if self.data_connection.is_some() {
-						let mut data_connection = self.data_connection.take().unwrap();
-						
-						let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
-						self.ctrl_connection.write(msg).await?;
-						
-						for msg in utils::get_ls(self.user.as_ref().unwrap().home_dir()) {
-							data_connection.write(msg).await?;
-						}
-						
-						data_connection.close().await;
-						self.data_connection = None;
-						
-						let msg = format!("{} {}", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
-						self.ctrl_connection.write(msg).await?;
-					} else {
-						error!("Data connection not initialized");
-					}
+					self.list().await?;
 				}
 				ClientCommand::Mkd(arg) => { unimplemented!() }
 				ClientCommand::NoOp => { unimplemented!() }
 				ClientCommand::Port(arg) => {
-					if let Some(addr) = Client::parse_port(arg) {
-						let mut socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
-						let (rx, tx) = socket.into_split();
-						self.data_connection = Some(Connection::new(rx, tx));
-						
-						let message = format!("{} PORT command successful. Consider using PASV", ServerResponse::OK.to_string());
-						self.ctrl_connection.write(message).await?;
-					} else {
-						break;
-					}
+					self.port(arg).await?;
 				}
 				ClientCommand::Pwd => { unimplemented!() }
 				ClientCommand::Pasv => {
-					if self.transfert_mode == Passive {
-						self.transfert_mode = Active;
-					} else {
-						self.transfert_mode = Passive;
-						
-						let port: u16 = pick_unused_port().expect("No ports free");
-						let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
-						let socket_addr = listener.local_addr()?;
-						info!("Server listening data on {:?}", socket_addr);
-						
-						let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), Client::get_addr_msg(socket_addr));
-						self.ctrl_connection.write(message).await?;
-						
-						let (mut stream, addr) = listener.accept().await?;
-						info!("Data connection open with addr {:?}", addr);
-						let (rx, tx) = stream.into_split();
-						self.data_connection = Some(Connection::new(rx, tx));
-					}
+					self.pasv().await?;
 				}
 				ClientCommand::Quit => {
 					self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
@@ -167,6 +118,65 @@ impl Client {
 			msg = self.ctrl_connection.read().await;
 		}
 		Ok(())
+	}
+	
+	async fn port(&mut self, arg: String) -> FtpResult<()> {
+		if let Some(addr) = Client::parse_port(arg) {
+			let socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
+			let (rx, tx) = socket.into_split();
+			self.data_connection = Some(Connection::new(rx, tx));
+			
+			let message = format!("{} PORT command successful. Consider using PASV", ServerResponse::OK.to_string());
+			self.ctrl_connection.write(message).await?;
+			Ok(())
+		} else {
+			Err(FtpError::DataConnectionError)
+		}
+	}
+	
+	async fn pasv(&mut self) -> FtpResult<()> {
+		if self.transfert_mode == Passive {
+			self.transfert_mode = Active;
+		} else {
+			self.transfert_mode = Passive;
+			
+			let port: u16 = pick_unused_port().expect("No ports free");
+			let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
+			let socket_addr = listener.local_addr()?;
+			info!("Server listening data on {:?}", socket_addr);
+			
+			let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), Client::get_addr_msg(socket_addr));
+			self.ctrl_connection.write(message).await?;
+			
+			let (stream, addr) = listener.accept().await?;
+			info!("Data connection open with addr {:?}", addr);
+			let (rx, tx) = stream.into_split();
+			self.data_connection = Some(Connection::new(rx, tx));
+		}
+		Ok(())
+	}
+	
+	async fn list(&mut self) -> FtpResult<()> {
+		if self.data_connection.is_some() {
+			let mut data_connection = self.data_connection.take().unwrap();
+			
+			let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
+			self.ctrl_connection.write(msg).await?;
+			
+			for msg in utils::get_ls(self.user.as_ref().unwrap().home_dir()) {
+				data_connection.write(msg).await?;
+			}
+			
+			data_connection.close().await;
+			self.data_connection = None;
+			
+			let msg = format!("{} {}", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
+			self.ctrl_connection.write(msg).await?;
+			Ok(())
+		} else {
+			error!("Data connection not initialized");
+			Err(FtpError::DataConnectionError)
+		}
 	}
 	
 	fn parse_port(msg: String) -> Option<(IpAddr, u16)> {

@@ -15,15 +15,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::net::IpAddr;
-use bytes::{BufMut, BytesMut};
-use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use log::{debug, error, info, warn};
 use std::time::Duration;
 use async_std::io as async_io;
 
-use std::net::SocketAddr;
 use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
 
 use crate::ftp_error::{FtpError, FtpResult};
@@ -87,12 +83,11 @@ impl Connection {
 	pub async fn write(&mut self, mut msg: String) -> FtpResult<()> {
 		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
-			// self.tx.write_all_buf(&mut msg.as_bytes()).await
 			msg.push_str("\r\n");
 			self.tx.write(msg.as_bytes()).await
 		}).await {
 			Ok(_) => {
-				info!(" >>>> {}", msg);
+				debug!(" >>>> {}", msg);
 				return Ok(());
 			}
 			Err(e) => {
@@ -105,7 +100,10 @@ impl Connection {
 	pub async fn close(&mut self) {
 		debug!("connection::close");
 		
-		self.tx.shutdown().await;
-		info!("Connection closed by server");
+		if self.tx.shutdown().await.is_ok() {
+			info!("Connection closed by server");
+		} else {
+			error!("Error while closing socket");
+		}
 	}
 }
