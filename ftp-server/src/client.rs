@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::borrow::Borrow;
+use std::fs;
 use std::io::{Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
@@ -85,14 +86,7 @@ impl Client {
 			match self.parse_command(msg.as_ref().unwrap().clone()) {
 				ClientCommand::Auth => { unimplemented!() }
 				ClientCommand::Cwd(arg) => {
-					if arg.exists() {
-						self.current_work_directory = Some(arg);
-						let message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
-						self.ctrl_connection.write(message).await?;
-					} else {
-						let message = format!("{} {}", ServerResponse::FileNotFound.to_string(), "Failed to change directory");
-						self.ctrl_connection.write(message).await?;
-					}
+					self.change_path(arg).await?;
 				}
 				ClientCommand::List(arg) => {
 					self.list(arg).await?;
@@ -102,7 +96,10 @@ impl Client {
 				ClientCommand::Port(arg) => {
 					self.port(arg).await?;
 				}
-				ClientCommand::Pwd => { unimplemented!() }
+				ClientCommand::Pwd => {
+					let message = format!("{} \"{}\" is the current directory", ServerResponse::PATHNAMECreated.to_string(), self.current_work_directory.as_ref().unwrap().to_str().unwrap());
+					self.ctrl_connection.write(message).await?;
+				}
 				ClientCommand::Pasv => {
 					self.pasv().await?;
 				}
@@ -129,6 +126,24 @@ impl Client {
 				}
 			}
 			msg = self.ctrl_connection.read().await;
+		}
+		Ok(())
+	}
+	
+	async fn change_path(&mut self, arg: PathBuf) -> FtpResult<()> {
+		if let Some(path) = arg.to_str() {
+			if path.is_empty() {
+				self.current_work_directory = Some(self.user.as_ref().unwrap().home_dir().to_path_buf());
+			} else {
+				if let Ok(paths) = fs::read_dir(path) {
+					self.current_work_directory = Some(arg);
+					let message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
+					self.ctrl_connection.write(message).await?;
+				} else {
+					let message = format!("{} {}", ServerResponse::FileNotFound.to_string(), "Failed to change directory");
+					self.ctrl_connection.write(message).await?;
+				}
+			}
 		}
 		Ok(())
 	}

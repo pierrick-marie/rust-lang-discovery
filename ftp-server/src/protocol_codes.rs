@@ -89,7 +89,7 @@ impl Display for ServerResponse {
 			EnteringPassiveMode => { write!(f, "{} Entering Passive Mode", EnteringPassiveMode as i32) },
 			UserLoggedIn => { write!(f, "{} User logged in ", UserLoggedIn as i32) },
 			RequestedFileActionOkay => { write!(f, "{}", RequestedFileActionOkay as i32) },
-			PATHNAMECreated => { write!(f, "{} Path created ", PATHNAMECreated as i32) },
+			PATHNAMECreated => { write!(f, "{}", PATHNAMECreated as i32) },
 			UserNameOkayNeedPassword => { write!(f, "{} Please specify the password ", UserNameOkayNeedPassword as i32) },
 			NeedAccountForLogin => { write!(f, "{} Need account for login ", NeedAccountForLogin as i32) },
 			RequestedFileActionPendingFurtherInformation => { write!(f, "{} Request further information ", RequestedFileActionPendingFurtherInformation as i32) },
