@@ -71,12 +71,10 @@ impl Client {
 		
 		if self.connect().await {
 			info!("Connected {}", self.user.as_ref().unwrap().name().to_str().unwrap());
+			self.command().await;
 		} else {
-			return Err(Error::new(ErrorKind::NotConnected, "Not connected".to_string()));
+			error!("Not connected");
 		}
-		
-		
-		self.command().await;
 		
 		self.close_connection().await;
 		Ok(())
@@ -92,7 +90,7 @@ impl Client {
 				ClientCommand::List(arg) => {
 					if self.data_connection.is_some() {
 						let mut data_connection = self.data_connection.take().unwrap();
-					
+						
 						let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
 						self.ctrl_connection.write(msg).await?;
 						
@@ -102,7 +100,7 @@ impl Client {
 						
 						data_connection.close().await;
 						self.data_connection = None;
-					
+						
 						let msg = format!("{} {}", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
 						self.ctrl_connection.write(msg).await?;
 					} else {
@@ -146,6 +144,8 @@ impl Client {
 				}
 				ClientCommand::Quit => {
 					self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
+					self.user = None;
+					return Ok(());
 				}
 				ClientCommand::Retr(arg) => { unimplemented!() }
 				ClientCommand::Rmd(arg) => { unimplemented!() }
@@ -204,72 +204,39 @@ impl Client {
 	}
 	
 	async fn connect(&mut self) -> bool {
-		loop {
-			match self.user().await {
-				Some(login) => {
-					info!("Login: {}", login);
-					if let Err(e) = self.ctrl_connection.write(ServerResponse::UserNameOkayNeedPassword.to_string()).await {
-						error!("Not connected {:?}", e);
-						return false;
-					}
-					if self.password().await.is_some() {
-						info!("Password: \"x\"");
-						let user = get_user_by_name(login.as_str());
-						if user.is_some() {
-							self.user = user;
-							if let Err(e) = self.ctrl_connection.write(ServerResponse::UserLoggedIn.to_string()).await {
-								error!("Not connected {:?}", e);
-								return false;
-							}
-							return true;
+		match self.user().await {
+			Some(login) => {
+				info!("Login: {}", login);
+				if let Err(e) = self.ctrl_connection.write(ServerResponse::UserNameOkayNeedPassword.to_string()).await {
+					error!("Not connected {:?}", e);
+				}
+				if self.password().await.is_some() {
+					info!("Password: \"x\"");
+					let user = get_user_by_name(login.as_str());
+					if user.is_some() {
+						self.user = user;
+						if let Err(e) = self.ctrl_connection.write(ServerResponse::UserLoggedIn.to_string()).await {
+							error!("Not connected {:?}", e);
 						}
+						return true;
 					}
 				}
-				_ => {}
 			}
-			if let Err(e) = self.ctrl_connection.write(ServerResponse::NotLoggedIn.to_string()).await {
-				error!("Not connected {:?}", e);
-				return false;
-			}
+			_ => {}
 		}
+		if let Err(e) = self.ctrl_connection.write(ServerResponse::NotLoggedIn.to_string()).await {
+			error!("Not connected {:?}", e);
+		}
+		false
 	}
 	
 	async fn user(&mut self) -> Option<String> {
 		debug!("client::user");
 		let msg = self.ctrl_connection.read().await?;
-		// dbg!("WTF 0");
-		let res = self.parse_command(msg.clone());
-		// dbg!("WTF 1");
-		// dbg!("RES = {} ", &res);
 		
-		
-		// match res.clone() {
-		// 	ClientCommand::Auth => { dbg!(ClientCommand::Auth); }
-		// 	ClientCommand::Cwd(c) => { dbg!(ClientCommand::Cwd(c)); }
-		// 	ClientCommand::List(c) => { dbg!(ClientCommand::List(c)); }
-		// 	ClientCommand::Mkd(c) => { dbg!(ClientCommand::Mkd(c)); }
-		// 	ClientCommand::NoOp => { dbg!(ClientCommand::NoOp); }
-		// 	ClientCommand::Port(c) => { dbg!(ClientCommand::Port(c)); }
-		// 	ClientCommand::Pass(c) => { dbg!(ClientCommand::Pass(c)); }
-		// 	ClientCommand::Pasv => { dbg!(ClientCommand::Pasv); }
-		// 	ClientCommand::Pwd => { dbg!(ClientCommand::Pwd); }
-		// 	ClientCommand::Quit => { dbg!(ClientCommand::Quit); }
-		// 	ClientCommand::Retr(c) => { dbg!(ClientCommand::Retr(c)); }
-		// 	ClientCommand::Rmd(c) => { dbg!(ClientCommand::Rmd(c)); }
-		// 	ClientCommand::Stor(c) => { dbg!(ClientCommand::Stor(c)); }
-		// 	ClientCommand::Syst => { dbg!(ClientCommand::Syst); }
-		// 	ClientCommand::Type(c) => { dbg!(ClientCommand::Type(c)); }
-		// 	ClientCommand::CdUp => { dbg!(ClientCommand::CdUp); }
-		// 	ClientCommand::Unknown(c) => { dbg!(ClientCommand::Unknown(c)); }
-		// 	ClientCommand::User(c) => { dbg!(ClientCommand::User(c)); }
-		// 	_ => { dbg!("JFHKFGHDFHGHFKJGHKGFJKJGH"); }
-		// }
-		
-		
-		return match res {
+		return match self.parse_command(msg.clone()) {
 			ClientCommand::User(args) => {
 				if self.check_username(args.clone()) {
-					// dbg!("USER: {}", args.clone());
 					Some(args.clone())
 				} else {
 					error!("User name error: {}", args);
@@ -327,8 +294,11 @@ impl Client {
 	
 	pub async fn close_connection(&mut self) {
 		info!("Close client connection");
-		if let Err(e) = self.ctrl_connection.write(ServerResponse::ConnectionClosed.to_string()).await {
-			error!("Failed to close connection with client: {:?}", e);
+		if self.user.is_some() {
+			if let Err(e) = self.ctrl_connection.write(ServerResponse::ConnectionClosed.to_string()).await {
+				error!("Failed to close connection with client: {:?}", e);
+			}
+			self.user = None;
 		}
 		self.ctrl_connection.close().await;
 	}
