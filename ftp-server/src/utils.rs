@@ -42,33 +42,34 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 			filename = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
 			
 			if filename.chars().next().unwrap() != '.' {
-				file = File::open(path.as_ref().unwrap().path()).unwrap();
-				metadata = file.metadata().unwrap();
-				mode = metadata.permissions().mode();
-				octal_right = format!("{:o}", mode);
-				octal_right = octal_right[octal_right.len() - 3..octal_right.len()].to_string();
-				
-				right = "".to_string();
-				for c in octal_right.chars() {
-					right += octal_to_string(c);
+				if let Ok(file) = File::open(path.as_ref().unwrap().path()) {
+					metadata = file.metadata().unwrap();
+					mode = metadata.permissions().mode();
+					octal_right = format!("{:o}", mode);
+					octal_right = octal_right[octal_right.len() - 3..octal_right.len()].to_string();
+					
+					right = "".to_string();
+					for c in octal_right.chars() {
+						right += octal_to_string(c);
+					}
+					
+					if metadata.is_dir() {
+						is_dir = 'd';
+					} else {
+						is_dir = '-';
+					}
+					
+					modification = DateTime::from(metadata.modified().unwrap());
+					
+					files_info.push(format!("{}{} {} {} {}      {} {}",
+					                        is_dir,
+					                        right,
+					                        metadata.uid(),
+					                        metadata.gid(),
+					                        metadata.size(),
+					                        modification.format("%Y %b %d %H:%M"),
+					                        filename));
 				}
-				
-				if metadata.is_dir() {
-					is_dir = 'd';
-				} else {
-					is_dir = '-';
-				}
-				
-				modification = DateTime::from(metadata.modified().unwrap());
-				
-				files_info.push(format!("{}{} {} {} {}      {} {}",
-				                        is_dir,
-				                        right,
-				                        metadata.uid(),
-				                        metadata.gid(),
-				                        metadata.size(),
-				                        modification.format("%Y %b %d %H:%M"),
-				                        filename));
 			}
 		}
 	}

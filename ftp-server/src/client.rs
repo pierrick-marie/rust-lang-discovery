@@ -15,6 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
+use std::borrow::Borrow;
 use std::io::{Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
@@ -44,6 +45,7 @@ pub struct Client {
 	transfert_mode: TransfertMod,
 	transfert_type: TransferType,
 	user: Option<User>,
+	current_work_directory: Option<PathBuf>,
 }
 
 impl Client {
@@ -54,6 +56,7 @@ impl Client {
 			transfert_mode: Active,
 			transfert_type: TransferType::Ascii,
 			user: None,
+			current_work_directory: None,
 		}
 	}
 	
@@ -81,7 +84,16 @@ impl Client {
 		while msg.is_some() {
 			match self.parse_command(msg.as_ref().unwrap().clone()) {
 				ClientCommand::Auth => { unimplemented!() }
-				ClientCommand::Cwd(arg) => { unimplemented!() }
+				ClientCommand::Cwd(arg) => {
+					if arg.exists() {
+						self.current_work_directory = Some(arg);
+						let message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
+						self.ctrl_connection.write(message).await?;
+					} else {
+						let message = format!("{} {}", ServerResponse::FileNotFound.to_string(), "Failed to change directory");
+						self.ctrl_connection.write(message).await?;
+					}
+				}
 				ClientCommand::List(arg) => {
 					self.list(arg).await?;
 				}
@@ -158,22 +170,23 @@ impl Client {
 	}
 	
 	async fn list(&mut self, arg: PathBuf) -> FtpResult<()> {
-		
 		if self.data_connection.is_some() {
 			let mut data_connection = self.data_connection.take().unwrap();
 			
 			let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
 			self.ctrl_connection.write(msg).await?;
 			
-			if arg.to_str().unwrap().is_empty() {
-				for msg in utils::get_ls(self.user.as_ref().unwrap().home_dir()) {
-					data_connection.write(msg).await?;
-				}
-			} else {
+			if arg.exists() {
 				for msg in utils::get_ls(arg.as_path()) {
 					data_connection.write(msg).await?;
 				}
+			} else {
+				for msg in utils::get_ls(self.current_work_directory.as_ref().unwrap()) {
+					data_connection.write(msg).await?;
+				}
 			}
+			
+			
 			data_connection.close().await;
 			self.data_connection = None;
 			
@@ -228,7 +241,8 @@ impl Client {
 					info!("Password: \"x\"");
 					let user = get_user_by_name(login.as_str());
 					if user.is_some() {
-						self.user = user;
+						self.user = user.clone();
+						self.current_work_directory = Some(user.unwrap().home_dir().to_path_buf());
 						if let Err(e) = self.ctrl_connection.write(ServerResponse::UserLoggedIn.to_string()).await {
 							error!("Not connected {:?}", e);
 						}
