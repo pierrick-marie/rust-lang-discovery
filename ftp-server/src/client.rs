@@ -33,7 +33,6 @@ use portpicker::pick_unused_port;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::error::{RecvError, TryRecvError};
 use tokio::time::sleep;
-use crate::data_connection::DataConnection;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
@@ -85,9 +84,9 @@ impl Client {
 	
 	async fn command(&mut self) -> FtpResult<()> {
 		debug!("client::command");
-		loop {
-			let msg = self.ctrl_connection.read().await.unwrap_or(FtpError::SocketReadError.to_string());
-			match self.parse_command(msg.clone()) {
+		let mut msg = self.ctrl_connection.read().await;
+		while msg.is_some() {
+			match self.parse_command(msg.as_ref().unwrap().clone()) {
 				ClientCommand::Auth => { unimplemented!() }
 				ClientCommand::Cwd(arg) => { unimplemented!() }
 				ClientCommand::List(arg) => {
@@ -170,10 +169,11 @@ impl Client {
 				}
 				ClientCommand::CdUp => { unimplemented!() }
 				_ => {
-					error!("Unknown command {}", msg);
+					error!("Unknown command {}", msg.unwrap());
 					return Err(FtpError::UnknownCommand);
 				}
 			}
+			msg = self.ctrl_connection.read().await;
 		}
 		Ok(())
 	}

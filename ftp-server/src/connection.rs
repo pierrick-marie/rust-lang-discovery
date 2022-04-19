@@ -77,7 +77,7 @@ impl Connection {
 					}
 				}
 				Err(e) => {
-					error!("{:?}", e);
+					error!("Read: time out {:?}", e);
 					return None;
 				}
 			}

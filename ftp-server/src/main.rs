@@ -29,7 +29,6 @@ mod ftp_error;
 mod server;
 mod ftp_logger;
 mod connection;
-mod data_connection;
 mod utils;
 use crate::client::Client;
 
