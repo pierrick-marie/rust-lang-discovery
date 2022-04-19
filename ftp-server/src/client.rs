@@ -184,7 +184,6 @@ impl Client {
 		let re = Regex::new(r"^([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3})$").ok()?;
 		let cap = re.captures(msg.as_str())?;
 		
-		dbg!(&cap);
 		let mut addr: [u8; 4] = [0; 4];
 		for i in 1..5 {
 			addr[i - 1] = cap.get(i).unwrap().as_str().to_string().parse::<u8>().ok()?;
@@ -193,8 +192,6 @@ impl Client {
 		let port1 = cap.get(5).unwrap().as_str().to_string().parse::<u16>().ok()?;
 		let port2 = cap.get(6).unwrap().as_str().to_string().parse::<u16>().ok()?;
 		let port = port1 * 256 + port2;
-		
-		dbg!(port);
 		
 		Some((IpAddr::from(addr), port))
 	}
