@@ -30,7 +30,6 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 	let mut right: String;
 	let mut modification: DateTime<Utc>; //: DateTime<Utc> = DateTime::from(metadata.modified().unwrap());
 	
-	let mut file: File;
 	let mut metadata: Metadata;
 	let mut mode;
 	let mut octal_right;

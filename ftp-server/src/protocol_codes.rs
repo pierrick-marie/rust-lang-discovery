@@ -60,9 +60,10 @@ pub enum ServerResponse {
 	CommandNotImplemented = 502,
 	BadSequenceOfCommands = 503,
 	CommandNotImplementedForThatParameter = 504,
+	AlreadyExists = 521,
 	NotLoggedIn = 530,
 	NeedAccountForStoringFiles = 532,
-	FileNotFound = 550,
+	PermissionDenied = 550,
 	PageTypeUnknown = 551,
 	ExceededStorageAllocation = 552,
 	FileNameNotAllowed = 553,
@@ -106,10 +107,11 @@ impl Display for ServerResponse {
 			CommandNotImplementedForThatParameter => { write!(f, "{} Not implemented for thet parameter ", CommandNotImplementedForThatParameter as i32) },
 			NotLoggedIn => { write!(f, "{} Please login with USER and PASS ", NotLoggedIn as i32) },
 			NeedAccountForStoringFiles => { write!(f, "{} need account for storing files ", NeedAccountForStoringFiles as i32) },
-			FileNotFound => { write!(f, "{}", FileNotFound as i32) },
+			PermissionDenied => { write!(f, "{}", PermissionDenied as i32) }
 			PageTypeUnknown => { write!(f, "{} Page type unknown ", PageTypeUnknown as i32) },
 			ExceededStorageAllocation => { write!(f, "{} Exceeded space allocated ", ExceededStorageAllocation as i32) },
 			FileNameNotAllowed => { write!(f, "{} File name not allowed ", FileNameNotAllowed as i32) },
+			AlreadyExists => { write!(f, "{}", AlreadyExists as i32) },
 		}
 	}
 }

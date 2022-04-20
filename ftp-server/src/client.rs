@@ -91,7 +91,9 @@ impl Client {
 				ClientCommand::List(arg) => {
 					self.list(arg).await?;
 				}
-				ClientCommand::Mkd(arg) => { unimplemented!() }
+				ClientCommand::Mkd(arg) => {
+					self.mkdir(arg).await?;
+				}
 				ClientCommand::NoOp => { unimplemented!() }
 				ClientCommand::Port(arg) => {
 					self.port(arg).await?;
@@ -130,8 +132,40 @@ impl Client {
 		Ok(())
 	}
 	
+	async fn mkdir(&mut self, arg: PathBuf) -> FtpResult<()> {
+		info!("Create directory with path {}", arg.to_str().unwrap());
+		let mut message= "".to_string();
+		if let Some(p) = arg.to_str() { // Path exists
+			let mut path: String = p.to_string();
+			if ! path.starts_with('/') { // This is a relative path
+				if path.starts_with("./") {
+					path.remove(0); // removing the first char (.)
+					path.remove(0); // removing the new first char (/)
+				}
+				path = format!("{}/{}", self.current_work_directory.as_ref().unwrap().to_str().unwrap(), path);
+			}
+			if let Err(e) = fs::create_dir(PathBuf::from(path.clone()).as_path()) {
+				match e.kind() {
+					ErrorKind::AlreadyExists => {
+						message = format!("{} - \"{}\" Directory already exists", ServerResponse::AlreadyExists.to_string(), path);
+					}
+					ErrorKind::PermissionDenied => {
+						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path);
+					}
+					_ => {
+						error!("MKD unknown error: {}", e);
+						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path);
+					}
+				}
+			} else {
+				message = format!("{} {}", ServerResponse::PATHNAMECreated.to_string(), path);
+			}
+		}
+		self.ctrl_connection.write(message).await
+	}
+	
 	async fn change_path(&mut self, arg: PathBuf) -> FtpResult<()> {
-		if let Some(path) = arg.to_str() {
+		if let Some(path) = arg.to_str() { // Path exists
 			if path.is_empty() {
 				self.current_work_directory = Some(self.user.as_ref().unwrap().home_dir().to_path_buf());
 			} else {
@@ -140,7 +174,7 @@ impl Client {
 					let message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
 					self.ctrl_connection.write(message).await?;
 				} else {
-					let message = format!("{} {}", ServerResponse::FileNotFound.to_string(), "Failed to change directory");
+					let message = format!("{} {}", ServerResponse::PermissionDenied.to_string(), "Failed to change directory");
 					self.ctrl_connection.write(message).await?;
 				}
 			}
@@ -200,7 +234,6 @@ impl Client {
 					data_connection.write(msg).await?;
 				}
 			}
-			
 			
 			data_connection.close().await;
 			self.data_connection = None;

@@ -87,7 +87,7 @@ impl Connection {
 			self.tx.write(msg.as_bytes()).await
 		}).await {
 			Ok(_) => {
-				debug!(" >>>> {}", msg);
+				info!(" >>>> {}", msg);
 				return Ok(());
 			}
 			Err(e) => {
