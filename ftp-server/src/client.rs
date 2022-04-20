@@ -86,7 +86,7 @@ impl Client {
 			match self.parse_command(msg.as_ref().unwrap().clone()) {
 				ClientCommand::Auth => { unimplemented!() }
 				ClientCommand::Cwd(arg) => {
-					self.change_path(arg).await?;
+					self.change_dir(arg).await?;
 				}
 				ClientCommand::List(arg) => {
 					self.list(arg).await?;
@@ -99,7 +99,7 @@ impl Client {
 					self.port(arg).await?;
 				}
 				ClientCommand::Pwd => {
-					let message = format!("{} \"{}\" is the current directory", ServerResponse::PATHNAMECreated.to_string(), self.current_work_directory.as_ref().unwrap().to_str().unwrap());
+					let message = format!("{} \"{}\" is the current directory", ServerResponse::PathNameCreated.to_string(), self.current_work_directory.as_ref().unwrap().to_str().unwrap());
 					self.ctrl_connection.write(message).await?;
 				}
 				ClientCommand::Pasv => {
@@ -111,7 +111,9 @@ impl Client {
 					return Ok(());
 				}
 				ClientCommand::Retr(arg) => { unimplemented!() }
-				ClientCommand::Rmd(arg) => { unimplemented!() }
+				ClientCommand::Rmd(arg) => {
+					self.rmdir(arg).await?;
+				}
 				ClientCommand::Stor(arg) => { unimplemented!() }
 				ClientCommand::Syst => {
 					self.syst().await?;
@@ -132,55 +134,93 @@ impl Client {
 		Ok(())
 	}
 	
+	async fn rmdir(&mut self, arg: PathBuf) -> FtpResult<()> {
+		info!("Remove directory {}", arg.to_str().unwrap());
+		let mut message = "".to_string();
+		if let Some(path) = self.get_absolut_path(&arg) {
+			if let Err(e) = fs::remove_dir(path.as_path()) {
+				match e.kind() {
+					ErrorKind::PermissionDenied => {
+						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path.to_str().unwrap());
+					}
+					_ => {
+						error!("RMDIR unknown error: {}", e);
+						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path.to_str().unwrap());
+					}
+				}
+			} else {
+				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), path.to_str().unwrap());
+			}
+		} else {
+			error!("RMDIR unknown error, arg: {}", arg.to_str().unwrap());
+			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
+		}
+		self.ctrl_connection.write(message).await
+	}
+	
 	async fn mkdir(&mut self, arg: PathBuf) -> FtpResult<()> {
-		info!("Create directory with path {}", arg.to_str().unwrap());
-		let mut message= "".to_string();
+		info!("Create directory {}", arg.to_str().unwrap());
+		let mut message = "".to_string();
+		if let Some(path) = self.get_absolut_path(&arg) {
+			if let Err(e) = fs::create_dir(path.as_path()) {
+				match e.kind() {
+					ErrorKind::AlreadyExists => {
+						message = format!("{} - \"{}\" Directory already exists", ServerResponse::AlreadyExists.to_string(), path.to_str().unwrap());
+					}
+					ErrorKind::PermissionDenied => {
+						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path.to_str().unwrap());
+					}
+					_ => {
+						error!("MKD unknown error: {}", e);
+						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path.to_str().unwrap());
+					}
+				}
+			} else {
+				message = format!("{} {}", ServerResponse::PathNameCreated.to_string(), path.to_str().unwrap());
+			}
+		} else {
+			error!("MKD unknown error, arg: {}", arg.to_str().unwrap());
+			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
+		}
+		self.ctrl_connection.write(message).await
+	}
+	
+	async fn change_dir(&mut self, arg: PathBuf) -> FtpResult<()> {
+		let mut message = "".to_string();
+		let absolut_path = self.get_absolut_path(&arg);
+		if absolut_path.is_some() {
+			let path = absolut_path.unwrap();
+			if let Ok(_) = fs::read_dir(path.clone()) {
+				self.current_work_directory = Some(path);
+				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
+			} else {
+				message = format!("{} {}", ServerResponse::PermissionDenied.to_string(), "Failed to change directory");
+			}
+		} else {
+			error!("CWD unknown error, arg: {}", arg.to_str().unwrap());
+			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
+		}
+		self.ctrl_connection.write(message).await
+	}
+	
+	fn get_absolut_path(&mut self, arg: &PathBuf) -> Option<PathBuf> {
 		if let Some(p) = arg.to_str() { // Path exists
 			let mut path: String = p.to_string();
-			if ! path.starts_with('/') { // This is a relative path
+			if !path.starts_with('/') { // This is a relative path
 				if path.starts_with("./") {
 					path.remove(0); // removing the first char (.)
 					path.remove(0); // removing the new first char (/)
 				}
 				path = format!("{}/{}", self.current_work_directory.as_ref().unwrap().to_str().unwrap(), path);
 			}
-			if let Err(e) = fs::create_dir(PathBuf::from(path.clone()).as_path()) {
-				match e.kind() {
-					ErrorKind::AlreadyExists => {
-						message = format!("{} - \"{}\" Directory already exists", ServerResponse::AlreadyExists.to_string(), path);
-					}
-					ErrorKind::PermissionDenied => {
-						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path);
-					}
-					_ => {
-						error!("MKD unknown error: {}", e);
-						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path);
-					}
-				}
-			} else {
-				message = format!("{} {}", ServerResponse::PATHNAMECreated.to_string(), path);
+			if path.ends_with('/') {
+				path.pop();
 			}
+			return Some(PathBuf::from(path));
 		}
-		self.ctrl_connection.write(message).await
+		None
 	}
 	
-	async fn change_path(&mut self, arg: PathBuf) -> FtpResult<()> {
-		if let Some(path) = arg.to_str() { // Path exists
-			if path.is_empty() {
-				self.current_work_directory = Some(self.user.as_ref().unwrap().home_dir().to_path_buf());
-			} else {
-				if let Ok(paths) = fs::read_dir(path) {
-					self.current_work_directory = Some(arg);
-					let message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
-					self.ctrl_connection.write(message).await?;
-				} else {
-					let message = format!("{} {}", ServerResponse::PermissionDenied.to_string(), "Failed to change directory");
-					self.ctrl_connection.write(message).await?;
-				}
-			}
-		}
-		Ok(())
-	}
 	
 	async fn port(&mut self, arg: String) -> FtpResult<()> {
 		if let Some(addr) = Client::parse_port(arg) {
