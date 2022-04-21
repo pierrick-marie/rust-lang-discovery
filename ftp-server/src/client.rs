@@ -326,7 +326,27 @@ impl Client {
 	}
 	
 	async fn dele(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		info!("Remove file {}", arg.to_str().unwrap());
+		let mut message = "".to_string();
+		if let Some(path) = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap()) {
+			if let Err(e) = fs::remove_file(path.as_path()) {
+				match e.kind() {
+					ErrorKind::PermissionDenied => {
+						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path.to_str().unwrap());
+					}
+					_ => {
+						error!("DELE unknown error: {}", e);
+						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path.to_str().unwrap());
+					}
+				}
+			} else {
+				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), path.to_str().unwrap());
+			}
+		} else {
+			error!("DELE unknown error, arg: {}", arg.to_str().unwrap());
+			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
+		}
+		self.ctrl_connection.write(message).await
 	}
 	
 	async fn help(&mut self, arg: String) -> FtpResult<()> {
