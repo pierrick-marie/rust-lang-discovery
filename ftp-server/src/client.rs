@@ -302,9 +302,9 @@ impl Client {
 	async fn cdup(&mut self) -> FtpResult<()> {
 		let path = self.current_work_directory.as_ref().unwrap().parent().unwrap().to_path_buf();
 		if let Ok(_) = fs::read_dir(path.clone()) {
-			return self.ctrl_connection.write(ServerResponse::RequestedFileActionOkay.to_string()).await
+			return self.ctrl_connection.write(ServerResponse::RequestedFileActionOkay.to_string()).await;
 		}
-		return self.ctrl_connection.write(ServerResponse::InvalidParameterOrArgument.to_string()).await
+		return self.ctrl_connection.write(ServerResponse::InvalidParameterOrArgument.to_string()).await;
 	}
 	
 	async fn cwd(&mut self, arg: PathBuf) -> FtpResult<()> {
@@ -314,9 +314,9 @@ impl Client {
 			let path = absolut_path.unwrap();
 			if let Ok(_) = fs::read_dir(path.clone()) {
 				self.current_work_directory = Some(path);
-				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
+				message = format!("{} Directory successfully changed", ServerResponse::RequestedFileActionOkay.to_string());
 			} else {
-				message = format!("{} {}", ServerResponse::PermissionDenied.to_string(), "Failed to change directory");
+				message = format!("{} Failed to change directory", ServerResponse::PermissionDenied.to_string());
 			}
 		} else {
 			error!("CWD unknown error, arg: {}", arg.to_str().unwrap());
@@ -352,7 +352,7 @@ impl Client {
 	async fn help(&mut self, arg: String) -> FtpResult<()> {
 		let mut message: String = "".to_string();
 		message.push_str("214-The following commands are recognized.\n");
-		message.push_str(" CDUP CWD DELE HELP LIST MKD PASS PASV PORT PWD QUIT RMD SYST USER\n");
+		message.push_str(" CDUP CWD DELE HELP LIST MKD PASS PASV PORT PWD QUIT RETR RMD SYST USER\n");
 		message.push_str("214 Help OK");
 		self.ctrl_connection.write(message).await
 	}
@@ -361,7 +361,7 @@ impl Client {
 		if self.data_connection.is_some() {
 			let mut data_connection = self.data_connection.take().unwrap();
 			
-			let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
+			let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
 			self.ctrl_connection.write(msg).await?;
 			
 			if arg.exists() {
@@ -377,7 +377,7 @@ impl Client {
 			data_connection.close().await;
 			self.data_connection = None;
 			
-			let msg = format!("{} {}", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
+			let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
 			self.ctrl_connection.write(msg).await?;
 			Ok(())
 		} else {
@@ -481,7 +481,32 @@ impl Client {
 	}
 	
 	async fn retr(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		if self.data_connection.is_some() {
+			let mut data_connection = self.data_connection.take().unwrap();
+			
+			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				if let Some(data) = utils::get_file(path.as_path()) {
+					let msg = format!("{} Start transfer file {}", ServerResponse::FileStatusOk.to_string(), path.to_str().unwrap());
+					self.ctrl_connection.write(msg).await?;
+					
+					data_connection.write_data(data).await?;
+					
+					data_connection.close().await;
+					self.data_connection = None;
+					
+					let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
+					self.ctrl_connection.write(msg).await?;
+					
+					return Ok(());
+				}
+			}
+			let msg = format!("{} Failed to open file {}", ServerResponse::PermissionDenied.to_string(), arg.to_str().unwrap());
+			self.ctrl_connection.write(msg).await?;
+			Ok(())
+		} else {
+			error!("Data connection not initialized");
+			Err(FtpError::DataConnectionError)
+		}
 	}
 	
 	async fn rmdir(&mut self, arg: PathBuf) -> FtpResult<()> {
@@ -549,11 +574,12 @@ impl Client {
 		let mut message = "".to_string();
 		match arg {
 			TransferType::Unknown => {
-				message = format!("{} {}", ServerResponse::InvalidParameterOrArgument.to_string(), "Transfert type unknown");
+				message = format!("{} Transfert type unknown", ServerResponse::InvalidParameterOrArgument.to_string());
 			}
 			_ => {
 				self.transfert_type = arg;
-				message = format!("{} {} {}", ServerResponse::OK.to_string(), "Swith to ", arg.to_string()); }
+				message = format!("{} Switch to {}", ServerResponse::OK.to_string(), arg.to_string());
+			}
 		}
 		self.ctrl_connection.write(message).await
 	}

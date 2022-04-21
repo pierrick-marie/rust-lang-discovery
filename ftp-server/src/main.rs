@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 extern crate core;
+use std::path::PathBuf;
 use log::{debug, error, info, Level};
 
 use async_shutdown::Shutdown;

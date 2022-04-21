@@ -17,14 +17,17 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::fs;
 use std::fs::{File, Metadata};
+use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
-use log::debug;
+use log::{debug, error};
 use regex::Regex;
 use crate::ADDR;
+
+const BUFFER_SIZE: usize = 20;
 
 pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<PathBuf> {
 	if let Some(p) = arg.to_str() { // Path exists
@@ -68,6 +71,27 @@ pub fn get_addr_msg(addr: SocketAddr) -> String {
 	let port2 = port % 256;
 	
 	format!("({},{},{})", ip, port1, port2)
+}
+
+pub fn get_file(path: &Path) -> Option<Vec<u8>> {
+	let mut result: Vec<u8> = vec![];
+	
+	match File::open(path) {
+		Ok(mut file) => {
+			match file.read_to_end(&mut result) {
+				Ok(_) => {}
+				Err(e) => {
+					error!("Failed to read file: {}", e);
+					return None;
+				}
+			};
+		}
+		Err(e) => {
+			error!("Failed to open file {:?}: {}", path, e);
+			return None;
+		}
+	}
+	Some(result)
 }
 
 pub fn get_ls(path: &Path) -> Vec<String> {

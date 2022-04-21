@@ -25,7 +25,7 @@ use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
 use crate::ftp_error::{FtpError, FtpResult};
 
 const TIME_OUT: u64 = 120;
-const BUFFER_SIZE: usize = 1024;
+const BUFFER_SIZE: usize = 20;
 
 pub struct Connection {
 	buffer_reader: [u8; BUFFER_SIZE],
@@ -76,6 +76,22 @@ impl Connection {
 					error!("Read: time out {:?}", e);
 					return None;
 				}
+			}
+		}
+	}
+	
+	pub async fn write_data(&mut self, mut data: Vec<u8>) -> FtpResult<()> {
+		debug!("connection::write");
+		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
+			self.tx.write(data.as_slice()).await
+		}).await {
+			Ok(_) => {
+				info!(" >>>> DATA");
+				return Ok(());
+			}
+			Err(e) => {
+				error!("Failed to send data, {:?}", e);
+				return Err(FtpError::SocketWriteError);
 			}
 		}
 	}
