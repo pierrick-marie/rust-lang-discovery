@@ -300,7 +300,11 @@ impl Client {
 	}
 	
 	async fn cdup(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		let path = self.current_work_directory.as_ref().unwrap().parent().unwrap().to_path_buf();
+		if let Ok(_) = fs::read_dir(path.clone()) {
+			return self.ctrl_connection.write(ServerResponse::RequestedFileActionOkay.to_string()).await
+		}
+		return self.ctrl_connection.write(ServerResponse::InvalidParameterOrArgument.to_string()).await
 	}
 	
 	async fn cwd(&mut self, arg: PathBuf) -> FtpResult<()> {
