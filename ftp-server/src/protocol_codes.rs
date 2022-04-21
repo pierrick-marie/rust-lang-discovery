@@ -116,10 +116,6 @@ impl Display for ServerResponse {
 	}
 }
 
-pub const ASCII: &str = "Ascii";
-pub const BINARY: &str = "Binary";
-pub const UNKNOWN: &str = "Unknown";
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TransferType {
 	Ascii,
@@ -132,7 +128,7 @@ impl Display for TransferType {
 		match self {
 			TransferType::Ascii => { write!(f, "Ascii mode") }
 			TransferType::Binary => { write!(f, "Binary mode") }
-			TransferType::Unknown => { write!(f, "Unknown") }
+			_ => { write!(f, "Unknown transfert type") }
 		}
 	}
 }
@@ -270,7 +266,7 @@ impl ClientCommand {
 			TYPE => {
 				match arg {
 					"A" => Type(TransferType::Ascii),
-					BINARY => Type(TransferType::Binary),
+					"I" => Type(TransferType::Binary),
 					_ => Type(TransferType::Unknown),
 				}
 			},

@@ -280,23 +280,23 @@ impl Client {
 	}
 	
 	async fn abor(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn acct(&mut self, arg: String) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn allo(&mut self, arg: u32) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn appe(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn auth(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn cdup(&mut self) -> FtpResult<()> {
@@ -414,15 +414,15 @@ impl Client {
 	}
 	
 	async fn mode(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn noop(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn nlst(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn pasv(&mut self) -> FtpResult<()> {
@@ -473,15 +473,15 @@ impl Client {
 	}
 	
 	async fn rein(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn rest(&mut self, arg: String) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn retr(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn rmdir(&mut self, arg: PathBuf) -> FtpResult<()> {
@@ -509,35 +509,35 @@ impl Client {
 	}
 	
 	async fn rnfr(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn rnto(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn site(&mut self, arg: String) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn smnt(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn stat(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn stor(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn stou(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn stru(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn syst(&mut self) -> FtpResult<()> {
@@ -546,13 +546,20 @@ impl Client {
 	}
 	
 	async fn transfert_type(&mut self, arg: TransferType) -> FtpResult<()> {
-		self.transfert_type = arg;
-		let message = format!("{} {} {}", ServerResponse::OK.to_string(), "Swith to ", arg.to_string());
+		let mut message = "".to_string();
+		match arg {
+			TransferType::Unknown => {
+				message = format!("{} {}", ServerResponse::InvalidParameterOrArgument.to_string(), "Transfert type unknown");
+			}
+			_ => {
+				self.transfert_type = arg;
+				message = format!("{} {} {}", ServerResponse::OK.to_string(), "Swith to ", arg.to_string()); }
+		}
 		self.ctrl_connection.write(message).await
 	}
 	
 	async fn unknown(&mut self, arg: String) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	pub async fn close_connection(&mut self) {
