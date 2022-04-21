@@ -350,7 +350,11 @@ impl Client {
 	}
 	
 	async fn help(&mut self, arg: String) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+		let mut message: String = "".to_string();
+		message.push_str("214-The following commands are recognized.\n");
+		message.push_str(" CDUP CWD DELE HELP LIST MKD PASS PASV PORT PWD QUIT RMD SYST USER\n");
+		message.push_str("214 Help OK");
+		self.ctrl_connection.write(message).await
 	}
 	
 	async fn list(&mut self, arg: PathBuf) -> FtpResult<()> {
