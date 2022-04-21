@@ -17,10 +17,58 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::fs;
 use std::fs::{File, Metadata};
+use std::net::{IpAddr, SocketAddr};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
+use log::debug;
+use regex::Regex;
+use crate::ADDR;
+
+pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<PathBuf> {
+	if let Some(p) = arg.to_str() { // Path exists
+		let mut path: String = p.to_string();
+		if !path.starts_with('/') { // This is a relative path
+			if path.starts_with("./") {
+				path.remove(0); // removing the first char (.)
+				path.remove(0); // removing the new first char (/)
+			}
+			path = format!("{}/{}", current_directory.to_str().unwrap(), path);
+		}
+		if path.ends_with('/') {
+			path.pop();
+		}
+		return Some(PathBuf::from(path));
+	}
+	None
+}
+
+pub fn parse_port(msg: String) -> Option<(IpAddr, u16)> {
+	debug!("client::parse_port {}", msg);
+	let re = Regex::new(r"^([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3})$").ok()?;
+	let cap = re.captures(msg.as_str())?;
+	
+	let mut addr: [u8; 4] = [0; 4];
+	for i in 1..5 {
+		addr[i - 1] = cap.get(i).unwrap().as_str().to_string().parse::<u8>().ok()?;
+	}
+	
+	let port1 = cap.get(5).unwrap().as_str().to_string().parse::<u16>().ok()?;
+	let port2 = cap.get(6).unwrap().as_str().to_string().parse::<u16>().ok()?;
+	let port = port1 * 256 + port2;
+	
+	Some((IpAddr::from(addr), port))
+}
+
+pub fn get_addr_msg(addr: SocketAddr) -> String {
+	let ip = ADDR.replace(".", ",");
+	let port = addr.port();
+	let port1 = port / 256;
+	let port2 = port % 256;
+	
+	format!("({},{},{})", ip, port1, port2)
+}
 
 pub fn get_ls(path: &Path) -> Vec<String> {
 	let mut files_info = vec![];

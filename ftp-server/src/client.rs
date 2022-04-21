@@ -73,311 +73,6 @@ impl Client {
 		Ok(())
 	}
 	
-	async fn command(&mut self) -> FtpResult<()> {
-		debug!("client::command");
-		let mut msg = self.ctrl_connection.read().await;
-		while msg.is_some() {
-			match self.parse_command(msg.as_ref().unwrap().clone()) {
-				ClientCommand::Auth => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Cwd(arg) => {
-					self.change_dir(arg).await?;
-				}
-				ClientCommand::List(arg) => {
-					self.list(arg).await?;
-				}
-				ClientCommand::Mkd(arg) => {
-					self.mkdir(arg).await?;
-				}
-				ClientCommand::NoOp => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Port(arg) => {
-					self.port(arg).await?;
-				}
-				ClientCommand::Pwd => {
-					let message = format!("{} \"{}\" is the current directory", ServerResponse::PathNameCreated.to_string(), self.current_work_directory.as_ref().unwrap().to_str().unwrap());
-					self.ctrl_connection.write(message).await?;
-				}
-				ClientCommand::Pasv => {
-					self.pasv().await?;
-				}
-				ClientCommand::Quit => {
-					self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
-					self.user = None;
-					return Ok(());
-				}
-				ClientCommand::Retr(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Rmd(arg) => {
-					self.rmdir(arg).await?;
-				}
-				ClientCommand::Stor(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Syst => {
-					self.syst().await?;
-				}
-				ClientCommand::Type(arg) => {
-					self.transfert_type = arg;
-					let message = format!("{} {} {}", ServerResponse::OK.to_string(), "Swith to ", arg.to_string());
-					self.ctrl_connection.write(message).await?;
-				}
-				ClientCommand::CdUp => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Abor => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Allo(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Appe(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Acct(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Dele(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Help(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Mode => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Nlst(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Pass(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Rein => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Rest(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Rnto(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Rnfr(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Site(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Smnt(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Stat(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Stou => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Stru => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::Unknown(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-				ClientCommand::User(arg) => {
-					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
-				}
-			}
-			msg = self.ctrl_connection.read().await;
-		}
-		Ok(())
-	}
-	
-	async fn rmdir(&mut self, arg: PathBuf) -> FtpResult<()> {
-		info!("Remove directory {}", arg.to_str().unwrap());
-		let mut message = "".to_string();
-		if let Some(path) = self.get_absolut_path(&arg) {
-			if let Err(e) = fs::remove_dir(path.as_path()) {
-				match e.kind() {
-					ErrorKind::PermissionDenied => {
-						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path.to_str().unwrap());
-					}
-					_ => {
-						error!("RMDIR unknown error: {}", e);
-						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path.to_str().unwrap());
-					}
-				}
-			} else {
-				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), path.to_str().unwrap());
-			}
-		} else {
-			error!("RMDIR unknown error, arg: {}", arg.to_str().unwrap());
-			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
-		}
-		self.ctrl_connection.write(message).await
-	}
-	
-	async fn mkdir(&mut self, arg: PathBuf) -> FtpResult<()> {
-		info!("Create directory {}", arg.to_str().unwrap());
-		let mut message = "".to_string();
-		if let Some(path) = self.get_absolut_path(&arg) {
-			if let Err(e) = fs::create_dir(path.as_path()) {
-				match e.kind() {
-					ErrorKind::AlreadyExists => {
-						message = format!("{} - \"{}\" Directory already exists", ServerResponse::AlreadyExists.to_string(), path.to_str().unwrap());
-					}
-					ErrorKind::PermissionDenied => {
-						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path.to_str().unwrap());
-					}
-					_ => {
-						error!("MKD unknown error: {}", e);
-						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path.to_str().unwrap());
-					}
-				}
-			} else {
-				message = format!("{} {}", ServerResponse::PathNameCreated.to_string(), path.to_str().unwrap());
-			}
-		} else {
-			error!("MKD unknown error, arg: {}", arg.to_str().unwrap());
-			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
-		}
-		self.ctrl_connection.write(message).await
-	}
-	
-	async fn change_dir(&mut self, arg: PathBuf) -> FtpResult<()> {
-		let mut message = "".to_string();
-		let absolut_path = self.get_absolut_path(&arg);
-		if absolut_path.is_some() {
-			let path = absolut_path.unwrap();
-			if let Ok(_) = fs::read_dir(path.clone()) {
-				self.current_work_directory = Some(path);
-				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
-			} else {
-				message = format!("{} {}", ServerResponse::PermissionDenied.to_string(), "Failed to change directory");
-			}
-		} else {
-			error!("CWD unknown error, arg: {}", arg.to_str().unwrap());
-			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
-		}
-		self.ctrl_connection.write(message).await
-	}
-	
-	fn get_absolut_path(&mut self, arg: &PathBuf) -> Option<PathBuf> {
-		if let Some(p) = arg.to_str() { // Path exists
-			let mut path: String = p.to_string();
-			if !path.starts_with('/') { // This is a relative path
-				if path.starts_with("./") {
-					path.remove(0); // removing the first char (.)
-					path.remove(0); // removing the new first char (/)
-				}
-				path = format!("{}/{}", self.current_work_directory.as_ref().unwrap().to_str().unwrap(), path);
-			}
-			if path.ends_with('/') {
-				path.pop();
-			}
-			return Some(PathBuf::from(path));
-		}
-		None
-	}
-	
-	
-	async fn port(&mut self, arg: String) -> FtpResult<()> {
-		if let Some(addr) = Client::parse_port(arg) {
-			let socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
-			let (rx, tx) = socket.into_split();
-			self.data_connection = Some(Connection::new(rx, tx));
-			
-			let message = format!("{} PORT command successful. Consider using PASV", ServerResponse::OK.to_string());
-			self.ctrl_connection.write(message).await?;
-			Ok(())
-		} else {
-			Err(FtpError::DataConnectionError)
-		}
-	}
-	
-	async fn pasv(&mut self) -> FtpResult<()> {
-		if self.transfert_mode == Passive {
-			self.transfert_mode = Active;
-		} else {
-			self.transfert_mode = Passive;
-			
-			let port: u16 = pick_unused_port().expect("No ports free");
-			let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
-			let socket_addr = listener.local_addr()?;
-			info!("Server listening data on {:?}", socket_addr);
-			
-			let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), Client::get_addr_msg(socket_addr));
-			self.ctrl_connection.write(message).await?;
-			
-			let (stream, addr) = listener.accept().await?;
-			info!("Data connection open with addr {:?}", addr);
-			let (rx, tx) = stream.into_split();
-			self.data_connection = Some(Connection::new(rx, tx));
-		}
-		Ok(())
-	}
-	
-	async fn list(&mut self, arg: PathBuf) -> FtpResult<()> {
-		if self.data_connection.is_some() {
-			let mut data_connection = self.data_connection.take().unwrap();
-			
-			let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
-			self.ctrl_connection.write(msg).await?;
-			
-			if arg.exists() {
-				for msg in utils::get_ls(arg.as_path()) {
-					data_connection.write(msg).await?;
-				}
-			} else {
-				for msg in utils::get_ls(self.current_work_directory.as_ref().unwrap()) {
-					data_connection.write(msg).await?;
-				}
-			}
-			
-			data_connection.close().await;
-			self.data_connection = None;
-			
-			let msg = format!("{} {}", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
-			self.ctrl_connection.write(msg).await?;
-			Ok(())
-		} else {
-			error!("Data connection not initialized");
-			Err(FtpError::DataConnectionError)
-		}
-	}
-	
-	fn parse_port(msg: String) -> Option<(IpAddr, u16)> {
-		debug!("client::parse_port {}", msg);
-		let re = Regex::new(r"^([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3})$").ok()?;
-		let cap = re.captures(msg.as_str())?;
-		
-		let mut addr: [u8; 4] = [0; 4];
-		for i in 1..5 {
-			addr[i - 1] = cap.get(i).unwrap().as_str().to_string().parse::<u8>().ok()?;
-		}
-		
-		let port1 = cap.get(5).unwrap().as_str().to_string().parse::<u16>().ok()?;
-		let port2 = cap.get(6).unwrap().as_str().to_string().parse::<u16>().ok()?;
-		let port = port1 * 256 + port2;
-		
-		Some((IpAddr::from(addr), port))
-	}
-	
-	fn get_addr_msg(addr: SocketAddr) -> String {
-		let ip = ADDR.replace(".", ",");
-		let port = addr.port();
-		let port1 = port / 256;
-		let port2 = port % 256;
-		
-		format!("({},{},{})", ip, port1, port2)
-	}
-	
-	async fn syst(&mut self) -> FtpResult<()> {
-		info!("SYST command");
-		self.ctrl_connection.write(ServerResponse::SystemType.to_string()).await
-	}
-	
 	async fn connect(&mut self) -> bool {
 		match self.user().await {
 			Some(login) => {
@@ -410,9 +105,9 @@ impl Client {
 		debug!("client::user");
 		let msg = self.ctrl_connection.read().await?;
 		
-		return match self.parse_command(msg.clone()) {
+		return match self.parse_command(&msg) {
 			ClientCommand::User(args) => {
-				if self.check_username(args.clone()) {
+				if self.check_word(&args) {
 					Some(args.clone())
 				} else {
 					error!("User name error: {}", args);
@@ -429,9 +124,9 @@ impl Client {
 	async fn password(&mut self) -> Option<String> {
 		debug!("client::password");
 		let msg = self.ctrl_connection.read().await?;
-		return match self.parse_command(msg.clone()) {
+		return match self.parse_command(&msg) {
 			ClientCommand::Pass(args) => {
-				if self.check_username(args.clone()) {
+				if self.check_word(&args) {
 					info!("PASSWORD xxx");
 					Some(args.clone())
 				} else {
@@ -446,7 +141,7 @@ impl Client {
 		};
 	}
 	
-	fn parse_command(&self, msg: String) -> ClientCommand {
+	fn parse_command(&self, msg: &String) -> ClientCommand {
 		debug!("client::parse_command '{}'", msg);
 		if let Some(re) = Regex::new(r"^([[:upper:]]{3,4})( .+)*$").ok() {
 			if let Some(cap) = re.captures(msg.as_str()) {
@@ -460,12 +155,376 @@ impl Client {
 			}
 		}
 		error!("failed to parse command: {}", msg);
-		ClientCommand::Unknown(msg)
+		ClientCommand::Unknown(msg.clone())
 	}
 	
-	fn check_username(&self, username: String) -> bool {
+	fn check_word(&self, username: &String) -> bool {
 		let re = Regex::new(r"^([[:word:]]+)$").unwrap();
 		re.captures(username.as_str()).is_some()
+	}
+	
+	async fn command(&mut self) -> FtpResult<()> {
+		debug!("client::command");
+		let mut msg = self.ctrl_connection.read().await;
+		while msg.is_some() {
+			match self.parse_command(&msg.as_ref().unwrap()) {
+				ClientCommand::Abor => {
+					self.abor().await?;
+				}
+				ClientCommand::Acct(arg) => {
+					self.acct(arg).await?;
+				}
+				ClientCommand::Allo(arg) => {
+					self.allo(arg).await?;
+				}
+				ClientCommand::Appe(arg) => {
+					self.appe(arg).await?;
+				}
+				ClientCommand::Auth => {
+					self.auth().await;
+				}
+				ClientCommand::CdUp => {
+					self.cdup().await?;
+				}
+				ClientCommand::Cwd(arg) => {
+					self.cwd(arg).await?;
+				}
+				ClientCommand::Dele(arg) => {
+					self.dele(arg).await?;
+				}
+				ClientCommand::Help(arg) => {
+					self.help(arg).await?;
+				}
+				ClientCommand::List(arg) => {
+					self.list(arg).await?;
+				}
+				ClientCommand::Mkd(arg) => {
+					self.mkdir(arg).await?;
+				}
+				ClientCommand::Mode => {
+					self.mode().await?;
+				}
+				ClientCommand::Nlst(arg) => {
+					self.nlst().await?;
+				}
+				ClientCommand::NoOp => {
+					self.noop().await?;
+				}
+				ClientCommand::Pass(arg) => {
+					// See connect() function
+				}
+				ClientCommand::Pasv => {
+					self.pasv().await?;
+				}
+				ClientCommand::Port(arg) => {
+					self.port(arg).await?;
+				}
+				ClientCommand::Pwd => {
+					self.pwd().await?;
+				}
+				ClientCommand::Quit => {
+					self.quit().await?;
+				}
+				ClientCommand::Rein => {
+					self.rein().await?;
+				}
+				ClientCommand::Rest(arg) => {
+					self.rest(arg).await?;
+				}
+				ClientCommand::Retr(arg) => {
+					self.retr(arg).await?;
+				}
+				ClientCommand::Rmd(arg) => {
+					self.rmdir(arg).await?;
+				}
+				ClientCommand::Rnfr(arg) => {
+					self.rnfr(arg).await?;
+				}
+				ClientCommand::Rnto(arg) => {
+					self.rnto(arg).await?;
+				}
+				ClientCommand::Site(arg) => {
+					self.site(arg).await?;
+				}
+				ClientCommand::Smnt(arg) => {
+					self.smnt(arg).await?;
+				}
+				ClientCommand::Stat(arg) => {
+					self.stat(arg).await?;
+				}
+				ClientCommand::Stor(arg) => {
+					self.stor(arg).await?;
+				}
+				ClientCommand::Stou => {
+					self.stou().await?;
+				}
+				ClientCommand::Stru => {
+					self.stru().await?;
+				}
+				ClientCommand::Syst => {
+					self.syst().await?;
+				}
+				ClientCommand::Type(arg) => {
+					self.transfert_type(arg).await?;
+				}
+				ClientCommand::Unknown(arg) => {
+					self.unknown(arg).await?;
+				}
+				ClientCommand::User(arg) => {
+					// See connect() function
+				}
+			}
+			msg = self.ctrl_connection.read().await;
+		}
+		Ok(())
+	}
+	
+	async fn abor(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn acct(&mut self, arg: String) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn allo(&mut self, arg: u32) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn appe(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn auth(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn cdup(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn cwd(&mut self, arg: PathBuf) -> FtpResult<()> {
+		let mut message = "".to_string();
+		let absolut_path = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap());
+		if absolut_path.is_some() {
+			let path = absolut_path.unwrap();
+			if let Ok(_) = fs::read_dir(path.clone()) {
+				self.current_work_directory = Some(path);
+				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), "Directory successfully changed");
+			} else {
+				message = format!("{} {}", ServerResponse::PermissionDenied.to_string(), "Failed to change directory");
+			}
+		} else {
+			error!("CWD unknown error, arg: {}", arg.to_str().unwrap());
+			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
+		}
+		self.ctrl_connection.write(message).await
+	}
+	
+	async fn dele(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn help(&mut self, arg: String) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn list(&mut self, arg: PathBuf) -> FtpResult<()> {
+		if self.data_connection.is_some() {
+			let mut data_connection = self.data_connection.take().unwrap();
+			
+			let msg = format!("{} {}", ServerResponse::FileStatusOk.to_string(), "Here comes the directory listing.");
+			self.ctrl_connection.write(msg).await?;
+			
+			if arg.exists() {
+				for msg in utils::get_ls(arg.as_path()) {
+					data_connection.write(msg).await?;
+				}
+			} else {
+				for msg in utils::get_ls(self.current_work_directory.as_ref().unwrap()) {
+					data_connection.write(msg).await?;
+				}
+			}
+			
+			data_connection.close().await;
+			self.data_connection = None;
+			
+			let msg = format!("{} {}", ServerResponse::ClosingDataConnection.to_string(), "Directory send OK.");
+			self.ctrl_connection.write(msg).await?;
+			Ok(())
+		} else {
+			error!("Data connection not initialized");
+			Err(FtpError::DataConnectionError)
+		}
+	}
+	
+	async fn mkdir(&mut self, arg: PathBuf) -> FtpResult<()> {
+		info!("Create directory {}", arg.to_str().unwrap());
+		let mut message = "".to_string();
+		if let Some(path) = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap()) {
+			if let Err(e) = fs::create_dir(path.as_path()) {
+				match e.kind() {
+					ErrorKind::AlreadyExists => {
+						message = format!("{} - \"{}\" Directory already exists", ServerResponse::AlreadyExists.to_string(), path.to_str().unwrap());
+					}
+					ErrorKind::PermissionDenied => {
+						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path.to_str().unwrap());
+					}
+					_ => {
+						error!("MKD unknown error: {}", e);
+						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path.to_str().unwrap());
+					}
+				}
+			} else {
+				message = format!("{} {}", ServerResponse::PathNameCreated.to_string(), path.to_str().unwrap());
+			}
+		} else {
+			error!("MKD unknown error, arg: {}", arg.to_str().unwrap());
+			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
+		}
+		self.ctrl_connection.write(message).await
+	}
+	
+	async fn mode(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn noop(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn nlst(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn pasv(&mut self) -> FtpResult<()> {
+		if self.transfert_mode == Passive {
+			self.transfert_mode = Active;
+		} else {
+			self.transfert_mode = Passive;
+			
+			let port: u16 = pick_unused_port().expect("No ports free");
+			let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
+			let socket_addr = listener.local_addr()?;
+			info!("Server listening data on {:?}", socket_addr);
+			
+			let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), utils::get_addr_msg(socket_addr));
+			self.ctrl_connection.write(message).await?;
+			
+			let (stream, addr) = listener.accept().await?;
+			info!("Data connection open with addr {:?}", addr);
+			let (rx, tx) = stream.into_split();
+			self.data_connection = Some(Connection::new(rx, tx));
+		}
+		Ok(())
+	}
+	
+	async fn port(&mut self, arg: String) -> FtpResult<()> {
+		if let Some(addr) = utils::parse_port(arg) {
+			let socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
+			let (rx, tx) = socket.into_split();
+			self.data_connection = Some(Connection::new(rx, tx));
+			
+			let message = format!("{} PORT command successful. Consider using PASV", ServerResponse::OK.to_string());
+			self.ctrl_connection.write(message).await?;
+			Ok(())
+		} else {
+			Err(FtpError::DataConnectionError)
+		}
+	}
+	
+	async fn pwd(&mut self) -> FtpResult<()> {
+		let message = format!("{} \"{}\" is the current directory", ServerResponse::PathNameCreated.to_string(), self.current_work_directory.as_ref().unwrap().to_str().unwrap());
+		self.ctrl_connection.write(message).await
+	}
+	
+	async fn quit(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
+		self.user = None;
+		return Ok(());
+	}
+	
+	async fn rein(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn rest(&mut self, arg: String) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn retr(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn rmdir(&mut self, arg: PathBuf) -> FtpResult<()> {
+		info!("Remove directory {}", arg.to_str().unwrap());
+		let mut message = "".to_string();
+		if let Some(path) = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap()) {
+			if let Err(e) = fs::remove_dir(path.as_path()) {
+				match e.kind() {
+					ErrorKind::PermissionDenied => {
+						message = format!("{} - \"{}\" Permission denied", ServerResponse::PermissionDenied.to_string(), path.to_str().unwrap());
+					}
+					_ => {
+						error!("RMDIR unknown error: {}", e);
+						message = format!("{} - \"{}\" error", ServerResponse::BadSequenceOfCommands.to_string(), path.to_str().unwrap());
+					}
+				}
+			} else {
+				message = format!("{} {}", ServerResponse::RequestedFileActionOkay.to_string(), path.to_str().unwrap());
+			}
+		} else {
+			error!("RMDIR unknown error, arg: {}", arg.to_str().unwrap());
+			message = format!("{} - \"{}\" error", ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap());
+		}
+		self.ctrl_connection.write(message).await
+	}
+	
+	async fn rnfr(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn rnto(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn site(&mut self, arg: String) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn smnt(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn stat(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn stor(&mut self, arg: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn stou(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn stru(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
+	}
+	
+	async fn syst(&mut self) -> FtpResult<()> {
+		info!("SYST command");
+		self.ctrl_connection.write(ServerResponse::SystemType.to_string()).await
+	}
+	
+	async fn transfert_type(&mut self, arg: TransferType) -> FtpResult<()> {
+		self.transfert_type = arg;
+		let message = format!("{} {} {}", ServerResponse::OK.to_string(), "Swith to ", arg.to_string());
+		self.ctrl_connection.write(message).await
+	}
+	
+	async fn unknown(&mut self, arg: String) -> FtpResult<()> {
+		self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await
 	}
 	
 	pub async fn close_connection(&mut self) {
