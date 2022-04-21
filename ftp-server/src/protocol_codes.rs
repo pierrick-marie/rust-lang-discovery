@@ -130,51 +130,100 @@ pub enum TransferType {
 impl Display for TransferType {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			TransferType::Ascii => { write!(f, "Ascii mod") }
-			TransferType::Binary => { write!(f, "Binary mod") }
+			TransferType::Ascii => { write!(f, "Ascii mode") }
+			TransferType::Binary => { write!(f, "Binary mode") }
 			TransferType::Unknown => { write!(f, "Unknown") }
 		}
 	}
 }
 
+#[derive(PartialEq)]
+pub enum TransfertMode {
+	Passive,
+	Active,
+}
+
+impl Display for TransfertMode {
+	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+		match self {
+			TransfertMode::Passive => { write!(f, "Passive mode") }
+			TransfertMode::Active => { write!(f, "Active mode") }
+		}
+	}
+}
+
+pub const ABOR: &str = "ABOR";
+pub const ALLO: &str = "ALLO";
+pub const APPE: &str = "APPE";
 pub const AUTH: &str = "AUTH";
+pub const ACCT: &str = "ACCT";
+pub const CDUP: &str = "CDUP";
 pub const CWD: &str = "CWD";
+pub const DELE: &str = "DELE";
+pub const HELP: &str = "HELP";
 pub const LIST: &str = "LIST";
+pub const MKD: &str = "MKD";
+pub const MODE: &str = "MODE";
+pub const NLST: &str = "NLST";
+pub const NOOP: &str = "NOOP";
 pub const PASS: &str = "PASS";
 pub const PASV: &str = "PASV";
 pub const PORT: &str = "PORT";
 pub const PWD: &str = "PWD";
 pub const QUIT: &str = "QUIT";
+pub const REIN: &str = "REIN";
+pub const REST: &str = "REST";
 pub const RETR: &str = "RETR";
+pub const RMD: &str = "RMD";
+pub const RNFR: &str = "RNFR";
+pub const RNTO: &str = "RNTO";
+pub const SITE: &str = "SITE";
+pub const SMNT: &str = "SMNT";
+pub const STAT: &str = "STAT";
 pub const STOR: &str = "STOR";
+pub const STOU: &str = "STOU";
+pub const STRU: &str = "STRU";
 pub const SYST: &str = "SYST";
 pub const TYPE: &str = "TYPE";
 pub const USER: &str = "USER";
-pub const CDUP: &str = "CDUP";
-pub const MKD: &str = "MKD";
-pub const RMD: &str = "RMD";
-pub const NOOP: &str = "NOOP";
 pub const UNKN: &str = "UNKN";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum ClientCommand {
+	Abor,
+	Allo(u32),
+	Appe(PathBuf),
 	Auth,
+	Acct(String),
+	CdUp,
 	Cwd(PathBuf),
+	Dele(PathBuf),
+	Help(String),
 	List(PathBuf),
 	Mkd(PathBuf),
+	Mode,
+	Nlst(PathBuf),
 	NoOp,
-	Port(String),
 	Pass(String),
 	Pasv,
+	Port(String),
 	Pwd,
 	Quit,
+	Rein,
+	Rest(String),
 	Retr(PathBuf),
 	Rmd(PathBuf),
+	Rnto(PathBuf),
+	Rnfr(PathBuf),
+	Site(String),
+	Smnt(PathBuf),
+	Stat(PathBuf),
 	Stor(PathBuf),
+	Stou,
+	Stru,
 	Syst,
 	Type(TransferType),
-	CdUp,
 	Unknown(String),
 	User(String),
 }
@@ -186,16 +235,37 @@ impl ClientCommand {
 		debug!("ClientCommant::new {} {}", &input, &arg);
 		
 		match input {
+			ABOR => Abor,
+			ALLO => Allo(arg.to_string().parse::<u32>().unwrap()),
+			APPE => Appe(PathBuf::from(arg.to_string())),
 			AUTH => Auth,
+			ACCT => Acct(arg.to_string()),
+			CDUP => CdUp,
 			CWD => Cwd(PathBuf::from(arg.to_string())),
+			DELE => Dele(PathBuf::from(arg.to_string())),
+			HELP => Help(arg.to_string()),
 			LIST => List(PathBuf::from(arg.to_string())),
+			MKD => Mkd(PathBuf::from(arg.to_string())),
+			MODE => Mode,
+			NLST => Nlst(PathBuf::from(arg.to_string())),
+			NOOP => NoOp,
 			PASS => Pass(arg.to_string()),
 			PORT => Port(arg.to_string()),
 			PWD => Pwd,
 			PASV => Pasv,
 			QUIT => Quit,
+			REIN => Rein,
+			REST => Rest(arg.to_string()),
 			RETR => Retr(PathBuf::from(arg.to_string())),
+			RMD => Rmd(PathBuf::from(arg.to_string())),
+			RNFR => Rnfr(PathBuf::from(arg.to_string())),
+			RNTO => Rnto(PathBuf::from(arg.to_string())),
+			SITE => Site(arg.to_string()),
+			SMNT => Smnt(PathBuf::from(arg.to_string())),
+			STAT => Stat(PathBuf::from(arg.to_string())),
 			STOR => Stor(PathBuf::from(arg.to_string())),
+			STOU => Stou,
+			STRU => Stru,
 			SYST => Syst,
 			TYPE => {
 				match arg {
@@ -205,10 +275,6 @@ impl ClientCommand {
 				}
 			},
 			USER => User(arg.to_string()),
-			CDUP => CdUp,
-			MKD => Mkd(PathBuf::from(arg.to_string())),
-			RMD => Rmd(PathBuf::from(arg.to_string())),
-			NOOP => NoOp,
 			_ => {
 				dbg!("Unknown");
 				Unknown(arg.to_string())
@@ -238,6 +304,23 @@ impl Display for ClientCommand {
 			Rmd(arg) => write!(f, "{} {}", RMD, arg.as_path().to_str().unwrap()),
  			NoOp => write!(f, "{}", NOOP),
 			Unknown(arg) => write!(f, "{} {}", UNKN, arg), // doesn't exist in the protocol
+			Abor => write!(f, "{}", ABOR),
+			Allo(arg) => write!(f, "{} {}", ALLO, arg),
+			Appe(arg) => write!(f, "{} {}", APPE, arg.as_path().to_str().unwrap()),
+			Acct(arg) => write!(f, "{} {}", ACCT, arg),
+			Dele(arg) => write!(f, "{} {}", DELE, arg.as_path().to_str().unwrap()),
+			Help(arg) => write!(f, "{} {}", HELP, arg),
+			Mode => write!(f, "{}", MODE),
+			Nlst(arg) => write!(f, "{} {}", NLST, arg.as_path().to_str().unwrap()),
+			Rein => write!(f, "{}", REIN),
+			Rest(arg) => write!(f, "{} {}", REST, arg),
+			Rnto(arg) => write!(f, "{} {}", RNTO, arg.as_path().to_str().unwrap()),
+			Rnfr(arg) => write!(f, "{} {}", RNFR, arg.as_path().to_str().unwrap()),
+			Site(arg) => write!(f, "{} {}", SITE, arg),
+			Smnt(arg) => write!(f, "{} {}", SMNT, arg.as_path().to_str().unwrap()),
+			Stat(arg) => write!(f, "{} {}", STAT, arg.as_path().to_str().unwrap()),
+			Stou => write!(f, "{}", STOU),
+			Stru => write!(f, "{}", STRU),
 		}
 	}
 }

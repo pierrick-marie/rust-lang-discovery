@@ -32,18 +32,12 @@ use portpicker::pick_unused_port;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
-use crate::client::TransfertMod::{Active, Passive};
-
-#[derive(PartialEq)]
-enum TransfertMod {
-	Passive,
-	Active,
-}
+use crate::protocol_codes::TransfertMode::*;
 
 pub struct Client {
 	ctrl_connection: Connection,
 	data_connection: Option<Connection>,
-	transfert_mode: TransfertMod,
+	transfert_mode: TransfertMode,
 	transfert_type: TransferType,
 	user: Option<User>,
 	current_work_directory: Option<PathBuf>,
@@ -84,7 +78,9 @@ impl Client {
 		let mut msg = self.ctrl_connection.read().await;
 		while msg.is_some() {
 			match self.parse_command(msg.as_ref().unwrap().clone()) {
-				ClientCommand::Auth => { unimplemented!() }
+				ClientCommand::Auth => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
 				ClientCommand::Cwd(arg) => {
 					self.change_dir(arg).await?;
 				}
@@ -94,7 +90,9 @@ impl Client {
 				ClientCommand::Mkd(arg) => {
 					self.mkdir(arg).await?;
 				}
-				ClientCommand::NoOp => { unimplemented!() }
+				ClientCommand::NoOp => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
 				ClientCommand::Port(arg) => {
 					self.port(arg).await?;
 				}
@@ -110,11 +108,15 @@ impl Client {
 					self.user = None;
 					return Ok(());
 				}
-				ClientCommand::Retr(arg) => { unimplemented!() }
+				ClientCommand::Retr(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
 				ClientCommand::Rmd(arg) => {
 					self.rmdir(arg).await?;
 				}
-				ClientCommand::Stor(arg) => { unimplemented!() }
+				ClientCommand::Stor(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
 				ClientCommand::Syst => {
 					self.syst().await?;
 				}
@@ -123,10 +125,68 @@ impl Client {
 					let message = format!("{} {} {}", ServerResponse::OK.to_string(), "Swith to ", arg.to_string());
 					self.ctrl_connection.write(message).await?;
 				}
-				ClientCommand::CdUp => { unimplemented!() }
-				_ => {
-					error!("Unknown command {}", msg.unwrap());
-					return Err(FtpError::UnknownCommand);
+				ClientCommand::CdUp => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Abor => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Allo(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Appe(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Acct(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Dele(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Help(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Mode => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Nlst(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Pass(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Rein => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Rest(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Rnto(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Rnfr(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Site(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Smnt(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Stat(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Stou => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Stru => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::Unknown(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
+				}
+				ClientCommand::User(arg) => {
+					self.ctrl_connection.write(ServerResponse::CommandNotImplementedSuperfluousAtThisSite.to_string()).await?;
 				}
 			}
 			msg = self.ctrl_connection.read().await;
