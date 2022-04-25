@@ -33,19 +33,21 @@ pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	
 	let server = TcpListener::bind(format!("{}:{}", ADDR, PORT)).await?;
 	info!("Server listening on {:?}", server.local_addr().unwrap());
+	let mut id = 1;
 	
 	// Simply use `wrap_cancel` for everything, since we do not need clean-up for the listening socket.
 	// See `handle_client` for a case where a future is given the time to perform logging after the shutdown was triggered.
 	while let Some(connection) = shutdown.wrap_cancel(server.accept()).await {
 		let (stream, address) = connection?;
 		// Handle a new client
-		tokio::spawn(handle_client(shutdown.clone(), stream, address));
+		tokio::spawn(handle_client(shutdown.clone(), stream, address, id));
+		id += 1;
 	}
 	
 	Ok(())
 }
 
-async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAddr) {
+async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAddr, id: i32) {
 	info!("Accepted new connection from {}", address);
 	
 	// Make sure the shutdown doesn't complete until the delay token is dropped.
@@ -69,7 +71,7 @@ async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAdd
 	
 	let (rx, tx) = stream.into_split();
 	let connection = Connection::new(rx, tx);
-	let mut client = Client::new(connection);
+	let mut client = Client::new(connection, id);
 	
 	// Now run the echo loop, but cancel it when the shutdown is triggered.
 	match shutdown.wrap_cancel(client.run()).await {

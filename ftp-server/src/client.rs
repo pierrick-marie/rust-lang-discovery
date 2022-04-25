@@ -26,7 +26,7 @@ use regex::{Regex};
 
 use log::{debug, error, info, warn};
 use tokio::net::{TcpListener, TcpStream};
-use crate::{ADDR, utils};
+use crate::{ADDR, connection, utils};
 use crate::connection::Connection;
 use crate::ftp_error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
@@ -43,10 +43,11 @@ pub struct Client {
 	user: Option<User>,
 	current_work_directory: Option<PathBuf>,
 	current_working_path: Option<PathBuf>,
+	id: i32,
 }
 
 impl Client {
-	pub fn new(connection: Connection) -> Self {
+	pub fn new(connection: Connection, id: i32) -> Self {
 		Client {
 			ctrl_connection: connection,
 			data_connection: None,
@@ -55,6 +56,7 @@ impl Client {
 			user: None,
 			current_work_directory: None,
 			current_working_path: None,
+			id,
 		}
 	}
 	
@@ -593,7 +595,36 @@ impl Client {
 	}
 	
 	async fn stat(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		
+		let mut message = "".to_string();
+		
+		if arg.as_path().to_str().unwrap().is_empty() {
+			message.push_str(format!("{} Server status \r\n", ServerResponse::SystemStatus.to_string()).as_str());
+			
+			message.push_str(format!("   Connected to {} \r\n", ADDR).as_str());
+			message.push_str(format!("   Logged in as {} \r\n", self.user.as_ref().unwrap().name().to_str().unwrap()).as_str());
+			message.push_str(format!("   Type {} \r\n", self.transfert_type).as_str());
+			message.push_str("   No session bandwidth limit\r\n");
+			message.push_str(format!("   Session timeout in seconds is {} \r\n", connection::TIME_OUT).as_str());
+			message.push_str("   Control connection is plain text\r\n");
+			message.push_str("   Data connection will be plain text\r\n");
+			message.push_str(format!("   At session startup, client count was {} \r\n", self.id).as_str());
+			message.push_str("   FTP server version 0.0.1\r\n");
+			
+			message.push_str(format!("{} End of status \r\n", ServerResponse::SystemStatus.to_string()).as_str());
+		} else {
+			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				message.push_str( format!("{} Status follows \r\n", ServerResponse::FileStatus.to_string()).as_str());
+				
+				for msg in utils::get_ls(path.as_path()) {
+					message.push_str(format!("{}\r\n", msg).as_str());
+				}
+				
+				message.push_str(format!("{} End of status", ServerResponse::FileStatus.to_string()).as_str());
+			}
+		}
+		
+		self.ctrl_connection.write(message).await
 	}
 	
 	async fn stor(&mut self, arg: PathBuf) -> FtpResult<()> {

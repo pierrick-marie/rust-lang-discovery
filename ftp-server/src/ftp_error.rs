@@ -28,6 +28,7 @@ pub enum FtpError {
 	SocketWriteError, // Writ socket error
 	Disconnected, // FTP client disconnected
 	Utf8, // UTF_8 error during reading message
+	FileSystemError,
 	ParseMessage, // Error during parsing incoming message from FTP client
 	UnknownCommand, // FTP client send an unknown command
 	SocketReadError, // Read socket error
@@ -51,6 +52,7 @@ impl Display for FtpError {
 			FtpError::SocketReadError => { write!(f, "!!Error!! Client does not answer") }
 			FtpError::InternalChannelError => { write!(f, "!!Error!! Internal channel error") }
 			FtpError::DataConnectionError => { write!(f, "!!Error!! Data connection error") }
+			FtpError::FileSystemError => { write!(f, "!!Error!! File system error") }
 		}
 	}
 }
