@@ -174,6 +174,7 @@ impl Client {
 		debug!("client::command");
 		let mut msg = self.ctrl_connection.read().await;
 		while msg.is_some() {
+			debug!("Message received: {:?}", msg);
 			match self.parse_command(&msg.as_ref().unwrap()) {
 				ClientCommand::Abor => {
 					self.abor().await?;
@@ -286,10 +287,11 @@ impl Client {
 	/**
 	 * Cancel the current data transfer
 	 * The function is partially implemented: the function does not support receiving ABOR during a data transfer process !
+	 * To do it a solution is tokio::select to transfer data and listening control socket at the same time.
 	 */
 	async fn abor(&mut self) -> FtpResult<()> {
 		if self.data_connection.is_some() {
-			self.data_connection.unwrap().close();
+			self.data_connection.take().unwrap().close();
 			self.data_connection = None;
 		}
 		let msg = format!("{} Closing data connection", ServerResponse::ClosingDataConnection.to_string());
@@ -384,18 +386,23 @@ impl Client {
 				let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
 				self.ctrl_connection.write(msg).await?;
 				
-				// tokio::select! {
-				//       _ = async {
-				for msg in utils::get_ls(path.as_path()) {
-					data_connection.write(msg).await;
+				tokio::select! {
+					_ = Client::data_transfer(&mut data_connection, utils::get_ls(path.as_path())) => { }
+					cmd = self.ctrl_connection.read() => {
+						if cmd.is_some() {
+							match self.parse_command(&cmd.as_ref().unwrap()) {
+								ClientCommand::Abor => {
+									self.abor().await;
+									return Ok(());
+								}
+								_ => { }
+							}
+						}
+					}
 				}
+				
 				data_connection.close().await;
 				self.data_connection = None;
-				// 		} => { }
-				// 	cmd = self.ctrl_connection.read() => {
-				//             // ABOR received
-				//       }
-				// }
 				
 				let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
 				self.ctrl_connection.write(msg).await?;
@@ -473,24 +480,23 @@ impl Client {
 	}
 	
 	async fn pasv(&mut self) -> FtpResult<()> {
-		if self.transfert_mode == Passive {
-			self.transfert_mode = Active;
-		} else {
-			self.transfert_mode = Passive;
-			
-			let port: u16 = pick_unused_port().expect("No ports free");
-			let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
-			let socket_addr = listener.local_addr()?;
-			info!("Server listening data on {:?}", socket_addr);
-			
-			let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), utils::get_addr_msg(socket_addr));
-			self.ctrl_connection.write(message).await?;
-			
-			let (stream, addr) = listener.accept().await?;
-			info!("Data connection open with addr {:?}", addr);
-			let (rx, tx) = stream.into_split();
-			self.data_connection = Some(Connection::new(rx, tx));
-		}
+		debug!("Client::pasv");
+		
+		self.transfert_mode = Passive;
+		
+		let port: u16 = pick_unused_port().expect("No ports free");
+		let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
+		let socket_addr = listener.local_addr()?;
+		info!("Server listening data on {:?}", socket_addr);
+		
+		let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), utils::get_addr_msg(socket_addr));
+		self.ctrl_connection.write(message).await?;
+		
+		let (stream, addr) = listener.accept().await?;
+		info!("Data connection open with addr {:?}", addr);
+		let (rx, tx) = stream.into_split();
+		self.data_connection = Some(Connection::new(rx, tx));
+		
 		Ok(())
 	}
 	
@@ -703,6 +709,13 @@ impl Client {
 	
 	async fn unknown(&mut self, arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+	}
+	
+	async fn data_transfer(connection: &mut Connection, data: Vec<String>) -> FtpResult<()> {
+		for msg in data {
+			connection.write(msg).await?;
+		}
+		Ok(())
 	}
 	
 	pub async fn close_connection(&mut self) {
