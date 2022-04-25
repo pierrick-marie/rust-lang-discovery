@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::borrow::Borrow;
+use std::fmt::format;
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
@@ -207,7 +208,7 @@ impl Client {
 					self.mode().await?;
 				}
 				ClientCommand::Nlst(arg) => {
-					self.nlst().await?;
+					self.nlst(arg).await?;
 				}
 				ClientCommand::NoOp => {
 					self.noop().await?;
@@ -355,6 +356,7 @@ impl Client {
 		let mut message: String = "".to_string();
 		message.push_str("214-The following commands are recognized.\n");
 		message.push_str(" CDUP CWD DELE HELP LIST MKD PASS PASV PORT PWD QUIT RETR RMD SYST USER\n");
+		message.push_str(" RNFR RNTO NOOP NLST\n");
 		message.push_str("214 Help OK");
 		self.ctrl_connection.write(message).await
 	}
@@ -363,24 +365,21 @@ impl Client {
 		if self.data_connection.is_some() {
 			let mut data_connection = self.data_connection.take().unwrap();
 			
-			let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
-			self.ctrl_connection.write(msg).await?;
-			
-			if arg.exists() {
-				for msg in utils::get_ls(arg.as_path()) {
+			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
+				self.ctrl_connection.write(msg).await?;
+				
+				for msg in utils::get_ls(path.as_path()) {
 					data_connection.write(msg).await?;
 				}
-			} else {
-				for msg in utils::get_ls(self.current_work_directory.as_ref().unwrap()) {
-					data_connection.write(msg).await?;
-				}
+				
+				data_connection.close().await;
+				self.data_connection = None;
+				
+				let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
+				self.ctrl_connection.write(msg).await?;
 			}
 			
-			data_connection.close().await;
-			self.data_connection = None;
-			
-			let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
-			self.ctrl_connection.write(msg).await?;
 			Ok(())
 		} else {
 			error!("Data connection not initialized");
@@ -420,11 +419,33 @@ impl Client {
 	}
 	
 	async fn noop(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		self.ctrl_connection.write(format!("{} NOOP", ServerResponse::OK.to_string())).await
 	}
 	
-	async fn nlst(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+	async fn nlst(&mut self, arg: PathBuf) -> FtpResult<()> {
+		if self.data_connection.is_some() {
+			let mut data_connection = self.data_connection.take().unwrap();
+			
+			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
+				self.ctrl_connection.write(msg).await?;
+				
+				for msg in utils::get_nls(path.as_path(), arg.as_path().to_str().unwrap()) {
+					data_connection.write(msg).await?;
+				}
+				
+				data_connection.close().await;
+				self.data_connection = None;
+				
+				let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
+				self.ctrl_connection.write(msg).await?;
+			}
+			
+			Ok(())
+		} else {
+			error!("Data connection not initialized");
+			Err(FtpError::DataConnectionError)
+		}
 	}
 	
 	async fn pasv(&mut self) -> FtpResult<()> {
@@ -553,6 +574,7 @@ impl Client {
 		if let Some(origin_path) = self.current_working_path.as_ref() {
 			if let Some(working_path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				if fs::rename(origin_path, working_path).is_ok() {
+					self.current_working_path = None;
 					message = format!("{} Rename successful", ServerResponse::RequestedFileActionOkay);
 					return self.ctrl_connection.write(message).await;
 				}

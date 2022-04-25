@@ -94,6 +94,28 @@ pub fn get_file(path: &Path) -> Option<Vec<u8>> {
 	Some(result)
 }
 
+pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
+	let mut files_info = vec![];
+	
+	let mut filename; //  = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
+	
+	if working_path.is_dir() {
+		if let Ok(paths) = fs::read_dir(working_path) {
+			for path in paths {
+				filename = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
+				
+				if filename.chars().next().unwrap() != '.' {
+					if let Ok(file) = File::open(path.as_ref().unwrap().path()) {
+						files_info.push(format!("{}{}", prefix, filename));
+					}
+				}
+			}
+		}
+	}
+	
+	files_info
+}
+
 pub fn get_ls(path: &Path) -> Vec<String> {
 	let mut files_info = vec![];
 	
