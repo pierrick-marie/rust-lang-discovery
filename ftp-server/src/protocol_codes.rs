@@ -93,7 +93,7 @@ impl Display for ServerResponse {
 			PathNameCreated => { write!(f, "{}", PathNameCreated as i32) },
 			UserNameOkayNeedPassword => { write!(f, "{} Please specify the password ", UserNameOkayNeedPassword as i32) },
 			NeedAccountForLogin => { write!(f, "{} Need account for login ", NeedAccountForLogin as i32) },
-			RequestedFileActionPendingFurtherInformation => { write!(f, "{} Request further information ", RequestedFileActionPendingFurtherInformation as i32) },
+			RequestedFileActionPendingFurtherInformation => { write!(f, "{}", RequestedFileActionPendingFurtherInformation as i32) },
 			ServiceNotAvailable => { write!(f, "{} Timeout ", ServiceNotAvailable as i32) },
 			CantOpenDataConnection => { write!(f, "{} Can't open data connection ", CantOpenDataConnection as i32) },
 			ConnectionClosed => { write!(f, "{} Connection closed ", ConnectionClosed as i32) },

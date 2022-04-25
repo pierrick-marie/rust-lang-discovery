@@ -41,6 +41,7 @@ pub struct Client {
 	transfert_type: TransferType,
 	user: Option<User>,
 	current_work_directory: Option<PathBuf>,
+	current_working_path: Option<PathBuf>,
 }
 
 impl Client {
@@ -52,6 +53,7 @@ impl Client {
 			transfert_type: TransferType::Ascii,
 			user: None,
 			current_work_directory: None,
+			current_working_path: None,
 		}
 	}
 	
@@ -534,11 +536,30 @@ impl Client {
 	}
 	
 	async fn rnfr(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		let mut message;
+		if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+			if path.exists() {
+				self.current_working_path = Some(path);
+				message = format!("{} Ready for RNTO", ServerResponse::RequestedFileActionPendingFurtherInformation);
+				return self.ctrl_connection.write(message).await;
+			}
+		}
+		message = format!("{} RNFR {} command failed", ServerResponse::PermissionDenied, arg.to_str().unwrap());
+		self.ctrl_connection.write(message).await
 	}
 	
 	async fn rnto(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		let mut message;
+		if let Some(origin_path) = self.current_working_path.as_ref() {
+			if let Some(working_path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				if fs::rename(origin_path, working_path).is_ok() {
+					message = format!("{} Rename successful", ServerResponse::RequestedFileActionOkay);
+					return self.ctrl_connection.write(message).await;
+				}
+			}
+		}
+		message = format!("{} RNTO {} command failed", ServerResponse::PermissionDenied, arg.to_str().unwrap());
+		self.ctrl_connection.write(message).await
 	}
 	
 	async fn site(&mut self, arg: String) -> FtpResult<()> {
