@@ -190,7 +190,6 @@ pub enum ClientCommand {
 	Abor,
 	Allo(u32),
 	Appe(PathBuf),
-	Auth,
 	Acct(String),
 	CdUp,
 	Cwd(PathBuf),
@@ -234,7 +233,6 @@ impl ClientCommand {
 			ABOR => Abor,
 			ALLO => Allo(arg.to_string().parse::<u32>().unwrap()),
 			APPE => Appe(PathBuf::from(arg.to_string())),
-			AUTH => Auth,
 			ACCT => Acct(arg.to_string()),
 			CDUP => CdUp,
 			CWD => Cwd(PathBuf::from(arg.to_string())),
@@ -282,7 +280,6 @@ impl ClientCommand {
 impl Display for ClientCommand {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Auth => write!(f, "{}", AUTH),
 			Cwd(arg) => write!(f, "{} {}", CWD, arg.as_path().to_str().unwrap()),
 			List(arg) => write!(f, "{} {}", LIST, arg.as_path().to_str().unwrap()),
 			Pass(_arg) => write!(f, "{} xxxx", PASS),

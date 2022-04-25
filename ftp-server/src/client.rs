@@ -18,6 +18,7 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 use std::borrow::Borrow;
 use std::fmt::format;
 use std::fs;
+use std::io;
 use std::io::{Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
@@ -30,6 +31,7 @@ use crate::{ADDR, connection, utils};
 use crate::connection::Connection;
 use crate::ftp_error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
+use regex::internal::Input;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
@@ -185,9 +187,6 @@ impl Client {
 				ClientCommand::Appe(arg) => {
 					self.appe(arg).await?;
 				}
-				ClientCommand::Auth => {
-					self.auth().await;
-				}
 				ClientCommand::CdUp => {
 					self.cdup().await?;
 				}
@@ -284,23 +283,37 @@ impl Client {
 		Ok(())
 	}
 	
+	/**
+	 * Cancel the current data transfer
+	 * The function is partially implemented: the function does not support receiving ABOR during a data transfer process !
+	 */
 	async fn abor(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		if self.data_connection.is_some() {
+			self.data_connection.unwrap().close();
+			self.data_connection = None;
+		}
+		let msg = format!("{} Closing data connection", ServerResponse::ClosingDataConnection.to_string());
+		self.ctrl_connection.write(msg).await
 	}
 	
+	/**
+	 * Setup the account of a user
+	 */
 	async fn acct(&mut self, arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
+	/**
+	 * Books free space to save data later.
+	 */
 	async fn allo(&mut self, arg: u32) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
+	/**
+	 * Same to STOR, but if the file exists, the data are not removed.
+	 */
 	async fn appe(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
-	}
-	
-	async fn auth(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
@@ -358,7 +371,7 @@ impl Client {
 		let mut message: String = "".to_string();
 		message.push_str("214-The following commands are recognized.\n");
 		message.push_str(" CDUP CWD DELE HELP LIST MKD PASS PASV PORT PWD QUIT RETR RMD SYST USER\n");
-		message.push_str(" RNFR RNTO NOOP NLST\n");
+		message.push_str(" RNFR RNTO NOOP NLST STAT\n");
 		message.push_str("214 Help OK");
 		self.ctrl_connection.write(message).await
 	}
@@ -371,12 +384,18 @@ impl Client {
 				let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
 				self.ctrl_connection.write(msg).await?;
 				
+				// tokio::select! {
+				//       _ = async {
 				for msg in utils::get_ls(path.as_path()) {
-					data_connection.write(msg).await?;
+					data_connection.write(msg).await;
 				}
-				
 				data_connection.close().await;
 				self.data_connection = None;
+				// 		} => { }
+				// 	cmd = self.ctrl_connection.read() => {
+				//             // ABOR received
+				//       }
+				// }
 				
 				let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
 				self.ctrl_connection.write(msg).await?;
@@ -416,6 +435,9 @@ impl Client {
 		self.ctrl_connection.write(message).await
 	}
 	
+	/**
+	 * Set transfer mode
+	 */
 	async fn mode(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
@@ -497,10 +519,16 @@ impl Client {
 		return Ok(());
 	}
 	
+	/**
+	 * Restart a user connection
+	 */
 	async fn rein(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
+	/**
+	 * Restart a data transfer process
+	 */
 	async fn rest(&mut self, arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
@@ -586,16 +614,21 @@ impl Client {
 		self.ctrl_connection.write(message).await
 	}
 	
+	/**
+	 * Specific commands for this site
+	 */
 	async fn site(&mut self, arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
+	/**
+	 * Mount a file system
+	 */
 	async fn smnt(&mut self, arg: PathBuf) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	async fn stat(&mut self, arg: PathBuf) -> FtpResult<()> {
-		
 		let mut message = "".to_string();
 		
 		if arg.as_path().to_str().unwrap().is_empty() {
@@ -614,7 +647,7 @@ impl Client {
 			message.push_str(format!("{} End of status \r\n", ServerResponse::SystemStatus.to_string()).as_str());
 		} else {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
-				message.push_str( format!("{} Status follows \r\n", ServerResponse::FileStatus.to_string()).as_str());
+				message.push_str(format!("{} Status follows \r\n", ServerResponse::FileStatus.to_string()).as_str());
 				
 				for msg in utils::get_ls(path.as_path()) {
 					message.push_str(format!("{}\r\n", msg).as_str());
@@ -627,14 +660,24 @@ impl Client {
 		self.ctrl_connection.write(message).await
 	}
 	
+	/**
+	 * Save data in a file. The data are sent through the control socket.
+	 * If the file exists, the data are removed.
+	 */
 	async fn stor(&mut self, arg: PathBuf) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
+	/**
+	 * Same to STOR, but it save the data in one unique file. The data are sent through the control socket.
+	 */
 	async fn stou(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
+	/**
+	 * Set File Structure
+	 */
 	async fn stru(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
