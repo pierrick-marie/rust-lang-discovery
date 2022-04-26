@@ -7,3 +7,7 @@ target/
 .idea/
 out/
 
+# Sub projects
+hello-world
+tetris
+music-player

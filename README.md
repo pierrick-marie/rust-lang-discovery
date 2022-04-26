@@ -96,3 +96,9 @@ Le lecteur utilise dans sa version finale la bibliothèque Gstreamer pour lire l
 Pour la partie graphique, le lecteur utilise la bibliothèque Relm (https://github.com/antoyo/relm) basée sur GTK.
 
 ![Lecteur de music en rust](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/music-player/music-player.jpg)
+
+# Server & client FTP
+
+## Documentation
+
+![RFC du prtocole FTP en français](http://abcdrfc.free.fr/rfc-vf/pdf/rfc959.pdf)

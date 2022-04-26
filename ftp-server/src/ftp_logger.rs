@@ -15,11 +15,27 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-fn main() {
+use log::{Record, Metadata, SetLoggerError};
 
-	let tuple = (12, 24);
-	println!("{} {}", tuple.0, tuple.1);
+struct SimpleLogger;
 
-	let (hello, world) = "helloworld".split_at(5);
-	println!("{}, {}", hello, world);
+impl log::Log for SimpleLogger {
+	fn enabled(&self, metadata: &Metadata) -> bool {
+		metadata.level() <= crate::LEVEL
+	}
+	
+	fn log(&self, record: &Record) {
+		if self.enabled(record.metadata()) {
+			println!("#{}: {}", record.level(), record.args());
+		}
+	}
+	
+	fn flush(&self) {}
+}
+
+static LOGGER: SimpleLogger = SimpleLogger;
+
+pub fn init() -> Result<(), SetLoggerError> {
+	log::set_logger(&LOGGER)
+		.map(|()| log::set_max_level(crate::LEVEL.to_level_filter()))
 }
