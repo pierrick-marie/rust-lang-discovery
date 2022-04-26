@@ -18,7 +18,7 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 use std::borrow::Borrow;
 use std::fmt::format;
 use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::{Write, Read, Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
@@ -641,20 +641,12 @@ impl Client {
 	async fn stor(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
-				if let Ok(mut file) = File::create(path) {
-					let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
-					self.ctrl_connection.write(msg).await?;
-					
-					let mut data_connection = self.data_connection.take().unwrap();
-					if let Some(data) = data_connection.read().await {
-						write!(file, "{}\n", data)?;
-						
-						data_connection.close().await;
-						self.data_connection = None;
-						let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
-						return self.ctrl_connection.write(msg).await;
-					}
-				}
+				let mut file = OpenOptions::new()
+					.write(true)
+					.append(false)
+					.open(path)?;
+				
+				self.save_data(file).await?;
 			}
 		}
 		error!("Data connection not initialized");
@@ -696,6 +688,24 @@ impl Client {
 	
 	async fn unknown(&mut self, arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+	}
+	
+	async fn save_data(&mut self, mut file: File) -> FtpResult<()> {
+		let mut data_connection = self.data_connection.take().unwrap();
+		
+		let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
+		self.ctrl_connection.write(msg).await?;
+		
+		if let Some(data) = data_connection.read().await {
+			writeln!(file, "{}", data)?;
+			
+			data_connection.close().await;
+			self.data_connection = None;
+			let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
+			return self.ctrl_connection.write(msg).await;
+		}
+		error!("Cannot read data connection");
+		Err(FtpError::DataConnectionError)
 	}
 	
 	async fn send_data(&mut self, data: Vec<String>) -> FtpResult<()> {
