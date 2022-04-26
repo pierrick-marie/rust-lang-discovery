@@ -35,6 +35,7 @@ pub enum FtpError {
 	NotLogged, // FTP client not logged
 	InternalChannelError, // Error while using tokio channel
 	DataConnectionError, // Error with data connection
+	Abord, // Stop current data transfer
 }
 
 pub type FtpResult<T> = result::Result<T, FtpError>;
@@ -53,6 +54,7 @@ impl Display for FtpError {
 			FtpError::InternalChannelError => { write!(f, "!!Error!! Internal channel error") }
 			FtpError::DataConnectionError => { write!(f, "!!Error!! Data connection error") }
 			FtpError::FileSystemError => { write!(f, "!!Error!! File system error") }
+			FtpError::Abord => { write!(f, "!!Error!! Stop current data transfer") }
 		}
 	}
 }

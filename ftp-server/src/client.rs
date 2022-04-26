@@ -228,7 +228,10 @@ impl Client {
 					self.pwd().await?;
 				}
 				ClientCommand::Quit => {
-					self.quit().await?;
+					self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
+					self.user = None;
+					self.ctrl_connection.close();
+					return Ok(());
 				}
 				ClientCommand::Rein => {
 					self.rein().await?;
@@ -294,7 +297,7 @@ impl Client {
 			self.data_connection.take().unwrap().close();
 			self.data_connection = None;
 		}
-		let msg = format!("{} Closing data connection", ServerResponse::ClosingDataConnection.to_string());
+		let msg = format!("{} ABORD: data connection closed", ServerResponse::ClosingDataConnection.to_string());
 		self.ctrl_connection.write(msg).await
 	}
 	
@@ -380,32 +383,32 @@ impl Client {
 	
 	async fn list(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
-			let mut data_connection = self.data_connection.take().unwrap();
-			
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
 				self.ctrl_connection.write(msg).await?;
 				
-				tokio::select! {
-					_ = Client::data_transfer(&mut data_connection, utils::get_ls(path.as_path())) => { }
-					cmd = self.ctrl_connection.read() => {
-						if cmd.is_some() {
-							match self.parse_command(&cmd.as_ref().unwrap()) {
-								ClientCommand::Abor => {
-									self.abor().await;
-									return Ok(());
-								}
-								_ => { }
-							}
-						}
-					}
+				// let mut data_connection = self.data_connection.take().unwrap();
+				// tokio::select! {
+				// 	_ = Client::send(&mut data_connection, utils::get_ls(path.as_path())) => { }
+				// 	cmd = self.ctrl_connection.read() => {
+				// 		if cmd.is_some() {
+				// 			match self.parse_command(&cmd.as_ref().unwrap()) {
+				// 				ClientCommand::Abor => {
+				// 					self.abor().await;
+				// 					return Ok(());
+				// 				}
+				// 				_ => { }
+				// 			}
+				// 		}
+				// 	}
+				// }
+				// data_connection.close().await;
+				// self.data_connection = None;
+				
+				if self.send_data(utils::get_ls(path.as_path())).await.is_ok() {
+					let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
+					self.ctrl_connection.write(msg).await?;
 				}
-				
-				data_connection.close().await;
-				self.data_connection = None;
-				
-				let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
-				self.ctrl_connection.write(msg).await?;
 			}
 			
 			Ok(())
@@ -517,12 +520,6 @@ impl Client {
 	async fn pwd(&mut self) -> FtpResult<()> {
 		let message = format!("{} \"{}\" is the current directory", ServerResponse::PathNameCreated.to_string(), self.current_work_directory.as_ref().unwrap().to_str().unwrap());
 		self.ctrl_connection.write(message).await
-	}
-	
-	async fn quit(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
-		self.user = None;
-		return Ok(());
 	}
 	
 	/**
@@ -711,9 +708,36 @@ impl Client {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
-	async fn data_transfer(connection: &mut Connection, data: Vec<String>) -> FtpResult<()> {
-		for msg in data {
-			connection.write(msg).await?;
+	async fn send_data(&mut self, data: Vec<String>) -> FtpResult<()> {
+		let mut data_connection = self.data_connection.take().unwrap();
+		
+		tokio::select! {
+			_ = async {
+				for msg in data {
+					data_connection.write(msg).await?;
+				}
+				data_connection.read().await.ok_or(FtpError::DataConnectionError);
+				Ok::<_, FtpError>(())
+			} => {
+				data_connection.close().await;
+				self.data_connection = None;
+			}
+			cmd = self.ctrl_connection.read() => {
+				if cmd.is_some() {
+					match self.parse_command(&cmd.as_ref().unwrap()) {
+						ClientCommand::Abor => {
+							data_connection.close().await;
+							self.data_connection = None;
+							let msg = format!("{} transfer interrupted by ABORD", ServerResponse::ConnectionClosed.to_string());
+							self.ctrl_connection.write(msg).await?;
+							let msg = format!("{} ABORD: ok", ServerResponse::ClosingDataConnection.to_string());
+							self.ctrl_connection.write(msg).await?;
+							return Err(FtpError::Abord);
+						}
+						_ => { }
+					}
+				}
+			}
 		}
 		Ok(())
 	}

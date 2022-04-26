@@ -96,7 +96,7 @@ impl Display for ServerResponse {
 			RequestedFileActionPendingFurtherInformation => { write!(f, "{}", RequestedFileActionPendingFurtherInformation as i32) },
 			ServiceNotAvailable => { write!(f, "{} Timeout ", ServiceNotAvailable as i32) },
 			CantOpenDataConnection => { write!(f, "{} Can't open data connection ", CantOpenDataConnection as i32) },
-			ConnectionClosed => { write!(f, "{} Connection closed ", ConnectionClosed as i32) },
+			ConnectionClosed => { write!(f, "{} Connection closed", ConnectionClosed as i32) },
 			FileBusy => { write!(f, "{} File busy ", FileBusy as i32) },
 			LocalErrorInProcessing => { write!(f, "{} Local error ", LocalErrorInProcessing as i32) },
 			InsufficientStorageSpace => { write!(f, "{} No space left ", InsufficientStorageSpace as i32) },
