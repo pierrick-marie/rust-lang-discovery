@@ -215,7 +215,7 @@ pub enum ClientCommand {
 	Smnt(PathBuf),
 	Stat(PathBuf),
 	Stor(PathBuf),
-	Stou,
+	Stou(PathBuf),
 	Stru,
 	Syst,
 	Type(TransferType),
@@ -258,7 +258,7 @@ impl ClientCommand {
 			SMNT => Smnt(PathBuf::from(arg.to_string())),
 			STAT => Stat(PathBuf::from(arg.to_string())),
 			STOR => Stor(PathBuf::from(arg.to_string())),
-			STOU => Stou,
+			STOU => Stou(PathBuf::from(arg.to_string())),
 			STRU => Stru,
 			SYST => Syst,
 			TYPE => {
@@ -312,7 +312,7 @@ impl Display for ClientCommand {
 			Site(arg) => write!(f, "{} {}", SITE, arg),
 			Smnt(arg) => write!(f, "{} {}", SMNT, arg.as_path().to_str().unwrap()),
 			Stat(arg) => write!(f, "{} {}", STAT, arg.as_path().to_str().unwrap()),
-			Stou => write!(f, "{}", STOU),
+			Stou(arg) => write!(f, "{} {}", STOU, arg.as_path().to_str().unwrap()),
 			Stru => write!(f, "{}", STRU),
 		}
 	}

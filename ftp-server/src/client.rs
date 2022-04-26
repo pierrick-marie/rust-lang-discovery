@@ -265,8 +265,8 @@ impl Client {
 				ClientCommand::Stor(arg) => {
 					self.stor(arg).await?;
 				}
-				ClientCommand::Stou => {
-					self.stou().await?;
+				ClientCommand::Stou(arg) => {
+					self.stou(arg).await?;
 				}
 				ClientCommand::Stru => {
 					self.stru().await?;
@@ -275,7 +275,7 @@ impl Client {
 					self.syst().await?;
 				}
 				ClientCommand::Type(arg) => {
-					self.transfert_type(arg).await?;
+					self.transfer_type(arg).await?;
 				}
 				ClientCommand::Unknown(arg) => {
 					self.unknown(arg).await?;
@@ -328,9 +328,13 @@ impl Client {
 						.write(true)
 						.append(true)
 						.open(path)?;
+					let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
+					self.ctrl_connection.write(msg).await?;
 					self.save_data(file).await
 				} else {
 					if let Ok(file) = File::create(path) {
+						let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
+						self.ctrl_connection.write(msg).await?;
 						self.save_data(file).await
 					} else {
 						let msg = format!("{} Cannot create file {}", ServerResponse::PermissionDenied, arg.to_str().unwrap());
@@ -662,6 +666,8 @@ impl Client {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				return if let Ok(file) = File::create(path) {
+					let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
+					self.ctrl_connection.write(msg).await?;
 					self.save_data(file).await
 				} else {
 					let msg = format!("{} Cannot create file {}", ServerResponse::PermissionDenied, arg.to_str().unwrap());
@@ -676,8 +682,31 @@ impl Client {
 	/**
 	 * Same to STOR, but it save the data in one unique file. The data are sent through the control socket.
 	 */
-	async fn stou(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+	async fn stou(&mut self, arg: PathBuf) -> FtpResult<()> {
+		if self.data_connection.is_some() {
+			if let Some(mut path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				
+				let mut string_path = path.to_str().unwrap().to_string();
+				let mut id = 1;
+				while path.exists() {
+					string_path.push('.');
+					string_path.push_str(id.to_string().as_str());
+					path = PathBuf::from(&string_path);
+					id += 1;
+				}
+				
+				return if let Ok(file) = File::create(&path) {
+					let msg = format!("{} File: {}", ServerResponse::FileStatusOk.to_string(), &path.file_name().unwrap().to_str().unwrap());
+					self.ctrl_connection.write(msg).await?;
+					self.save_data(file).await
+				} else {
+					let msg = format!("{} Cannot create file {}", ServerResponse::PermissionDenied, arg.to_str().unwrap());
+					self.ctrl_connection.write(msg).await
+				};
+			}
+		}
+		error!("Data connection not initialized");
+		Err(FtpError::DataConnectionError)
 	}
 	
 	/**
@@ -692,7 +721,7 @@ impl Client {
 		self.ctrl_connection.write(ServerResponse::SystemType.to_string()).await
 	}
 	
-	async fn transfert_type(&mut self, arg: TransferType) -> FtpResult<()> {
+	async fn transfer_type(&mut self, arg: TransferType) -> FtpResult<()> {
 		let mut message = "".to_string();
 		match arg {
 			TransferType::Unknown => {
@@ -714,9 +743,6 @@ impl Client {
 		debug!("Client::save_data");
 		
 		let mut data_connection = self.data_connection.take().unwrap();
-		
-		let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
-		self.ctrl_connection.write(msg).await?;
 		
 		if let Some(data) = data_connection.read().await {
 			writeln!(file, "{}", data)?;
