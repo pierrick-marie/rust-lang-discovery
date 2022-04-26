@@ -107,7 +107,18 @@ pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
 				
 				if filename.chars().next().unwrap() != '.' {
 					if let Ok(file) = File::open(path.as_ref().unwrap().path()) {
-						files_info.push(format!("{}{}", prefix, filename));
+						let mut msg= "".to_string();
+						if prefix.is_empty() {
+							msg = filename;
+						} else {
+							if prefix.ends_with('/') {
+								msg = format!("{}{}", prefix, filename)
+							} else {
+								msg = format!("{}/{}", prefix, filename)
+							}
+						}
+						
+						files_info.push(msg);
 					}
 				}
 			}

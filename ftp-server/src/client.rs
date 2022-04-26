@@ -387,24 +387,6 @@ impl Client {
 				let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
 				self.ctrl_connection.write(msg).await?;
 				
-				// let mut data_connection = self.data_connection.take().unwrap();
-				// tokio::select! {
-				// 	_ = Client::send(&mut data_connection, utils::get_ls(path.as_path())) => { }
-				// 	cmd = self.ctrl_connection.read() => {
-				// 		if cmd.is_some() {
-				// 			match self.parse_command(&cmd.as_ref().unwrap()) {
-				// 				ClientCommand::Abor => {
-				// 					self.abor().await;
-				// 					return Ok(());
-				// 				}
-				// 				_ => { }
-				// 			}
-				// 		}
-				// 	}
-				// }
-				// data_connection.close().await;
-				// self.data_connection = None;
-				
 				if self.send_data(utils::get_ls(path.as_path())).await.is_ok() {
 					let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
 					self.ctrl_connection.write(msg).await?;
@@ -458,21 +440,14 @@ impl Client {
 	
 	async fn nlst(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
-			let mut data_connection = self.data_connection.take().unwrap();
-			
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				let msg = format!("{} Here comes the directory listing", ServerResponse::FileStatusOk.to_string());
 				self.ctrl_connection.write(msg).await?;
 				
-				for msg in utils::get_nls(path.as_path(), arg.as_path().to_str().unwrap()) {
-					data_connection.write(msg).await?;
+				if self.send_data(utils::get_nls(path.as_path(), arg.as_path().to_str().unwrap())).await.is_ok() {
+					let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
+					self.ctrl_connection.write(msg).await?;
 				}
-				
-				data_connection.close().await;
-				self.data_connection = None;
-				
-				let msg = format!("{} Directory send OK", ServerResponse::ClosingDataConnection.to_string());
-				self.ctrl_connection.write(msg).await?;
 			}
 			
 			Ok(())
@@ -538,20 +513,16 @@ impl Client {
 	
 	async fn retr(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
-			let mut data_connection = self.data_connection.take().unwrap();
 			
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				if let Some(data) = utils::get_file(path.as_path()) {
 					let msg = format!("{} Start transfer file {}", ServerResponse::FileStatusOk.to_string(), path.to_str().unwrap());
 					self.ctrl_connection.write(msg).await?;
 					
-					data_connection.write_data(data).await?;
-					
-					data_connection.close().await;
-					self.data_connection = None;
-					
-					let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
-					self.ctrl_connection.write(msg).await?;
+					if self.send_data(vec![String::from_utf8(data).unwrap()]).await.is_ok() {
+						let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
+						self.ctrl_connection.write(msg).await?;
+					}
 					
 					return Ok(());
 				}
@@ -716,7 +687,6 @@ impl Client {
 				for msg in data {
 					data_connection.write(msg).await?;
 				}
-				data_connection.read().await.ok_or(FtpError::DataConnectionError);
 				Ok::<_, FtpError>(())
 			} => {
 				data_connection.close().await;
