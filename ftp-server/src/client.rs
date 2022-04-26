@@ -312,7 +312,7 @@ impl Client {
 	 * Books free space to save data later.
 	 */
 	async fn allo(&mut self, arg: u32) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		self.ctrl_connection.write(format!("{} Not necessary for this site", ServerResponse::OK.to_string())).await
 	}
 	
 	/**
