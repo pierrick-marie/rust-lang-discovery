@@ -18,8 +18,9 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 use std::borrow::Borrow;
 use std::fmt::format;
 use std::fs;
+use std::fs::File;
 use std::io;
-use std::io::{Error, ErrorKind};
+use std::io::{Write, Read, Error, ErrorKind};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use crate::protocol_codes::*;
@@ -513,7 +514,6 @@ impl Client {
 	
 	async fn retr(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
-			
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				if let Some(data) = utils::get_file(path.as_path()) {
 					let msg = format!("{} Start transfer file {}", ServerResponse::FileStatusOk.to_string(), path.to_str().unwrap());
@@ -635,11 +635,30 @@ impl Client {
 	}
 	
 	/**
-	 * Save data in a file. The data are sent through the control socket.
+	 * Save data in a file. The data are sent through the data socket.
 	 * If the file exists, the data are removed.
 	 */
 	async fn stor(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		if self.data_connection.is_some() {
+			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				if let Ok(mut file) = File::create(path) {
+					let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
+					self.ctrl_connection.write(msg).await?;
+					
+					let mut data_connection = self.data_connection.take().unwrap();
+					if let Some(data) = data_connection.read().await {
+						write!(file, "{}\n", data)?;
+						
+						data_connection.close().await;
+						self.data_connection = None;
+						let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
+						return self.ctrl_connection.write(msg).await;
+					}
+				}
+			}
+		}
+		error!("Data connection not initialized");
+		Err(FtpError::DataConnectionError)
 	}
 	
 	/**
