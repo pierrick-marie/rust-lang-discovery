@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::fs;
-use std::fs::{File, Metadata};
+use std::fs::File;
 use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -27,8 +27,6 @@ use log::{debug, error};
 use regex::Regex;
 use crate::ADDR;
 use crate::ftp_error::{FtpError, FtpResult};
-
-const BUFFER_SIZE: usize = 20;
 
 pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<PathBuf> {
 	if let Some(p) = arg.to_str() { // Path exists
@@ -106,20 +104,18 @@ pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
 				filename = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
 				
 				if filename.chars().next().unwrap() != '.' {
-					if let Ok(file) = File::open(path.as_ref().unwrap().path()) {
-						let mut msg= "".to_string();
-						if prefix.is_empty() {
-							msg = filename;
+					let msg;
+					if prefix.is_empty() {
+						msg = filename;
+					} else {
+						if prefix.ends_with('/') {
+							msg = format!("{}{}", prefix, filename)
 						} else {
-							if prefix.ends_with('/') {
-								msg = format!("{}{}", prefix, filename)
-							} else {
-								msg = format!("{}/{}", prefix, filename)
-							}
+							msg = format!("{}/{}", prefix, filename)
 						}
-						
-						files_info.push(msg);
 					}
+					
+					files_info.push(msg);
 				}
 			}
 		}
@@ -129,13 +125,12 @@ pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
 }
 
 fn get_file_info(path: &Path) -> FtpResult<String> {
-	
 	if let Ok(file) = File::open(path) {
 		let metadata = file.metadata().unwrap();
 		let mode = metadata.permissions().mode();
 		let mut octal_right = format!("{:o}", mode);
 		octal_right = octal_right[octal_right.len() - 3..octal_right.len()].to_string();
-		let mut is_dir;
+		let is_dir;
 		
 		let mut right = "".to_string();
 		for c in octal_right.chars() {
@@ -148,15 +143,15 @@ fn get_file_info(path: &Path) -> FtpResult<String> {
 			is_dir = '-';
 		}
 		
-		let modification:DateTime<Utc> = DateTime::from(metadata.modified().unwrap());
+		let modification: DateTime<Utc> = DateTime::from(metadata.modified().unwrap());
 		
 		return Ok(format!("{}{} {} {} {}      {}",
-		                        is_dir,
-		                        right,
-		                        metadata.uid(),
-		                        metadata.gid(),
-		                        metadata.size(),
-		                        modification.format("%Y %b %d %H:%M")));
+		                  is_dir,
+		                  right,
+		                  metadata.uid(),
+		                  metadata.gid(),
+		                  metadata.size(),
+		                  modification.format("%Y %b %d %H:%M")));
 	}
 	return Err(FtpError::FileSystemError);
 }
@@ -165,7 +160,7 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 	let mut files_info = vec![];
 	
 	let mut filename; //  = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
-
+	
 	
 	if path.exists() {
 		if path.is_dir() {

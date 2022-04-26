@@ -24,16 +24,8 @@ use log::debug;
 use tokio::io;
 
 pub enum FtpError {
-	TimeOut, // Time out to read message from FTP client
 	SocketWriteError, // Writ socket error
-	Disconnected, // FTP client disconnected
-	Utf8, // UTF_8 error during reading message
 	FileSystemError,
-	ParseMessage, // Error during parsing incoming message from FTP client
-	UnknownCommand, // FTP client send an unknown command
-	SocketReadError, // Read socket error
-	NotLogged, // FTP client not logged
-	InternalChannelError, // Error while using tokio channel
 	DataConnectionError, // Error with data connection
 	Abord, // Stop current data transfer
 }
@@ -43,15 +35,7 @@ pub type FtpResult<T> = result::Result<T, FtpError>;
 impl Display for FtpError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			FtpError::TimeOut => { write!(f, "!!Error!! Time out connection") }
-			FtpError::NotLogged => { write!(f, "!!Error!! Client not logged") }
 			FtpError::SocketWriteError => { write!(f, "!!Error!! Connection closed") }
-			FtpError::Utf8 => { write!(f, "!!Error!! UTF_8 error") }
-			FtpError::ParseMessage => { write!(f, "!!Error!! Wrong data, impossible to parse message") }
-			FtpError::UnknownCommand => { write!(f, "!!Error!! Unknown command") }
-			FtpError::Disconnected => { write!(f, "!!Error!! Disconnected") }
-			FtpError::SocketReadError => { write!(f, "!!Error!! Client does not answer") }
-			FtpError::InternalChannelError => { write!(f, "!!Error!! Internal channel error") }
 			FtpError::DataConnectionError => { write!(f, "!!Error!! Data connection error") }
 			FtpError::FileSystemError => { write!(f, "!!Error!! File system error") }
 			FtpError::Abord => { write!(f, "!!Error!! Stop current data transfer") }

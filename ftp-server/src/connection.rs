@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::time::Duration;
 use async_std::io as async_io;
 
@@ -76,22 +76,6 @@ impl Connection {
 					error!("Read: time out {:?}", e);
 					return None;
 				}
-			}
-		}
-	}
-	
-	pub async fn write_data(&mut self, mut data: Vec<u8>) -> FtpResult<()> {
-		debug!("connection::write");
-		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
-			self.tx.write(data.as_slice()).await
-		}).await {
-			Ok(_) => {
-				info!(" >>>> DATA");
-				return Ok(());
-			}
-			Err(e) => {
-				error!("Failed to send data, {:?}", e);
-				return Err(FtpError::SocketWriteError);
 			}
 		}
 	}

@@ -151,7 +151,7 @@ impl Display for TransfertMode {
 pub const ABOR: &str = "ABOR";
 pub const ALLO: &str = "ALLO";
 pub const APPE: &str = "APPE";
-pub const AUTH: &str = "AUTH";
+pub const _AUTH: &str = "AUTH";
 pub const ACCT: &str = "ACCT";
 pub const CDUP: &str = "CDUP";
 pub const CWD: &str = "CWD";

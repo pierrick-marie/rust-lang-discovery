@@ -15,24 +15,20 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use std::borrow::Borrow;
-use std::fmt::format;
 use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io;
-use std::io::{Write, Read, Error, ErrorKind};
-use std::net::{IpAddr, SocketAddr};
-use std::path::{Path, PathBuf};
+use std::io::{Write, Error, ErrorKind};
+use std::net::{SocketAddr};
+use std::path::{PathBuf};
 use crate::protocol_codes::*;
 use regex::{Regex};
 
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
 use crate::{ADDR, connection, utils};
 use crate::connection::Connection;
 use crate::ftp_error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
-use regex::internal::Input;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
@@ -217,7 +213,7 @@ impl Client {
 				ClientCommand::NoOp => {
 					self.noop().await?;
 				}
-				ClientCommand::Pass(arg) => {
+				ClientCommand::Pass(_arg) => {
 					// See connect() function
 				}
 				ClientCommand::Pasv => {
@@ -232,7 +228,7 @@ impl Client {
 				ClientCommand::Quit => {
 					self.ctrl_connection.write(ServerResponse::ServiceClosingControlConnection.to_string()).await?;
 					self.user = None;
-					self.ctrl_connection.close();
+					self.ctrl_connection.close().await;
 					return Ok(());
 				}
 				ClientCommand::Rein => {
@@ -280,7 +276,7 @@ impl Client {
 				ClientCommand::Unknown(arg) => {
 					self.unknown(arg).await?;
 				}
-				ClientCommand::User(arg) => {
+				ClientCommand::User(_arg) => {
 					// See connect() function
 				}
 			}
@@ -296,7 +292,7 @@ impl Client {
 	 */
 	async fn abor(&mut self) -> FtpResult<()> {
 		if self.data_connection.is_some() {
-			self.data_connection.take().unwrap().close();
+			self.data_connection.take().unwrap().close().await;
 			self.data_connection = None;
 		}
 		let msg = format!("{} ABORD: data connection closed", ServerResponse::ClosingDataConnection.to_string());
@@ -306,14 +302,14 @@ impl Client {
 	/**
 	 * Setup the account of a user
 	 */
-	async fn acct(&mut self, arg: String) -> FtpResult<()> {
+	async fn acct(&mut self, _arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	/**
 	 * Books free space to save data later.
 	 */
-	async fn allo(&mut self, arg: u32) -> FtpResult<()> {
+	async fn allo(&mut self, _arg: u32) -> FtpResult<()> {
 		self.ctrl_connection.write(format!("{} Not necessary for this site", ServerResponse::OK.to_string())).await
 	}
 	
@@ -324,7 +320,7 @@ impl Client {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				return if path.exists() {
-					let mut file = OpenOptions::new()
+					let file = OpenOptions::new()
 						.write(true)
 						.append(true)
 						.open(path)?;
@@ -356,7 +352,7 @@ impl Client {
 	}
 	
 	async fn cwd(&mut self, arg: PathBuf) -> FtpResult<()> {
-		let mut message = "".to_string();
+		let message;
 		let absolut_path = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap());
 		if absolut_path.is_some() {
 			let path = absolut_path.unwrap();
@@ -375,7 +371,7 @@ impl Client {
 	
 	async fn dele(&mut self, arg: PathBuf) -> FtpResult<()> {
 		info!("Remove file {}", arg.to_str().unwrap());
-		let mut message = "".to_string();
+		let message;
 		if let Some(path) = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap()) {
 			if let Err(e) = fs::remove_file(path.as_path()) {
 				match e.kind() {
@@ -397,7 +393,7 @@ impl Client {
 		self.ctrl_connection.write(message).await
 	}
 	
-	async fn help(&mut self, arg: String) -> FtpResult<()> {
+	async fn help(&mut self, _arg: String) -> FtpResult<()> {
 		let mut message: String = "".to_string();
 		message.push_str("214-The following commands are recognized.\n");
 		message.push_str(" CDUP CWD DELE HELP LIST MKD PASS PASV PORT PWD QUIT RETR RMD SYST USER\n");
@@ -427,7 +423,7 @@ impl Client {
 	
 	async fn mkdir(&mut self, arg: PathBuf) -> FtpResult<()> {
 		info!("Create directory {}", arg.to_str().unwrap());
-		let mut message = "".to_string();
+		let message;
 		if let Some(path) = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap()) {
 			if let Err(e) = fs::create_dir(path.as_path()) {
 				match e.kind() {
@@ -532,7 +528,7 @@ impl Client {
 	/**
 	 * Restart a data transfer process
 	 */
-	async fn rest(&mut self, arg: String) -> FtpResult<()> {
+	async fn rest(&mut self, _arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
@@ -562,7 +558,7 @@ impl Client {
 	
 	async fn rmdir(&mut self, arg: PathBuf) -> FtpResult<()> {
 		info!("Remove directory {}", arg.to_str().unwrap());
-		let mut message = "".to_string();
+		let message;
 		if let Some(path) = utils::get_absolut_path(&arg, &self.current_work_directory.as_ref().unwrap()) {
 			if let Err(e) = fs::remove_dir(path.as_path()) {
 				match e.kind() {
@@ -585,7 +581,7 @@ impl Client {
 	}
 	
 	async fn rnfr(&mut self, arg: PathBuf) -> FtpResult<()> {
-		let mut message;
+		let message;
 		if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 			if path.exists() {
 				self.current_working_path = Some(path);
@@ -598,7 +594,7 @@ impl Client {
 	}
 	
 	async fn rnto(&mut self, arg: PathBuf) -> FtpResult<()> {
-		let mut message;
+		let message;
 		if let Some(origin_path) = self.current_working_path.as_ref() {
 			if let Some(working_path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				if fs::rename(origin_path, working_path).is_ok() {
@@ -615,14 +611,14 @@ impl Client {
 	/**
 	 * Specific commands for this site
 	 */
-	async fn site(&mut self, arg: String) -> FtpResult<()> {
+	async fn site(&mut self, _arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
 	/**
 	 * Mount a file system
 	 */
-	async fn smnt(&mut self, arg: PathBuf) -> FtpResult<()> {
+	async fn smnt(&mut self, _arg: PathBuf) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
@@ -722,7 +718,7 @@ impl Client {
 	}
 	
 	async fn transfer_type(&mut self, arg: TransferType) -> FtpResult<()> {
-		let mut message = "".to_string();
+		let message ;
 		match arg {
 			TransferType::Unknown => {
 				message = format!("{} Transfert type unknown", ServerResponse::InvalidParameterOrArgument.to_string());
@@ -735,7 +731,7 @@ impl Client {
 		self.ctrl_connection.write(message).await
 	}
 	
-	async fn unknown(&mut self, arg: String) -> FtpResult<()> {
+	async fn unknown(&mut self, _arg: String) -> FtpResult<()> {
 		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
 	}
 	
