@@ -187,6 +187,7 @@ impl Client {
 					self.allo(arg).await?;
 				}
 				ClientCommand::Appe(arg) => {
+					dbg!(&arg);
 					self.appe(arg).await?;
 				}
 				ClientCommand::CdUp => {
@@ -322,12 +323,20 @@ impl Client {
 	async fn appe(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
-				let mut file = OpenOptions::new()
-					.write(true)
-					.append(true)
-					.open(path)?;
-				
-				self.save_data(file).await?;
+				return if path.exists() {
+					let mut file = OpenOptions::new()
+						.write(true)
+						.append(true)
+						.open(path)?;
+					self.save_data(file).await
+				} else {
+					if let Ok(file) = File::create(path) {
+						self.save_data(file).await
+					} else {
+						let msg = format!("{} Cannot create file {}", ServerResponse::PermissionDenied, arg.to_str().unwrap());
+						self.ctrl_connection.write(msg).await
+					}
+				};
 			}
 		}
 		error!("Data connection not initialized");
@@ -652,12 +661,12 @@ impl Client {
 	async fn stor(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
-				let mut file = OpenOptions::new()
-					.write(true)
-					.append(false)
-					.open(path)?;
-				
-				self.save_data(file).await?;
+				return if let Ok(file) = File::create(path) {
+					self.save_data(file).await
+				} else {
+					let msg = format!("{} Cannot create file {}", ServerResponse::PermissionDenied, arg.to_str().unwrap());
+					self.ctrl_connection.write(msg).await
+				};
 			}
 		}
 		error!("Data connection not initialized");
@@ -702,6 +711,8 @@ impl Client {
 	}
 	
 	async fn save_data(&mut self, mut file: File) -> FtpResult<()> {
+		debug!("Client::save_data");
+		
 		let mut data_connection = self.data_connection.take().unwrap();
 		
 		let msg = format!("{} Ok to send data", ServerResponse::FileStatusOk.to_string());
@@ -709,7 +720,6 @@ impl Client {
 		
 		if let Some(data) = data_connection.read().await {
 			writeln!(file, "{}", data)?;
-			
 			data_connection.close().await;
 			self.data_connection = None;
 			let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
