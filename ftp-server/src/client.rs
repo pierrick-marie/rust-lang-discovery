@@ -320,7 +320,18 @@ impl Client {
 	 * Same to STOR, but if the file exists, the data are not removed.
 	 */
 	async fn appe(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.write(ServerResponse::CommandNotImplemented.to_string()).await
+		if self.data_connection.is_some() {
+			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
+				let mut file = OpenOptions::new()
+					.write(true)
+					.append(true)
+					.open(path)?;
+				
+				self.save_data(file).await?;
+			}
+		}
+		error!("Data connection not initialized");
+		Err(FtpError::DataConnectionError)
 	}
 	
 	async fn cdup(&mut self) -> FtpResult<()> {
