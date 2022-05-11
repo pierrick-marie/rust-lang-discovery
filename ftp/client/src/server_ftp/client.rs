@@ -20,19 +20,20 @@ use std::fs::{File, OpenOptions};
 use std::io::{Write, Error, ErrorKind};
 use std::net::{SocketAddr};
 use std::path::{PathBuf};
-use crate::protocol_codes::*;
 use regex::{Regex};
 
 use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
-use crate::{ADDR, connection, utils};
-use crate::connection::Connection;
-use crate::ftp_error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
-use crate::protocol_codes::TransfertMode::*;
+
+use crate::{Connection, DEFAULT_ADDR, utils};
+use crate::protocol::{ClientCommand, ServerResponse, TransfertMode, TransferType};
+use crate::protocol::TransfertMode::{Active, Passive};
+use crate::utils::connection;
+use crate::utils::error::{FtpError, FtpResult};
 
 pub struct Client {
 	ctrl_connection: Connection,
@@ -484,7 +485,7 @@ impl Client {
 		self.transfert_mode = Passive;
 		
 		let port: u16 = pick_unused_port().expect("No ports free");
-		let listener = TcpListener::bind(format!("{}:{}", ADDR, port)).await?;
+		let listener = TcpListener::bind(format!("{}:{}", DEFAULT_ADDR, port)).await?;
 		let socket_addr = listener.local_addr()?;
 		info!("Server listening data on {:?}", socket_addr);
 		
@@ -628,7 +629,7 @@ impl Client {
 		if arg.as_path().to_str().unwrap().is_empty() {
 			message.push_str(format!("{} Server status \r\n", ServerResponse::SystemStatus.to_string()).as_str());
 			
-			message.push_str(format!("   Connected to {} \r\n", ADDR).as_str());
+			message.push_str(format!("   Connected to {} \r\n", DEFAULT_ADDR).as_str());
 			message.push_str(format!("   Logged in as {} \r\n", self.user.as_ref().unwrap().name().to_str().unwrap()).as_str());
 			message.push_str(format!("   Type {} \r\n", self.transfert_type).as_str());
 			message.push_str("   No session bandwidth limit\r\n");
@@ -636,7 +637,7 @@ impl Client {
 			message.push_str("   Control connection is plain text\r\n");
 			message.push_str("   Data connection will be plain text\r\n");
 			message.push_str(format!("   At session startup, client count was {} \r\n", self.id).as_str());
-			message.push_str("   FTP server version 0.0.1\r\n");
+			message.push_str("   FTP server_ftp version 0.0.1\r\n");
 			
 			message.push_str(format!("{} End of status \r\n", ServerResponse::SystemStatus.to_string()).as_str());
 		} else {

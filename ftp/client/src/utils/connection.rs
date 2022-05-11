@@ -21,8 +21,7 @@ use std::time::Duration;
 use async_std::io as async_io;
 
 use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
-
-use crate::ftp_error::{FtpError, FtpResult};
+use crate::utils::error::{FtpError, FtpResult};
 
 pub const TIME_OUT: u64 = 300;
 const BUFFER_SIZE: usize = 1024;
@@ -101,7 +100,7 @@ impl Connection {
 		debug!("connection::close");
 		
 		if self.tx.shutdown().await.is_ok() {
-			info!("Connection closed by server");
+			info!("Connection closed by server_ftp");
 		} else {
 			error!("Error while closing socket");
 		}

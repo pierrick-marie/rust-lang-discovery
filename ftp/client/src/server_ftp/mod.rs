@@ -23,15 +23,18 @@ I modified some parts of it.
 
 use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
-use crate::{ADDR, Client, PORT};
-use crate::connection::Connection;
 use async_shutdown::Shutdown;
 use std::net::SocketAddr;
+
+pub mod client;
+
+use crate::{Connection, DEFAULT_ADDR, DEFAULT_PORT};
+use crate::server_ftp::client::Client;
 
 
 pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	
-	let server = TcpListener::bind(format!("{}:{}", ADDR, PORT)).await?;
+	let server = TcpListener::bind(format!("{}:{}", DEFAULT_ADDR, DEFAULT_PORT)).await?;
 	info!("Server listening on {:?}", server.local_addr().unwrap());
 	let mut id = 1;
 	

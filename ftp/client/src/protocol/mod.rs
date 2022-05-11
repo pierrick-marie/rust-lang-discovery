@@ -83,7 +83,7 @@ impl Display for ServerResponse {
 			FileStatus => { write!(f, "{}", FileStatus as i32) },
 			HelpMessage => { write!(f, "{} Help ", HelpMessage as i32) },
 			SystemType => { write!(f, "{} UNIX Type: L8", SystemType as i32) },
-			ServiceReadyForNewUser => { write!(f, "{} Welcome to my rust ftp server. I'm waiting for your user name ", ServiceReadyForNewUser as i32) },
+			ServiceReadyForNewUser => { write!(f, "{} Welcome to my rust ftp server_ftp. I'm waiting for your user name ", ServiceReadyForNewUser as i32) },
 			ServiceClosingControlConnection => { write!(f, "{} Goodbye ", ServiceClosingControlConnection as i32) },
 			DataConnectionOpen => { write!(f, "{} Data connection open ", DataConnectionOpen as i32) },
 			ClosingDataConnection => { write!(f, "{}", ClosingDataConnection as i32) },

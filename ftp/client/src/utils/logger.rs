@@ -19,9 +19,11 @@ use log::{Record, Metadata, SetLoggerError};
 
 struct SimpleLogger;
 
+use crate::LEVEL;
+
 impl log::Log for SimpleLogger {
 	fn enabled(&self, metadata: &Metadata) -> bool {
-		metadata.level() <= crate::LEVEL
+		metadata.level() <= LEVEL
 	}
 	
 	fn log(&self, record: &Record) {
@@ -37,5 +39,5 @@ static LOGGER: SimpleLogger = SimpleLogger;
 
 pub fn init() -> Result<(), SetLoggerError> {
 	log::set_logger(&LOGGER)
-		.map(|()| log::set_max_level(crate::LEVEL.to_level_filter()))
+		.map(|()| log::set_max_level(LEVEL.to_level_filter()))
 }

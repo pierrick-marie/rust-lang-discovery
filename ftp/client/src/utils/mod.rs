@@ -25,8 +25,12 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use log::{debug, error};
 use regex::Regex;
-use crate::ADDR;
-use crate::ftp_error::{FtpError, FtpResult};
+use crate::DEFAULT_ADDR;
+use crate::utils::error::{FtpError, FtpResult};
+
+pub mod connection;
+pub mod error;
+pub mod logger;
 
 pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<PathBuf> {
 	if let Some(p) = arg.to_str() { // Path exists
@@ -64,7 +68,7 @@ pub fn parse_port(msg: String) -> Option<(IpAddr, u16)> {
 }
 
 pub fn get_addr_msg(addr: SocketAddr) -> String {
-	let ip = ADDR.replace(".", ",");
+	let ip = DEFAULT_ADDR.replace(".", ",");
 	let port = addr.port();
 	let port1 = port / 256;
 	let port2 = port % 256;
