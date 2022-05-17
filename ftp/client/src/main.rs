@@ -17,8 +17,8 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 extern crate core;
 use log::{debug, error, info, Level};
-use std::env;
-use std::net::{IpAddr, SocketAddr};
+use std::{env};
+use std::net::{IpAddr};
 use std::str::FromStr;
 
 mod protocol;
@@ -26,95 +26,58 @@ mod server_ftp;
 mod utils;
 mod client_ftp;
 
-use async_shutdown::Shutdown;
-use tokio::net::{TcpListener, TcpStream};
 use crate::utils::connection::Connection;
 use crate::utils::logger;
-
 
 pub const LOCALHOST: &str = "localhost";
 pub const DEFAULT_ADDR: &str = "::1";
 pub const DEFAULT_PORT: u16 = 21;
 
-pub const LEVEL: Level = Level::Info;
-
-async fn wait_ctrl_c(shutdown: Shutdown) {
-	
-	// Spawn a task to wait for CTRL+C and trigger a shutdown.
-	tokio::spawn({
-		async move {
-			if let Err(e) = tokio::signal::ctrl_c().await {
-				error!("Failed to wait for CTRL+C: {}", e);
-				std::process::exit(1);
-			} else {
-				info!("Received interrupt signal. Shutting down server_ftp...");
-				shutdown.shutdown();
-			}
-		}
-	});
-}
-
-async fn connect(addr: IpAddr, port: u16) {
-	
-	info!("Connecting with {} {}", addr.to_string(), port);
-	
-	let socket = TcpStream::connect(SocketAddr::new(addr, port.to_string().parse::<u16>().unwrap())).await.unwrap();
-	let (rx, tx) = socket.into_split();
-	
-	// Create a new shutdown object.
-	// We will clone it into all tasks that need it.
-	let shutdown = Shutdown::new();
-	
-	wait_ctrl_c(shutdown.clone()).await;
-	
-	// Run the server_ftp and set a non-zero exit code if we had an error.
-	let exit_code = match client_ftp::run(shutdown.clone(), Connection::new(rx, tx)).await {
-		Ok(()) => 0,
-		Err(e) => {
-			error!("Server task finished with an error: {}", e);
-			1
-		}
-	};
-	
-	// Wait for clients to run their cleanup code, then exit.
-	// Without this, background tasks could be killed before they can run their cleanup code.
-	shutdown.wait_shutdown_complete().await;
-	
-	std::process::exit(exit_code);
-}
+pub const LEVEL: Level = Level::Debug;
 
 #[tokio::main]
 async fn main() {
+	
+	// Init logger
 	if let Err(e) = logger::init() {
 		println!("Failed to init logger: {:?}", e);
 		return;
 	}
 	
+	// Check args
 	let args: Vec<String> = env::args().collect();
 	match args.len() {
 		1 => {
-			connect(IpAddr::from_str(DEFAULT_ADDR).unwrap(), DEFAULT_PORT).await;
+			client_ftp::connect(IpAddr::from_str(DEFAULT_ADDR).unwrap(), DEFAULT_PORT).await;
 		}
 		2 => {
-			if let Ok(addr) = IpAddr::from_str(&*args.get(1).unwrap().to_string()) {
-				connect(addr, DEFAULT_PORT).await;
+			if let Some(str_arg) = args.get(1) {
+				if let Ok(addr) = IpAddr::from_str(str_arg) {
+					client_ftp::connect(addr, DEFAULT_PORT).await;
+				} else {
+					error!("Address argument error: {:?}", args.get(1));
+				}
 			} else {
 				error!("Address argument error: {:?}", args.get(1));
 			}
 		}
 		3 => {
-			if let Ok(port) = args.get(2).unwrap().to_string().parse::<u16>() {
-				if let Some(arg_addr) = args.get(1) {
-					arg_addr.to_lowercase();
-					if arg_addr.eq(LOCALHOST) {
-						let ip_addr = IpAddr::from_str(DEFAULT_ADDR).expect("Failed to create connection");
-						connect(ip_addr, port).await;
+			if let Some(str_port) = args.get(2) {
+				if let Ok(port) = str_port.parse::<u16>() {
+					if let Some(arg_addr) = args.get(1) {
+						arg_addr.to_lowercase();
+						if arg_addr.eq(LOCALHOST) {
+							let ip_addr = IpAddr::from_str(DEFAULT_ADDR).expect("Failed to create connection");
+							client_ftp::connect(ip_addr, port).await;
+						} else {
+							let ip_addr = IpAddr::from_str(arg_addr).expect("Failed to create connection");
+							client_ftp::connect(ip_addr, port).await;
+						}
 					} else {
-						let ip_addr = IpAddr::from_str(arg_addr).expect("Failed to create connection");
-						connect(ip_addr, port).await;
+						error!("Address argument error: {:?}", args.get(1));
 					}
 				} else {
-					error!("Address argument error: {:?}", args.get(1));
+					error!("Port argument error: {:?}", args.get(2));
 				}
 			} else {
 				error!("Port argument error: {:?}", args.get(2));
@@ -126,5 +89,3 @@ async fn main() {
 		}
 	};
 }
-
-

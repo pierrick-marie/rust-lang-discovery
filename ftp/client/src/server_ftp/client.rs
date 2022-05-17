@@ -341,7 +341,7 @@ impl Client {
 			}
 		}
 		error!("Data connection not initialized");
-		Err(FtpError::DataConnectionError)
+		Err(FtpError::ConnectionError)
 	}
 	
 	async fn cdup(&mut self) -> FtpResult<()> {
@@ -418,7 +418,7 @@ impl Client {
 			Ok(())
 		} else {
 			error!("Data connection not initialized");
-			Err(FtpError::DataConnectionError)
+			Err(FtpError::ConnectionError)
 		}
 	}
 	
@@ -475,7 +475,7 @@ impl Client {
 			Ok(())
 		} else {
 			error!("Data connection not initialized");
-			Err(FtpError::DataConnectionError)
+			Err(FtpError::ConnectionError)
 		}
 	}
 	
@@ -510,7 +510,7 @@ impl Client {
 			self.ctrl_connection.write(message).await?;
 			Ok(())
 		} else {
-			Err(FtpError::DataConnectionError)
+			Err(FtpError::ConnectionError)
 		}
 	}
 	
@@ -553,7 +553,7 @@ impl Client {
 			Ok(())
 		} else {
 			error!("Data connection not initialized");
-			Err(FtpError::DataConnectionError)
+			Err(FtpError::ConnectionError)
 		}
 	}
 	
@@ -673,7 +673,7 @@ impl Client {
 			}
 		}
 		error!("Data connection not initialized");
-		Err(FtpError::DataConnectionError)
+		Err(FtpError::ConnectionError)
 	}
 	
 	/**
@@ -703,7 +703,7 @@ impl Client {
 			}
 		}
 		error!("Data connection not initialized");
-		Err(FtpError::DataConnectionError)
+		Err(FtpError::ConnectionError)
 	}
 	
 	/**
@@ -749,7 +749,7 @@ impl Client {
 			return self.ctrl_connection.write(msg).await;
 		}
 		error!("Cannot read data connection");
-		Err(FtpError::DataConnectionError)
+		Err(FtpError::ConnectionError)
 	}
 	
 	async fn send_data(&mut self, data: Vec<String>) -> FtpResult<()> {

@@ -31,7 +31,6 @@ pub mod client;
 use crate::{Connection, DEFAULT_ADDR, DEFAULT_PORT};
 use crate::server_ftp::client::Client;
 
-
 pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	
 	let server = TcpListener::bind(format!("{}:{}", DEFAULT_ADDR, DEFAULT_PORT)).await?;

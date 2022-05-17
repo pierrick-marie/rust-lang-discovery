@@ -26,8 +26,9 @@ use tokio::io;
 pub enum FtpError {
 	SocketWriteError, // Writ socket error
 	FileSystemError,
-	DataConnectionError, // Error with data connection
+	ConnectionError, // Error with data connection
 	Abord, // Stop current data transfer
+	InternalError,
 }
 
 pub type FtpResult<T> = result::Result<T, FtpError>;
@@ -36,9 +37,10 @@ impl Display for FtpError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
 			FtpError::SocketWriteError => { write!(f, "!!Error!! Connection closed") }
-			FtpError::DataConnectionError => { write!(f, "!!Error!! Data connection error") }
+			FtpError::ConnectionError => { write!(f, "!!Error!! Data connection error") }
 			FtpError::FileSystemError => { write!(f, "!!Error!! File system error") }
 			FtpError::Abord => { write!(f, "!!Error!! Stop current data transfer") }
+			FtpError::InternalError => { write!(f, "!!Error!! Internal error") }
 		}
 	}
 }
