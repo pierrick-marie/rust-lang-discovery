@@ -20,6 +20,10 @@ use log::{debug, error, info, Level};
 use std::{env};
 use std::net::{IpAddr};
 use std::str::FromStr;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::mpsc;
+use crate::client_ftp::ClientFtp;
 
 mod protocol;
 mod server_ftp;
@@ -30,7 +34,7 @@ use crate::utils::connection::Connection;
 use crate::utils::logger;
 
 pub const LOCALHOST: &str = "localhost";
-pub const DEFAULT_ADDR: &str = "::1";
+pub const DEFAULT_ADDR: &str = "192.168.0.0";
 pub const DEFAULT_PORT: u16 = 21;
 
 pub const LEVEL: Level = Level::Debug;
@@ -46,19 +50,21 @@ async fn main() {
 	
 	// Check args
 	let args: Vec<String> = env::args().collect();
-	match args.len() {
+	let r_client = match args.len() {
 		1 => {
-			client_ftp::connect(IpAddr::from_str(DEFAULT_ADDR).unwrap(), DEFAULT_PORT).await;
+			ClientFtp::new(IpAddr::from_str(DEFAULT_ADDR).unwrap(), DEFAULT_PORT).await
 		}
 		2 => {
 			if let Some(str_arg) = args.get(1) {
 				if let Ok(addr) = IpAddr::from_str(str_arg) {
-					client_ftp::connect(addr, DEFAULT_PORT).await;
+					ClientFtp::new(addr, DEFAULT_PORT).await
 				} else {
 					error!("Address argument error: {:?}", args.get(1));
+					return;
 				}
 			} else {
 				error!("Address argument error: {:?}", args.get(1));
+				return;
 			}
 		}
 		3 => {
@@ -68,19 +74,22 @@ async fn main() {
 						arg_addr.to_lowercase();
 						if arg_addr.eq(LOCALHOST) {
 							let ip_addr = IpAddr::from_str(DEFAULT_ADDR).expect("Failed to create connection");
-							client_ftp::connect(ip_addr, port).await;
+							ClientFtp::new(ip_addr, port).await
 						} else {
 							let ip_addr = IpAddr::from_str(arg_addr).expect("Failed to create connection");
-							client_ftp::connect(ip_addr, port).await;
+							ClientFtp::new(ip_addr, port).await
 						}
 					} else {
 						error!("Address argument error: {:?}", args.get(1));
+						return;
 					}
 				} else {
 					error!("Port argument error: {:?}", args.get(2));
+					return;
 				}
 			} else {
 				error!("Port argument error: {:?}", args.get(2));
+				return;
 			}
 		}
 		_ => {
@@ -88,4 +97,13 @@ async fn main() {
 			return;
 		}
 	};
+	
+	if let Ok(mut client) = r_client {
+		client.run().await;
+	} else {
+		error!("Client is not initialised");
+	}
+	
+	info!("Finished");
 }
+

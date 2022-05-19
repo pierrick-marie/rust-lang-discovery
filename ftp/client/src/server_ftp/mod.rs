@@ -26,10 +26,10 @@ use tokio::net::{TcpListener, TcpStream};
 use async_shutdown::Shutdown;
 use std::net::SocketAddr;
 
-pub mod client;
+pub mod user_ftp;
 
 use crate::{Connection, DEFAULT_ADDR, DEFAULT_PORT};
-use crate::server_ftp::client::Client;
+use crate::server_ftp::user_ftp::UserFtp;
 
 pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	
@@ -73,15 +73,15 @@ async fn handle_client(shutdown: Shutdown, stream: TcpStream, address: SocketAdd
 	
 	let (rx, tx) = stream.into_split();
 	let connection = Connection::new(rx, tx);
-	let mut client = Client::new(connection, id);
+	let mut user = UserFtp::new(connection, id);
 	
 	// Now run the echo loop, but cancel it when the shutdown is triggered.
-	match shutdown.wrap_cancel(client.run()).await {
+	match shutdown.wrap_cancel(user.run()).await {
 		Some(Err(e)) => error!("Error in connection {}: {:?}", address, e),
 		Some(Ok(())) => info!("Connection closed by {}", address),
 		None => {
 			info!("Shutdown triggered, closing connection with {}", address);
-			client.close_connection().await;
+			user.close_connection().await;
 		}
 	}
 	

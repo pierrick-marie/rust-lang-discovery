@@ -23,38 +23,72 @@ use crate::Connection;
 use crate::utils::error::{FtpError, FtpResult};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::{thread, time};
+use tokio::sync::mpsc::Receiver;
 
-pub async fn connect(addr: IpAddr, port: u16) {
-	info!("Connecting with {} {}", addr.to_string(), port);
+pub struct ClientFtp {
+	pub connection: Connection,
+}
+
+impl ClientFtp {
+	pub async fn new(addr: IpAddr, port: u16) -> FtpResult<Self> {
+		info!("New ClientFTP {} {}", addr.to_string(), port);
+		
+		return if let Ok(socket) = TcpStream::connect(SocketAddr::new(addr, port.to_string().parse::<u16>().unwrap())).await {
+			let (rx, tx) = socket.into_split();
+			let mut connection = Connection::new(rx, tx);
+			
+			Ok(ClientFtp {
+				connection,
+			})
+		} else {
+			Err(FtpError::ConnectionError)
+		};
+	}
 	
-	if let Ok(socket) = TcpStream::connect(SocketAddr::new(addr, port.to_string().parse::<u16>().unwrap())).await {
-		let (rx, tx) = socket.into_split();
-		
-		// Init CTRL-C
-		let keep_running = Arc::new(AtomicBool::new(true));
-		let r = keep_running.clone();
-		ctrlc::set_handler(move || {
-			r.clone().store(false, Ordering::SeqCst);
-		}).expect("Error setting Ctrl-C handler");
-		
-		
-		tokio::spawn(async move {
-			run(keep_running.clone(), Connection::new(rx, tx), "Plop 0".to_string()).await;
-		});
-	} else {
-		error!("Failed to connect to the server");
+	pub async fn run(&mut self)  {
+		info!("RUN !");
+		tokio::select! {
+			_ = tokio::spawn(wait_ctrlc()) => {
+				println!("Wait CTRL-C completed first")
+			}
+			_ = self.connect() => {
+				println!("Client run completed first")
+			}
+		};
+		self.close_connection().await;
+	}
+	
+	async fn connect(&mut self) {
+		loop {
+			info!("Read from server");
+			if let Some(msg) = self.connection.read().await {
+				info!("MSG = {}", msg);
+			} else {
+				info!("Failed to read from server");
+			}
+		}
+	}
+	
+	pub async fn close_connection(&mut self) -> FtpResult<()> {
+		self.connection.close();
+		info!("Connection closed");
+		Ok(())
 	}
 }
 
-pub async fn run(keep_running: Arc<AtomicBool>, connection: Connection, msg: String) -> FtpResult<()> {
+async fn wait_ctrlc() {
+	let keep_running = Arc::new(AtomicBool::new(true));
+	
+	let running = keep_running.clone();
+	
+	ctrlc::set_handler(move || {
+		info!("Received CTRL-C");
+		running.store(false, Ordering::SeqCst);
+	}).expect("Error setting Ctrl-C handler");
+	
 	while keep_running.load(Ordering::SeqCst) {
-		println!("{}", msg);
+		thread::sleep(time::Duration::from_millis(500));
 	}
-	
-	close_connection().await
-}
-
-async fn close_connection() -> FtpResult<()> {
-	debug!("Finished");
-	Ok(())
+	debug!("End of wait CTRL-C");
 }

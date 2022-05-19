@@ -35,7 +35,7 @@ use crate::protocol::TransfertMode::{Active, Passive};
 use crate::utils::connection;
 use crate::utils::error::{FtpError, FtpResult};
 
-pub struct Client {
+pub struct UserFtp {
 	ctrl_connection: Connection,
 	data_connection: Option<Connection>,
 	transfert_mode: TransfertMode,
@@ -46,9 +46,9 @@ pub struct Client {
 	id: i32,
 }
 
-impl Client {
+impl UserFtp {
 	pub fn new(connection: Connection, id: i32) -> Self {
-		Client {
+		UserFtp {
 			ctrl_connection: connection,
 			data_connection: None,
 			transfert_mode: Active,
@@ -67,7 +67,7 @@ impl Client {
 		
 		if self.connect().await {
 			info!("Connected {}", self.user.as_ref().unwrap().name().to_str().unwrap());
-			if let Err(e) = self.command().await {
+			if let Err(e) = self.handle_commands().await {
 				error!("{}", e);
 			}
 		} else {
@@ -168,7 +168,7 @@ impl Client {
 		re.captures(username.as_str()).is_some()
 	}
 	
-	async fn command(&mut self) -> FtpResult<()> {
+	async fn handle_commands(&mut self) -> FtpResult<()> {
 		debug!("client::command");
 		let mut msg = self.ctrl_connection.read().await;
 		while msg.is_some() {
