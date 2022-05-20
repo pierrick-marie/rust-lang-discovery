@@ -29,7 +29,7 @@ use portpicker::pick_unused_port;
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
 
-use crate::{Connection, DEFAULT_ADDR, utils};
+use crate::{Connection, DEFAULT_ADDR, protocol, utils};
 use crate::protocol::{ClientCommand, ServerResponse, TransfertMode, TransferType};
 use crate::protocol::TransfertMode::{Active, Passive};
 use crate::utils::connection;
@@ -110,9 +110,9 @@ impl UserFtp {
 		debug!("client::user");
 		let msg = self.ctrl_connection.read().await?;
 		
-		return match self.parse_command(&msg) {
+		return match protocol::parse_client_command(&msg) {
 			ClientCommand::User(args) => {
-				if self.check_word(&args) {
+				if utils::check_word(&args) {
 					Some(args.clone())
 				} else {
 					error!("User name error: {}", args);
@@ -129,9 +129,9 @@ impl UserFtp {
 	async fn password(&mut self) -> Option<String> {
 		debug!("client::password");
 		let msg = self.ctrl_connection.read().await?;
-		return match self.parse_command(&msg) {
+		return match protocol::parse_client_command(&msg) {
 			ClientCommand::Pass(args) => {
-				if self.check_word(&args) {
+				if utils::check_word(&args) {
 					info!("PASSWORD xxx");
 					Some(args.clone())
 				} else {
@@ -146,34 +146,12 @@ impl UserFtp {
 		};
 	}
 	
-	fn parse_command(&self, msg: &String) -> ClientCommand {
-		debug!("client::parse_command '{}'", msg);
-		if let Some(re) = Regex::new(r"^([[:upper:]]{3,4})( .+)*$").ok() {
-			if let Some(cap) = re.captures(msg.as_str()) {
-				if let Some(cmd) = cap.get(1) {
-					if let Some(args) = cap.get(2) {
-						return ClientCommand::new(cmd.as_str(), args.as_str().to_string().trim());
-					} else {
-						return ClientCommand::new(cmd.as_str(), "");
-					}
-				}
-			}
-		}
-		error!("failed to parse command: {}", msg);
-		ClientCommand::Unknown(msg.clone())
-	}
-	
-	fn check_word(&self, username: &String) -> bool {
-		let re = Regex::new(r"^([[:word:]]+)$").unwrap();
-		re.captures(username.as_str()).is_some()
-	}
-	
 	async fn handle_commands(&mut self) -> FtpResult<()> {
 		debug!("client::command");
 		let mut msg = self.ctrl_connection.read().await;
 		while msg.is_some() {
 			debug!("Message received: {:?}", msg);
-			match self.parse_command(&msg.as_ref().unwrap()) {
+			match protocol::parse_client_command(&msg.as_ref().unwrap()) {
 				ClientCommand::Abor => {
 					self.abor().await?;
 				}
@@ -637,7 +615,7 @@ impl UserFtp {
 			message.push_str("   Control connection is plain text\r\n");
 			message.push_str("   Data connection will be plain text\r\n");
 			message.push_str(format!("   At session startup, client count was {} \r\n", self.id).as_str());
-			message.push_str("   FTP server_ftp version 0.0.1\r\n");
+			message.push_str("   FTP ftp_server version 0.0.1\r\n");
 			
 			message.push_str(format!("{} End of status \r\n", ServerResponse::SystemStatus.to_string()).as_str());
 		} else {
@@ -767,7 +745,7 @@ impl UserFtp {
 			}
 			cmd = self.ctrl_connection.read() => {
 				if cmd.is_some() {
-					match self.parse_command(&cmd.as_ref().unwrap()) {
+					match protocol::parse_client_command(&cmd.as_ref().unwrap()) {
 						ClientCommand::Abor => {
 							data_connection.close().await;
 							self.data_connection = None;

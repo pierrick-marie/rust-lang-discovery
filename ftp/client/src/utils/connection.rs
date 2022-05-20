@@ -86,7 +86,11 @@ impl Connection {
 			self.tx.write(msg.as_bytes()).await
 		}).await {
 			Ok(_) => {
-				info!(" >>>> {}", msg);
+				if msg.starts_with("PASS") {
+					info!(" >>>> PASS xxxx");
+				} else {
+					info!(" >>>> {}", msg);
+				}
 				return Ok(());
 			}
 			Err(e) => {
@@ -100,7 +104,7 @@ impl Connection {
 		debug!("connection::close");
 		
 		if self.tx.shutdown().await.is_ok() {
-			info!("Connection closed by server_ftp");
+			info!("Connection closed by ftp_server");
 		} else {
 			error!("Error while closing socket");
 		}

@@ -17,11 +17,12 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::fs;
 use std::fs::File;
-use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-
+use async_std::{io, task};
+use std::{thread::sleep, time::Duration};
+use std::io::Read;
 use chrono::{DateTime, Utc};
 use log::{debug, error};
 use regex::Regex;
@@ -195,6 +196,21 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 	files_info
 }
 
+pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
+	
+	let stdin = io::stdin();
+	let mut input_line = String::new();
+	let reader = stdin.read_line(&mut input_line);
+	
+	println!("{}", msg);
+	if let Ok(n) = reader.await {
+		return Ok(input_line);
+	} else {
+		error!("Failed to read from async_std::io");
+		return Err(FtpError::InternalError);
+	}
+}
+
 fn octal_to_string(octal_right: char) -> &'static str {
 	match octal_right {
 		'0' => { "---" }
@@ -207,4 +223,9 @@ fn octal_to_string(octal_right: char) -> &'static str {
 		'7' => { "rwx" }
 		_ => { "" }
 	}
+}
+
+pub fn check_word(word: &String) -> bool {
+	let re = Regex::new(r"^([[:word:]]+)$").unwrap();
+	re.captures(word.as_str()).is_some()
 }

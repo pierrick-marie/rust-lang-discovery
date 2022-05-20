@@ -18,12 +18,14 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 extern crate num;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
-use log::debug;
+use std::str::FromStr;
+use log::{debug, error};
+use regex::Regex;
 
 use self::ServerResponse::*;
 use self::ClientCommand::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u32)]
 #[allow(dead_code)]
 pub enum ServerResponse {
@@ -49,7 +51,8 @@ pub enum ServerResponse {
 	UserNameOkayNeedPassword = 331,
 	NeedAccountForLogin = 332,
 	RequestedFileActionPendingFurtherInformation = 350,
-	ServiceNotAvailable = 421, // ==> use it for timeout connection !
+	ServiceNotAvailable = 421,
+	// ==> use it for timeout connection !
 	CantOpenDataConnection = 425,
 	ConnectionClosed = 426,
 	FileBusy = 450,
@@ -72,48 +75,114 @@ pub enum ServerResponse {
 impl Display for ServerResponse {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			RestartMarkerReply => { write!(f, "{} Restart ", RestartMarkerReply as i32) },
-			ServiceReadInXXXMinutes => { write!(f, "{} Service ready later ", ServiceReadInXXXMinutes as i32) },
-			DataConnectionAlreadyOpen => { write!(f, "{} Data connection already open ", DataConnectionAlreadyOpen as i32) },
-			FileStatusOk => { write!(f, "{}", FileStatusOk as i32) },
-			OK => { write!(f, "{} Ok", OK as i32) },
-			CommandNotImplementedSuperfluousAtThisSite => { write!(f, "{} Command not implemented ", CommandNotImplementedSuperfluousAtThisSite as i32) },
-			SystemStatus => { write!(f, "{}", SystemStatus as i32) },
-			DirectoryStatus => { write!(f, "{} Directory status ", DirectoryStatus as i32) },
-			FileStatus => { write!(f, "{}", FileStatus as i32) },
-			HelpMessage => { write!(f, "{} Help ", HelpMessage as i32) },
-			SystemType => { write!(f, "{} UNIX Type: L8", SystemType as i32) },
-			ServiceReadyForNewUser => { write!(f, "{} Welcome to my rust ftp server_ftp. I'm waiting for your user name ", ServiceReadyForNewUser as i32) },
-			ServiceClosingControlConnection => { write!(f, "{} Goodbye ", ServiceClosingControlConnection as i32) },
-			DataConnectionOpen => { write!(f, "{} Data connection open ", DataConnectionOpen as i32) },
-			ClosingDataConnection => { write!(f, "{}", ClosingDataConnection as i32) },
-			EnteringPassiveMode => { write!(f, "{} Entering Passive Mode", EnteringPassiveMode as i32) },
-			UserLoggedIn => { write!(f, "{} User logged in ", UserLoggedIn as i32) },
-			RequestedFileActionOkay => { write!(f, "{}", RequestedFileActionOkay as i32) },
-			PathNameCreated => { write!(f, "{}", PathNameCreated as i32) },
-			UserNameOkayNeedPassword => { write!(f, "{} Please specify the password ", UserNameOkayNeedPassword as i32) },
-			NeedAccountForLogin => { write!(f, "{} Need account for login ", NeedAccountForLogin as i32) },
-			RequestedFileActionPendingFurtherInformation => { write!(f, "{}", RequestedFileActionPendingFurtherInformation as i32) },
-			ServiceNotAvailable => { write!(f, "{} Timeout ", ServiceNotAvailable as i32) },
-			CantOpenDataConnection => { write!(f, "{} Can't open data connection ", CantOpenDataConnection as i32) },
-			ConnectionClosed => { write!(f, "{} Connection closed", ConnectionClosed as i32) },
-			FileBusy => { write!(f, "{} File busy ", FileBusy as i32) },
-			LocalErrorInProcessing => { write!(f, "{} Local error ", LocalErrorInProcessing as i32) },
-			InsufficientStorageSpace => { write!(f, "{} No space left ", InsufficientStorageSpace as i32) },
-			UnknownCommand => { write!(f, "{} Unknown command ", UnknownCommand as i32) },
-			InvalidParameterOrArgument => { write!(f, "{} Invalid argument ", InvalidParameterOrArgument as i32) },
-			CommandNotImplemented => { write!(f, "{} Not implemented yet ", CommandNotImplemented as i32) },
-			BadSequenceOfCommands => { write!(f, "{} Bad command ", BadSequenceOfCommands as i32) },
-			CommandNotImplementedForThatParameter => { write!(f, "{} Not implemented for thet parameter ", CommandNotImplementedForThatParameter as i32) },
-			NotLoggedIn => { write!(f, "{} Please login with USER and PASS ", NotLoggedIn as i32) },
-			NeedAccountForStoringFiles => { write!(f, "{} need account for storing files ", NeedAccountForStoringFiles as i32) },
+			RestartMarkerReply => { write!(f, "{} Restart ", RestartMarkerReply as i32) }
+			ServiceReadInXXXMinutes => { write!(f, "{} Service ready later ", ServiceReadInXXXMinutes as i32) }
+			DataConnectionAlreadyOpen => { write!(f, "{} Data connection already open ", DataConnectionAlreadyOpen as i32) }
+			FileStatusOk => { write!(f, "{}", FileStatusOk as i32) }
+			OK => { write!(f, "{} Ok", OK as i32) }
+			CommandNotImplementedSuperfluousAtThisSite => { write!(f, "{} Command not implemented ", CommandNotImplementedSuperfluousAtThisSite as i32) }
+			SystemStatus => { write!(f, "{}", SystemStatus as i32) }
+			DirectoryStatus => { write!(f, "{} Directory status ", DirectoryStatus as i32) }
+			FileStatus => { write!(f, "{}", FileStatus as i32) }
+			HelpMessage => { write!(f, "{} Help ", HelpMessage as i32) }
+			SystemType => { write!(f, "{} UNIX Type: L8", SystemType as i32) }
+			ServiceReadyForNewUser => { write!(f, "{} Welcome to my rust ftp ftp_server. I'm waiting for your user name ", ServiceReadyForNewUser as i32) }
+			ServiceClosingControlConnection => { write!(f, "{} Goodbye ", ServiceClosingControlConnection as i32) }
+			DataConnectionOpen => { write!(f, "{} Data connection open ", DataConnectionOpen as i32) }
+			ClosingDataConnection => { write!(f, "{}", ClosingDataConnection as i32) }
+			EnteringPassiveMode => { write!(f, "{} Entering Passive Mode", EnteringPassiveMode as i32) }
+			UserLoggedIn => { write!(f, "{} User logged in ", UserLoggedIn as i32) }
+			RequestedFileActionOkay => { write!(f, "{}", RequestedFileActionOkay as i32) }
+			PathNameCreated => { write!(f, "{}", PathNameCreated as i32) }
+			UserNameOkayNeedPassword => { write!(f, "{} Please specify the password ", UserNameOkayNeedPassword as i32) }
+			NeedAccountForLogin => { write!(f, "{} Need account for login ", NeedAccountForLogin as i32) }
+			RequestedFileActionPendingFurtherInformation => { write!(f, "{}", RequestedFileActionPendingFurtherInformation as i32) }
+			ServiceNotAvailable => { write!(f, "{} Timeout ", ServiceNotAvailable as i32) }
+			CantOpenDataConnection => { write!(f, "{} Can't open data connection ", CantOpenDataConnection as i32) }
+			ConnectionClosed => { write!(f, "{} Connection closed", ConnectionClosed as i32) }
+			FileBusy => { write!(f, "{} File busy ", FileBusy as i32) }
+			LocalErrorInProcessing => { write!(f, "{} Local error ", LocalErrorInProcessing as i32) }
+			InsufficientStorageSpace => { write!(f, "{} No space left ", InsufficientStorageSpace as i32) }
+			UnknownCommand => { write!(f, "{} Unknown command ", UnknownCommand as i32) }
+			InvalidParameterOrArgument => { write!(f, "{} Invalid argument ", InvalidParameterOrArgument as i32) }
+			CommandNotImplemented => { write!(f, "{} Not implemented yet ", CommandNotImplemented as i32) }
+			BadSequenceOfCommands => { write!(f, "{} Bad command ", BadSequenceOfCommands as i32) }
+			CommandNotImplementedForThatParameter => { write!(f, "{} Not implemented for thet parameter ", CommandNotImplementedForThatParameter as i32) }
+			NotLoggedIn => { write!(f, "{} Please login with USER and PASS ", NotLoggedIn as i32) }
+			NeedAccountForStoringFiles => { write!(f, "{} need account for storing files ", NeedAccountForStoringFiles as i32) }
 			PermissionDenied => { write!(f, "{}", PermissionDenied as i32) }
-			PageTypeUnknown => { write!(f, "{} Page type unknown ", PageTypeUnknown as i32) },
-			ExceededStorageAllocation => { write!(f, "{} Exceeded space allocated ", ExceededStorageAllocation as i32) },
-			FileNameNotAllowed => { write!(f, "{} File name not allowed ", FileNameNotAllowed as i32) },
-			AlreadyExists => { write!(f, "{}", AlreadyExists as i32) },
+			PageTypeUnknown => { write!(f, "{} Page type unknown ", PageTypeUnknown as i32) }
+			ExceededStorageAllocation => { write!(f, "{} Exceeded space allocated ", ExceededStorageAllocation as i32) }
+			FileNameNotAllowed => { write!(f, "{} File name not allowed ", FileNameNotAllowed as i32) }
+			AlreadyExists => { write!(f, "{}", AlreadyExists as i32) }
 		}
 	}
+}
+
+pub fn parse_server_response(msg: &String) -> (ServerResponse, String) {
+	debug!("protocol::parse_server_response '{}'", msg);
+	if let Some(re) = Regex::new(r"^([[:digit:]]{3})( .+)*$").ok() {
+		if let Some(cap) = re.captures(msg.as_str()) {
+			if let Some(cmd) = cap.get(1) {
+				let num = i32::from_str(cmd.as_str()).unwrap();
+				let response = match num {
+					110 => RestartMarkerReply,
+					120 => ServiceReadInXXXMinutes,
+					125 => DataConnectionAlreadyOpen,
+					150 => FileStatusOk,
+					200 => OK,
+					202 => CommandNotImplementedSuperfluousAtThisSite,
+					211 => SystemStatus,
+					212 => DirectoryStatus,
+					213 => FileStatus,
+					214 => HelpMessage,
+					215 => SystemType,
+					220 => ServiceReadyForNewUser,
+					221 => ServiceClosingControlConnection,
+					225 => DataConnectionOpen,
+					226 => ClosingDataConnection,
+					227 => EnteringPassiveMode,
+					230 => UserLoggedIn,
+					250 => RequestedFileActionOkay,
+					257 => PathNameCreated,
+					331 => UserNameOkayNeedPassword,
+					332 => NeedAccountForLogin,
+					350 => RequestedFileActionPendingFurtherInformation,
+					421 => ServiceNotAvailable,
+					425 => CantOpenDataConnection,
+					426 => ConnectionClosed,
+					450 => FileBusy,
+					451 => LocalErrorInProcessing,
+					452 => InsufficientStorageSpace,
+					501 => InvalidParameterOrArgument,
+					502 => CommandNotImplemented,
+					503 => BadSequenceOfCommands,
+					504 => CommandNotImplementedForThatParameter,
+					521 => AlreadyExists,
+					530 => NotLoggedIn,
+					532 => NeedAccountForStoringFiles,
+					550 => PermissionDenied,
+					551 => PageTypeUnknown,
+					552 => ExceededStorageAllocation,
+					553 => FileNameNotAllowed,
+					_ => UnknownCommand,
+				};
+				if let Some(args) = cap.get(2) {
+					return (response, args.as_str().to_string());
+				} else {
+					return (response, "".to_string());
+				}
+			} else {
+				dbg!("2");
+			}
+		} else {
+			dbg!("1");
+		}
+	} else {
+		dbg!("0");
+	}
+	error!("failed to parse response: {}", msg);
+	(UnknownCommand, String::new())
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -223,10 +292,25 @@ pub enum ClientCommand {
 	User(String),
 }
 
+pub fn parse_client_command(msg: &String) -> ClientCommand {
+	debug!("protocol::parse_client_command '{}'", msg);
+	if let Some(re) = Regex::new(r"^([[:digit:]]{3,4})( .+)*$").ok() {
+		if let Some(cap) = re.captures(msg.as_str()) {
+			if let Some(cmd) = cap.get(1) {
+				if let Some(args) = cap.get(2) {
+					return ClientCommand::new(cmd.as_str(), args.as_str().to_string().trim());
+				} else {
+					return ClientCommand::new(cmd.as_str(), "");
+				}
+			}
+		}
+	}
+	error!("failed to parse command: {}", msg);
+	ClientCommand::Unknown(msg.clone())
+}
+
 impl ClientCommand {
-	
 	pub fn new(input: &str, arg: &str) -> ClientCommand {
-		
 		debug!("ClientCommant::new {} {}", &input, &arg);
 		
 		match input {
@@ -267,12 +351,12 @@ impl ClientCommand {
 					"I" => Type(TransferType::Binary),
 					_ => Type(TransferType::Unknown),
 				}
-			},
+			}
 			USER => User(arg.to_string()),
 			_ => {
 				dbg!("Unknown");
 				Unknown(arg.to_string())
-			},
+			}
 		}
 	}
 }
@@ -282,7 +366,7 @@ impl Display for ClientCommand {
 		match self {
 			Cwd(arg) => write!(f, "{} {}", CWD, arg.as_path().to_str().unwrap()),
 			List(arg) => write!(f, "{} {}", LIST, arg.as_path().to_str().unwrap()),
-			Pass(_arg) => write!(f, "{} xxxx", PASS),
+			Pass(arg) => write!(f, "{} {}", PASS, arg),
 			Port(arg) => write!(f, "{} {}", PORT, arg),
 			Pwd => write!(f, "{}", PWD),
 			Pasv => write!(f, "{}", PASV),
@@ -295,7 +379,7 @@ impl Display for ClientCommand {
 			CdUp => write!(f, "{}", CDUP),
 			Mkd(arg) => write!(f, "{} {}", MKD, arg.as_path().to_str().unwrap()),
 			Rmd(arg) => write!(f, "{} {}", RMD, arg.as_path().to_str().unwrap()),
- 			NoOp => write!(f, "{}", NOOP),
+			NoOp => write!(f, "{}", NOOP),
 			Unknown(arg) => write!(f, "{} {}", UNKN, arg), // doesn't exist in the protocol
 			Abor => write!(f, "{}", ABOR),
 			Allo(arg) => write!(f, "{} {}", ALLO, arg),

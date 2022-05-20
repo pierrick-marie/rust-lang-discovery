@@ -19,12 +19,16 @@ use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
 use std::net::{IpAddr, SocketAddr};
 use log::Level::Debug;
-use crate::Connection;
+use crate::{Connection, protocol, utils};
 use crate::utils::error::{FtpError, FtpResult};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{thread, time};
+use async_std::{io, task};
+use std::{thread::sleep, time::Duration};
 use tokio::sync::mpsc::Receiver;
+use crate::protocol::{ClientCommand, ServerResponse};
+use std::io::prelude::*;
 
 pub struct ClientFtp {
 	pub connection: Connection,
@@ -46,31 +50,75 @@ impl ClientFtp {
 		};
 	}
 	
-	pub async fn run(&mut self)  {
-		info!("RUN !");
+	pub async fn start(&mut self) {
+		info!("START !");
 		tokio::select! {
 			_ = tokio::spawn(wait_ctrlc()) => {
-				println!("Wait CTRL-C completed first")
+				println!("Wait CTRL-C completed first");
 			}
-			_ = self.connect() => {
-				println!("Client run completed first")
+			_ = self.run() => {
+				println!("Client run completed first");
 			}
-		};
+		}
 		self.close_connection().await;
 	}
 	
-	async fn connect(&mut self) {
-		loop {
-			info!("Read from server");
-			if let Some(msg) = self.connection.read().await {
-				info!("MSG = {}", msg);
-			} else {
-				info!("Failed to read from server");
-			}
-		}
+	async fn run(&mut self) {
+		self.connect().await;
+		self.handle_commands().await;
 	}
 	
-	pub async fn close_connection(&mut self) -> FtpResult<()> {
+	async fn connect(&mut self) -> FtpResult<()> {
+		self.user().await?;
+		self.password().await?;
+		
+		if let Some(msg) = self.connection.read().await {
+			let response = protocol::parse_server_response(&msg);
+			if response.0 == ServerResponse::UserLoggedIn {
+				println!("{}", msg);
+				return Ok(());
+			}
+		}
+		error!("Failed to login");
+		Err(FtpError::UserConnectionError)
+	}
+	
+	async fn user(&mut self) -> FtpResult<()> {
+		if let Some(msg) = self.connection.read().await {
+			let response = protocol::parse_server_response(&msg);
+			if response.0 == ServerResponse::ServiceReadyForNewUser {
+				println!("{}", msg);
+				let user_name = utils::read_from_cmd_line("Name: ").await?;
+				self.connection.write(ClientCommand::User(user_name.to_string()).to_string()).await?;
+				return Ok(());
+			}
+		}
+		error!("Failed to send USER to the server");
+		return Err(FtpError::UserConnectionError);
+	}
+	
+	async fn password(&mut self) -> FtpResult<()> {
+		if let Some(msg) = self.connection.read().await {
+			let response = protocol::parse_server_response(&msg);
+			if response.0 == ServerResponse::UserNameOkayNeedPassword {
+				println!("{}", msg);
+				let password = utils::read_from_cmd_line("Password: ").await?;
+				self.connection.write(ClientCommand::Pass(password.to_string()).to_string()).await?;
+				return Ok(());
+			}
+		}
+		error!("Failed to send PASS to the server");
+		return Err(FtpError::UserConnectionError);
+	}
+	
+	async fn handle_commands(&mut self) -> FtpResult<()> {
+		loop {
+			thread::sleep(time::Duration::from_millis(1000));
+		}
+		Ok(())
+	}
+	
+	async fn close_connection(&mut self) -> FtpResult<()> {
 		self.connection.close();
 		info!("Connection closed");
 		Ok(())
@@ -79,7 +127,6 @@ impl ClientFtp {
 
 async fn wait_ctrlc() {
 	let keep_running = Arc::new(AtomicBool::new(true));
-	
 	let running = keep_running.clone();
 	
 	ctrlc::set_handler(move || {
@@ -91,4 +138,5 @@ async fn wait_ctrlc() {
 		thread::sleep(time::Duration::from_millis(500));
 	}
 	debug!("End of wait CTRL-C");
+	
 }

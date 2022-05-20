@@ -23,18 +23,18 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
-use crate::client_ftp::ClientFtp;
+use crate::ftp_client::ClientFtp;
 
 mod protocol;
-mod server_ftp;
+mod ftp_server;
 mod utils;
-mod client_ftp;
+mod ftp_client;
 
 use crate::utils::connection::Connection;
 use crate::utils::logger;
 
 pub const LOCALHOST: &str = "localhost";
-pub const DEFAULT_ADDR: &str = "192.168.0.0";
+pub const DEFAULT_ADDR: &str = "::1";
 pub const DEFAULT_PORT: u16 = 21;
 
 pub const LEVEL: Level = Level::Debug;
@@ -99,7 +99,7 @@ async fn main() {
 	};
 	
 	if let Ok(mut client) = r_client {
-		client.run().await;
+		client.start().await;
 	} else {
 		error!("Client is not initialised");
 	}

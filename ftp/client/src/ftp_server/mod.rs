@@ -26,10 +26,10 @@ use tokio::net::{TcpListener, TcpStream};
 use async_shutdown::Shutdown;
 use std::net::SocketAddr;
 
-pub mod user_ftp;
+pub mod ftp_user;
 
 use crate::{Connection, DEFAULT_ADDR, DEFAULT_PORT};
-use crate::server_ftp::user_ftp::UserFtp;
+use crate::ftp_server::ftp_user::UserFtp;
 
 pub async fn run(shutdown: Shutdown) -> std::io::Result<()> {
 	

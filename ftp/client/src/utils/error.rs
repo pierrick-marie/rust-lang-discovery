@@ -20,7 +20,6 @@ use std::result;
 use std::str::Utf8Error;
 use std::error;
 use log::debug;
-
 use tokio::io;
 
 pub enum FtpError {
@@ -28,6 +27,7 @@ pub enum FtpError {
 	FileSystemError,
 	ConnectionError, // Error with data connection
 	Abord, // Stop current data transfer
+	UserConnectionError, // Failed to connect to server
 	InternalError,
 }
 
@@ -41,6 +41,7 @@ impl Display for FtpError {
 			FtpError::FileSystemError => { write!(f, "!!Error!! File system error") }
 			FtpError::Abord => { write!(f, "!!Error!! Stop current data transfer") }
 			FtpError::InternalError => { write!(f, "!!Error!! Internal error") }
+			FtpError::UserConnectionError => { write!(f, "!!Error!! Failed to connect to server") }
 		}
 	}
 }
