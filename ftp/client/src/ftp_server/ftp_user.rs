@@ -318,8 +318,7 @@ impl UserFtp {
 				};
 			}
 		}
-		error!("Data connection not initialized");
-		Err(FtpError::ConnectionError)
+		Err(FtpError::ConnectionError("Data connection not initialized".to_string()))
 	}
 	
 	async fn cdup(&mut self) -> FtpResult<()> {
@@ -395,8 +394,7 @@ impl UserFtp {
 			
 			Ok(())
 		} else {
-			error!("Data connection not initialized");
-			Err(FtpError::ConnectionError)
+			Err(FtpError::ConnectionError("Data connection not initialized".to_string()))
 		}
 	}
 	
@@ -452,8 +450,7 @@ impl UserFtp {
 			
 			Ok(())
 		} else {
-			error!("Data connection not initialized");
-			Err(FtpError::ConnectionError)
+			Err(FtpError::ConnectionError("Data connection not initialized".to_string()))
 		}
 	}
 	
@@ -488,7 +485,7 @@ impl UserFtp {
 			self.ctrl_connection.write(message).await?;
 			Ok(())
 		} else {
-			Err(FtpError::ConnectionError)
+			Err(FtpError::InternalError("impossible to parse PORT command".to_string()))
 		}
 	}
 	
@@ -530,8 +527,7 @@ impl UserFtp {
 			self.ctrl_connection.write(msg).await?;
 			Ok(())
 		} else {
-			error!("Data connection not initialized");
-			Err(FtpError::ConnectionError)
+			Err(FtpError::ConnectionError("Data connection not initialized".to_string()))
 		}
 	}
 	
@@ -650,8 +646,7 @@ impl UserFtp {
 				};
 			}
 		}
-		error!("Data connection not initialized");
-		Err(FtpError::ConnectionError)
+		Err(FtpError::ConnectionError("Data connection not initialized".to_string()))
 	}
 	
 	/**
@@ -680,8 +675,7 @@ impl UserFtp {
 				};
 			}
 		}
-		error!("Data connection not initialized");
-		Err(FtpError::ConnectionError)
+		Err(FtpError::ConnectionError("Data connection not initialized".to_string()))
 	}
 	
 	/**
@@ -726,8 +720,7 @@ impl UserFtp {
 			let msg = format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string());
 			return self.ctrl_connection.write(msg).await;
 		}
-		error!("Cannot read data connection");
-		Err(FtpError::ConnectionError)
+		Err(FtpError::ConnectionError("Cannot read data connection".to_string()))
 	}
 	
 	async fn send_data(&mut self, data: Vec<String>) -> FtpResult<()> {
@@ -753,7 +746,7 @@ impl UserFtp {
 							self.ctrl_connection.write(msg).await?;
 							let msg = format!("{} ABORD: ok", ServerResponse::ClosingDataConnection.to_string());
 							self.ctrl_connection.write(msg).await?;
-							return Err(FtpError::Abord);
+							return Err(FtpError::Abord("Data transfert interrupted".to_string()));
 						}
 						_ => { }
 					}

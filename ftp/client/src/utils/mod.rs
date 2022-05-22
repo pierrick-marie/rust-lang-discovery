@@ -54,16 +54,21 @@ pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<Pa
 
 pub fn parse_port(msg: String) -> Option<(IpAddr, u16)> {
 	debug!("client::parse_port {}", msg);
-	let re = Regex::new(r"^([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3})$").ok()?;
-	let cap = re.captures(msg.as_str())?;
+	let re = Regex::new(r"(([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}))").ok()?;
 	
-	let mut addr: [u8; 4] = [0; 4];
-	for i in 1..5 {
-		addr[i - 1] = cap.get(i).unwrap().as_str().to_string().parse::<u8>().ok()?;
+	let cap = re.captures(msg.as_str())?;
+	if cap.len() < 6 {
+		return None;
 	}
 	
-	let port1 = cap.get(5).unwrap().as_str().to_string().parse::<u16>().ok()?;
-	let port2 = cap.get(6).unwrap().as_str().to_string().parse::<u16>().ok()?;
+	let mut addr: [u8; 4] = [0; 4];
+	
+	for i in 0..4 {
+		addr[i] = cap.get(cap.len() - 6 + i).unwrap().as_str().to_string().parse::<u8>().ok()?;
+	}
+	
+	let port1 = cap.get(cap.len() - 2).unwrap().as_str().to_string().parse::<u16>().ok()?;
+	let port2 = cap.get(cap.len() - 1).unwrap().as_str().to_string().parse::<u16>().ok()?;
 	let port = port1 * 256 + port2;
 	
 	Some((IpAddr::from(addr), port))
@@ -159,7 +164,7 @@ fn get_file_info(path: &Path) -> FtpResult<String> {
 		                  metadata.size(),
 		                  modification.format("%Y %b %d %H:%M")));
 	}
-	return Err(FtpError::FileSystemError);
+	return Err(FtpError::FileSystemError("Imposible to get file information".to_string()));
 }
 
 pub fn get_ls(path: &Path) -> Vec<String> {
@@ -208,8 +213,7 @@ pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
 	if let Ok(n) = reader.await {
 		return Ok(input_line);
 	} else {
-		error!("Failed to read from async_std::io");
-		return Err(FtpError::InternalError);
+		return Err(FtpError::InternalError("Failed to read from async_std::io".to_string()));
 	}
 }
 

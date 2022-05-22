@@ -94,8 +94,7 @@ impl Connection {
 				return Ok(());
 			}
 			Err(e) => {
-				error!("Failed to send message: {}, {:?}", msg, e);
-				return Err(FtpError::SocketWriteError);
+				return Err(FtpError::ConnectionError(format!("Failed to send message: {}, {:?}", msg, e)));
 			}
 		}
 	}

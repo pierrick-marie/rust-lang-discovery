@@ -23,12 +23,11 @@ use log::debug;
 use tokio::io;
 
 pub enum FtpError {
-	SocketWriteError, // Writ socket error
-	FileSystemError,
-	ConnectionError, // Error with data connection
-	Abord, // Stop current data transfer
-	UserConnectionError, // Failed to connect to server
-	InternalError,
+	FileSystemError(String),
+	ConnectionError(String),
+	Abord(String), // Stop current task
+	UserConnectionError(String), // Failed to connect to server
+	InternalError(String),
 }
 
 pub type FtpResult<T> = result::Result<T, FtpError>;
@@ -36,12 +35,11 @@ pub type FtpResult<T> = result::Result<T, FtpError>;
 impl Display for FtpError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			FtpError::SocketWriteError => { write!(f, "!!Error!! Connection closed") }
-			FtpError::ConnectionError => { write!(f, "!!Error!! Data connection error") }
-			FtpError::FileSystemError => { write!(f, "!!Error!! File system error") }
-			FtpError::Abord => { write!(f, "!!Error!! Stop current data transfer") }
-			FtpError::InternalError => { write!(f, "!!Error!! Internal error") }
-			FtpError::UserConnectionError => { write!(f, "!!Error!! Failed to connect to server") }
+			FtpError::FileSystemError(msg) => { write!(f, "!!Error!! File system error: {}", msg) }
+			FtpError::Abord(msg) => { write!(f, "!!Error!! Stop current data transfer: {}", msg) }
+			FtpError::InternalError(msg) => { write!(f, "!!Error!! Internal error: {}", msg) }
+			FtpError::UserConnectionError(msg) => { write!(f, "!!Error!! Failed to connect to server: {}", msg) }
+			FtpError::ConnectionError(msg) => { write!(f, "!!Error!! Connection error: {}", msg) }
 		}
 	}
 }

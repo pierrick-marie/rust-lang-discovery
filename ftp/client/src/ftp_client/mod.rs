@@ -31,14 +31,17 @@ use crate::protocol::{ClientCommand, parse_server_response, ServerResponse, Tran
 use std::io::prelude::*;
 use std::path::PathBuf;
 use futures::future::err;
+use log::kv::ToValue;
 use portpicker::pick_unused_port;
 use scanpw::scanpw;
 use crate::ftp_client::command::{Command, parse_command};
+use crate::utils::parse_port;
 
 mod command;
 
 pub struct ClientFtp {
 	ctrl_connection: Connection,
+	data_connection: Option<Connection>,
 	mode: TransfertMode,
 }
 
@@ -52,10 +55,11 @@ impl ClientFtp {
 			
 			Ok(ClientFtp {
 				ctrl_connection: connection,
+				data_connection: None,
 				mode: TransfertMode::Active,
 			})
 		} else {
-			Err(FtpError::ConnectionError)
+			Err(FtpError::ConnectionError("Impossible to init control connection".to_string()))
 		};
 	}
 	
@@ -90,8 +94,7 @@ impl ClientFtp {
 				return Ok(());
 			}
 		}
-		error!("Failed to login");
-		Err(FtpError::UserConnectionError)
+		Err(FtpError::UserConnectionError("Failed to login".to_string()))
 	}
 	
 	async fn user(&mut self) -> FtpResult<()> {
@@ -104,8 +107,7 @@ impl ClientFtp {
 				return Ok(());
 			}
 		}
-		error!("Failed to send USER to the server");
-		return Err(FtpError::UserConnectionError);
+		return Err(FtpError::UserConnectionError("Failed to send USER command to the server".to_string()));
 	}
 	
 	async fn password(&mut self) -> FtpResult<()> {
@@ -121,8 +123,7 @@ impl ClientFtp {
 				return Ok(());
 			}
 		}
-		error!("Failed to send PASS to the server");
-		return Err(FtpError::UserConnectionError);
+		return Err(FtpError::UserConnectionError("Failed to send PASS command to the server".to_string()));
 	}
 	
 	async fn syst(&mut self) -> FtpResult<()> {
@@ -141,8 +142,8 @@ impl ClientFtp {
 			match command {
 				Command::Help => { self.help().await; }
 				Command::Unknown(arg) => { println!("Unknown command"); }
-				Command::Ls(arg) => { self.ls().await; }
-				Command::Pass => { self.mode = TransfertMode::Passive; println!("Set up passive mode"); }
+				Command::Ls(arg) => { self.ls(arg).await; }
+				Command::Pass => { self.pass(); }
 			}
 		}
 		Ok(())
@@ -153,67 +154,114 @@ impl ClientFtp {
 		println!(" Available commands: help ls");
 	}
 	
-	async fn ls(&mut self) -> FtpResult<()> {
-		
-		if self.mode == TransfertMode::Active {
-			let port: u16 = pick_unused_port().expect("No ports free");
-			let listener = TcpListener::bind(format!("{}:{}", DEFAULT_ADDR, port)).await?;
-			let socket_addr = listener.local_addr()?;
-			info!("Server listening data on {:?}", socket_addr);
-			self.ctrl_connection.write(ClientCommand::Port(utils::get_addr_msg(socket_addr)).to_string()).await?;
-			
-			if let Some(msg) = self.ctrl_connection.read().await {
-				if parse_server_response(&msg).0 == ServerResponse::OK {
-					println!("{}", msg);
-				} else {
-					error!("Failed to send LIST command");
-					return Err(FtpError::ConnectionError);
-				}
-			}
-			
-			self.ctrl_connection.write(ClientCommand::List(PathBuf::from(".")).to_string()).await?;
-			
-			debug!("Wait new connection");
-			let (stream, addr) = listener.accept().await?;
-			info!("Data connection open with addr {:?}", addr);
-			let (rx, tx) = stream.into_split();
-			let mut data_connection = Connection::new(rx, tx);
-			
-			if let Some(msg) = self.ctrl_connection.read().await {
-				if parse_server_response(&msg).0 == ServerResponse::FileStatusOk {
-					println!("{}", msg);
-				} else {
-					error!("Failed to tranfert LIST command");
-					return Err(FtpError::ConnectionError);
-				}
-			}
-			
-			let mut msg: String = data_connection.read().await.unwrap_or("Failed to read data connection".to_string());
-			// while ! msg.starts_with("226") {
-			// 	println!("{}", msg);
-			// 	msg = data_connection.read().await.unwrap_or("Failed to read data connection".to_string());
-			// }
-			
-			if let Some(msg) = self.ctrl_connection.read().await {
-				if parse_server_response(&msg).0 == ServerResponse::ClosingDataConnection {
-					println!("{}", msg);
-				} else {
-					error!("Failed to tranfert LIST command");
-					return Err(FtpError::ConnectionError);
-				}
-			}
-			
-			data_connection.close();
+	fn pass(&mut self) {
+		if self.mode == TransfertMode::Passive {
+			self.mode = TransfertMode::Active;
+			println!("Set up active mode");
 		} else {
-			// Passive mode
-			self.ctrl_connection.write(ClientCommand::Pasv.to_string()).await;
+			self.mode = TransfertMode::Passive;
+			println!("Set up passive mode");
+		}
+	}
+	
+	async fn ls(&mut self, path: String) -> FtpResult<()> {
+		if self.mode == TransfertMode::Active {
+			self.setup_active_transfert_mode(ClientCommand::List(PathBuf::from(path)).to_string()).await?;
+		} else {
+			self.setup_passive_transfert_mode(ClientCommand::List(PathBuf::from(path)).to_string()).await?;
 		}
 		
+		return if self.data_connection.is_some() {
+			self.read_data().await
+		} else {
+			Err(FtpError::ConnectionError("Failed to initiate data connection".to_string()))
+		}
+	}
+	
+	async fn setup_active_transfert_mode(&mut self, command: String) -> FtpResult<()> {
+		let port: u16 = pick_unused_port().expect("No ports free");
+		let listener = TcpListener::bind(format!("{}:{}", DEFAULT_ADDR, port)).await?;
+		let socket_addr = listener.local_addr()?;
+		info!("Server listening data on {:?}", socket_addr);
+		self.ctrl_connection.write(ClientCommand::Port(utils::get_addr_msg(socket_addr)).to_string()).await?;
 		
+		if let Some(msg) = self.ctrl_connection.read().await {
+			if parse_server_response(&msg).0 == ServerResponse::OK {
+				println!("{}", msg);
+			} else {
+				return Err(FtpError::ConnectionError("Failed to send LIST command".to_string()));
+			}
+		} else {
+			return Err(FtpError::ConnectionError("Failed to send port information".to_string()));
+		}
 		
+		self.ctrl_connection.write(command).await?;
 		
+		debug!("Wait new connection");
+		let (stream, addr) = listener.accept().await?;
+		info!("Data connection open with addr {:?}", addr);
+		let (rx, tx) = stream.into_split();
+		self.data_connection = Some(Connection::new(rx, tx));
 		
+		Ok(())
+	}
+	
+	async fn setup_passive_transfert_mode(&mut self, command: String) -> FtpResult<()> {
+		self.ctrl_connection.write(ClientCommand::Pasv.to_string()).await?;
 		
+		if let Some(msg) = self.ctrl_connection.read().await {
+			let response = parse_server_response(&msg);
+			if response.0 == ServerResponse::EnteringPassiveMode {
+				println!("{}", msg);
+				if let Some(addr) = parse_port(response.1) {
+					debug!("Connect to {} {}", &addr.0, &addr.1);
+					let socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
+					let (rx, tx) = socket.into_split();
+					self.data_connection = Some(Connection::new(rx, tx));
+					
+					self.ctrl_connection.write(command).await?;
+				} else {
+					return Err(FtpError::ConnectionError("Failed to parse port information".to_string()));
+				}
+			} else {
+				return Err(FtpError::ConnectionError("Failed to get port information".to_string()));
+			}
+		} else {
+			return Err(FtpError::ConnectionError("Failed to get pasv information".to_string()));
+		}
+		
+		Ok(())
+	}
+	
+	async fn read_data(&mut self) -> FtpResult<()> {
+		let mut data_connection = self.data_connection.take().unwrap();
+		
+		if let Some(msg) = self.ctrl_connection.read().await {
+			if parse_server_response(&msg).0 == ServerResponse::FileStatusOk {
+				println!("{}", msg);
+			} else {
+				return Err(FtpError::ConnectionError("Failed to send LIST command".to_string()));
+			}
+		}
+		
+		let mut msg: Option<String> = data_connection.read().await;
+		while msg.is_some() {
+			println!("{}", msg.unwrap());
+			msg = data_connection.read().await;
+		}
+		
+		if let Some(msg) = self.ctrl_connection.read().await {
+			if parse_server_response(&msg).0 == ServerResponse::ClosingDataConnection {
+				println!("{}", msg);
+			} else {
+				return Err(FtpError::ConnectionError("Failed to transfer LIST data".to_string()));
+			}
+		} else {
+			return Err(FtpError::ConnectionError("Failed to finish LIST command".to_string()));
+		}
+		
+		data_connection.close().await;
+		self.data_connection = None;
 		
 		Ok(())
 	}
