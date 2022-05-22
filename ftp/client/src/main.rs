@@ -25,6 +25,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
 use crate::ftp_client::ClientFtp;
 
+use console::Term;
+use dialoguer::Password;
+use scanpw::scanpw;
+
 mod protocol;
 mod ftp_server;
 mod utils;
@@ -34,7 +38,11 @@ use crate::utils::connection::Connection;
 use crate::utils::logger;
 
 pub const LOCALHOST: &str = "localhost";
-pub const DEFAULT_ADDR: &str = "::1";
+const IPV4_ADDR: &str = "127.0.0.1";
+const IPV6_ADDR: &str = "127.0.0.1";
+pub const DEFAULT_ADDR: &str = IPV4_ADDR;
+pub const IPV4: bool = true;
+pub const IPV6: bool = !IPV4;
 pub const DEFAULT_PORT: u16 = 21;
 
 pub const LEVEL: Level = Level::Debug;
@@ -105,5 +113,6 @@ async fn main() {
 	}
 	
 	info!("Finished");
+	std::process::exit(0);
 }
 

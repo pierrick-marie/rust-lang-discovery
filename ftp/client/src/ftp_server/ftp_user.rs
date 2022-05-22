@@ -467,7 +467,7 @@ impl UserFtp {
 		let socket_addr = listener.local_addr()?;
 		info!("Server listening data on {:?}", socket_addr);
 		
-		let message = format!("{} {}", ServerResponse::EnteringPassiveMode.to_string(), utils::get_addr_msg(socket_addr));
+		let message = format!("{} ({})", ServerResponse::EnteringPassiveMode.to_string(), utils::get_addr_msg(socket_addr));
 		self.ctrl_connection.write(message).await?;
 		
 		let (stream, addr) = listener.accept().await?;

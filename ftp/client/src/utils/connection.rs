@@ -87,7 +87,7 @@ impl Connection {
 		}).await {
 			Ok(_) => {
 				if msg.starts_with("PASS") {
-					info!(" >>>> PASS xxxx");
+					info!(" >>>> PASS xxxx\n");
 				} else {
 					info!(" >>>> {}", msg);
 				}

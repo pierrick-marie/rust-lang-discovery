@@ -23,10 +23,11 @@ use std::path::{Path, PathBuf};
 use async_std::{io, task};
 use std::{thread::sleep, time::Duration};
 use std::io::Read;
+use async_std::io::WriteExt;
 use chrono::{DateTime, Utc};
 use log::{debug, error};
 use regex::Regex;
-use crate::DEFAULT_ADDR;
+use crate::{DEFAULT_ADDR};
 use crate::utils::error::{FtpError, FtpResult};
 
 pub mod connection;
@@ -74,7 +75,7 @@ pub fn get_addr_msg(addr: SocketAddr) -> String {
 	let port1 = port / 256;
 	let port2 = port % 256;
 	
-	format!("({},{},{})", ip, port1, port2)
+	format!("{},{},{}", ip, port1, port2)
 }
 
 pub fn get_file(path: &Path) -> Option<Vec<u8>> {
@@ -202,7 +203,8 @@ pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
 	let mut input_line = String::new();
 	let reader = stdin.read_line(&mut input_line);
 	
-	println!("{}", msg);
+	print!("{}", msg);
+	io::stdout().flush().await;
 	if let Ok(n) = reader.await {
 		return Ok(input_line);
 	} else {
