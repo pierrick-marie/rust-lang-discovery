@@ -146,7 +146,6 @@ impl ClientFtp {
 				Command::Pass => { self.pass(); }
 			}
 		}
-		Ok(())
 	}
 	
 	async fn help(&mut self) {

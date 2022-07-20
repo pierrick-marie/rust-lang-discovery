@@ -25,7 +25,7 @@ use std::{thread::sleep, time::Duration};
 use std::io::Read;
 use async_std::io::WriteExt;
 use chrono::{DateTime, Utc};
-use log::{debug, error};
+use log::{debug, error, info};
 use regex::Regex;
 use crate::{DEFAULT_ADDR};
 use crate::utils::error::{FtpError, FtpResult};
@@ -210,10 +210,18 @@ pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
 	
 	print!("{}", msg);
 	io::stdout().flush().await;
-	if let Ok(n) = reader.await {
-		return Ok(input_line);
-	} else {
-		return Err(FtpError::InternalError("Failed to read from async_std::io".to_string()));
+
+	match reader.await {
+		Ok(0) => {
+			info!("Received EOF");
+			return Err(FtpError::Abord("received EOF".to_string()));
+		},
+		Ok(n) => {
+			return Ok(input_line);
+		}
+		_ => {
+			return Err(FtpError::InternalError("Failed to read from async_std::io".to_string()));
+		}
 	}
 }
 

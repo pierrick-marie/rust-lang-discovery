@@ -55,7 +55,7 @@ async fn main() {
 		println!("Failed to init logger: {:?}", e);
 		return;
 	}
-	
+
 	// Check args
 	let args: Vec<String> = env::args().collect();
 	let r_client = match args.len() {
