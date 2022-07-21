@@ -37,7 +37,7 @@ use portpicker::pick_unused_port;
 use scanpw::scanpw;
 use users::get_user_by_name;
 use users::os::unix::UserExt;
-use crate::ftp_client::command::*;
+use crate::user::command::*;
 use crate::utils::*;
 
 mod command;

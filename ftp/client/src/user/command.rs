@@ -20,7 +20,7 @@ use std::net::Shutdown::Write;
 use std::path::PathBuf;
 use log::{debug, error};
 use regex::Regex;
-use crate::ftp_client::command::UserCommand::*;
+use crate::user::command::UserCommand::*;
 use crate::protocol::DELE;
 
 pub const HELP: &str = "help";

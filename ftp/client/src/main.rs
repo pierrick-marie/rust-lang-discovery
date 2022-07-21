@@ -23,7 +23,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
-use crate::ftp_client::ClientFtp;
+use crate::user::ClientFtp;
 
 use console::Term;
 use dialoguer::Password;
@@ -31,7 +31,7 @@ use scanpw::scanpw;
 
 mod protocol;
 mod utils;
-mod ftp_client;
+mod user;
 
 use crate::utils::connection::Connection;
 use crate::utils::logger;
