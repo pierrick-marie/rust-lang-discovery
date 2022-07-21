@@ -27,6 +27,7 @@ pub enum FtpError {
 	ConnectionError(String),
 	Abord(String), // Stop current task
 	UserConnectionError(String), // Failed to connect to server
+	DataConnectionError, // Error with data connection
 	InternalError(String),
 }
 
@@ -37,6 +38,7 @@ impl Display for FtpError {
 		match self {
 			FtpError::FileSystemError(msg) => { write!(f, "!!Error!! File system error: {}", msg) }
 			FtpError::Abord(msg) => { write!(f, "!!Error!! Stop current data transfer: {}", msg) }
+			FtpError::DataConnectionError => { write!(f, "!!Error!! Data connection error") }
 			FtpError::InternalError(msg) => { write!(f, "!!Error!! Internal error: {}", msg) }
 			FtpError::UserConnectionError(msg) => { write!(f, "!!Error!! Failed to connect to server: {}", msg) }
 			FtpError::ConnectionError(msg) => { write!(f, "!!Error!! Connection error: {}", msg) }

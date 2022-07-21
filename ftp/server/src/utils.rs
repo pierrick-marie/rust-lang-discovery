@@ -32,7 +32,7 @@ pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<Pa
 	if let Some(p) = arg.to_str() { // Path exists
 		let mut path: String = p.to_string();
 		if !path.starts_with('/') { // This is a relative path
-			if path.starts_with("./") {
+			if path.starts_with("./") || path.starts_with("~/") {
 				path.remove(0); // removing the first char (.)
 				path.remove(0); // removing the new first char (/)
 			}

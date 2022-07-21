@@ -34,11 +34,51 @@ pub mod connection;
 pub mod error;
 pub mod logger;
 
+pub async fn get_args(arg: Option<String>) -> (String, String) {
+
+	let mut arg1: String = "".to_string();
+	let mut arg2: String = "".to_string();
+
+	if let Some(args) = arg {
+		let mut split: Vec<&str> = args.split(" ").collect();
+		match split.len() {
+			1 => {
+				arg1 = split.get(0).unwrap().to_string();
+				println!("(local file) {}", arg1);
+				if let Ok(msg) = read_from_cmd_line("(remote file)").await {
+					arg2 = msg.trim().to_string();
+				}
+			}
+			2 => {
+				arg1 = split.get(0).unwrap().to_string();
+				arg2 = split.get(1).unwrap().to_string();
+			}
+			_ => {
+				if let Ok(msg) = read_from_cmd_line("(local file)").await {
+					arg1 = msg.trim().to_string();
+				}
+				if let Ok(msg) = read_from_cmd_line("(remote file)").await {
+					arg2 = msg.trim().to_string();
+				}
+			}
+		}
+	} else {
+		if let Ok(msg) = read_from_cmd_line("(local file)").await {
+			arg1 = msg.trim().to_string();
+		}
+		if let Ok(msg) = read_from_cmd_line("(remote file)").await {
+			arg2 = msg.trim().to_string();
+		}
+	}
+	debug!("Arg1: {} Arg2: {}", arg1, arg2);
+	(arg1, arg2)
+}
+
 pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<PathBuf> {
 	if let Some(p) = arg.to_str() { // Path exists
 		let mut path: String = p.to_string();
 		if !path.starts_with('/') { // This is a relative path
-			if path.starts_with("./") {
+			if path.starts_with("./") || path.starts_with("~/") {
 				path.remove(0); // removing the first char (.)
 				path.remove(0); // removing the new first char (/)
 			}
@@ -208,7 +248,7 @@ pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
 	let mut input_line = String::new();
 	let reader = stdin.read_line(&mut input_line);
 	
-	print!("{}", msg);
+	print!("{} ", msg);
 	io::stdout().flush().await;
 
 	match reader.await {

@@ -298,9 +298,9 @@ pub fn parse_client_command(msg: &String) -> ClientCommand {
 		if let Some(cap) = re.captures(msg.as_str()) {
 			if let Some(cmd) = cap.get(1) {
 				if let Some(args) = cap.get(2) {
-					return ClientCommand::new(cmd.as_str(), args.as_str().to_string().trim());
+					return ClientCommand::new_with_args(cmd.as_str(), args.as_str().to_string().trim());
 				} else {
-					return ClientCommand::new(cmd.as_str(), "");
+					return ClientCommand::new_without_args(cmd.as_str());
 				}
 			}
 		}
@@ -310,29 +310,21 @@ pub fn parse_client_command(msg: &String) -> ClientCommand {
 }
 
 impl ClientCommand {
-	pub fn new(input: &str, arg: &str) -> ClientCommand {
+	pub fn new_with_args(input: &str, arg: &str) -> ClientCommand {
 		debug!("ClientCommant::new {} {}", &input, &arg);
 		
 		match input {
-			ABOR => Abor,
 			ALLO => Allo(arg.to_string().parse::<u32>().unwrap()),
 			APPE => Appe(PathBuf::from(arg.to_string())),
 			ACCT => Acct(arg.to_string()),
-			CDUP => CdUp,
 			CWD => Cwd(PathBuf::from(arg.to_string())),
 			DELE => Dele(PathBuf::from(arg.to_string())),
 			HELP => Help(arg.to_string()),
 			LIST => List(PathBuf::from(arg.to_string())),
 			MKD => Mkd(PathBuf::from(arg.to_string())),
-			MODE => Mode,
 			NLST => Nlst(PathBuf::from(arg.to_string())),
-			NOOP => NoOp,
 			PASS => Pass(arg.to_string()),
 			PORT => Port(arg.to_string()),
-			PWD => Pwd,
-			PASV => Pasv,
-			QUIT => Quit,
-			REIN => Rein,
 			REST => Rest(arg.to_string()),
 			RETR => Retr(PathBuf::from(arg.to_string())),
 			RMD => Rmd(PathBuf::from(arg.to_string())),
@@ -343,8 +335,6 @@ impl ClientCommand {
 			STAT => Stat(PathBuf::from(arg.to_string())),
 			STOR => Stor(PathBuf::from(arg.to_string())),
 			STOU => Stou(PathBuf::from(arg.to_string())),
-			STRU => Stru,
-			SYST => Syst,
 			TYPE => {
 				match arg {
 					"A" => Type(TransferType::Ascii),
@@ -354,8 +344,27 @@ impl ClientCommand {
 			}
 			USER => User(arg.to_string()),
 			_ => {
-				dbg!("Unknown");
-				Unknown(arg.to_string())
+				Unknown("Unknown command".to_string())
+			}
+		}
+	}
+
+	pub fn new_without_args(input: &str) -> ClientCommand {
+		debug!("ClientCommant::new {}", &input);
+
+		match input {
+			ABOR => Abor,
+			CDUP => CdUp,
+			MODE => Mode,
+			NOOP => NoOp,
+			PWD => Pwd,
+			PASV => Pasv,
+			QUIT => Quit,
+			REIN => Rein,
+			STRU => Stru,
+			SYST => Syst,
+			_ => {
+				Unknown("Unknown command".to_string())
 			}
 		}
 	}

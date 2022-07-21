@@ -86,7 +86,7 @@ impl Client {
 				}
 				if self.password().await.is_some() {
 					info!("Password: \"x\"");
-					let user = get_user_by_name(login.as_str());
+					let user = get_user_by_name(login.trim());
 					if user.is_some() {
 						self.user = user.clone();
 						self.current_work_directory = Some(user.unwrap().home_dir().to_path_buf());
@@ -183,7 +183,6 @@ impl Client {
 					self.allo(arg).await?;
 				}
 				ClientCommand::Appe(arg) => {
-					dbg!(&arg);
 					self.appe(arg).await?;
 				}
 				ClientCommand::CdUp => {

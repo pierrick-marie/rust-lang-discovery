@@ -26,6 +26,7 @@ use crate::utils::error::{FtpError, FtpResult};
 pub const TIME_OUT: u64 = 300;
 const BUFFER_SIZE: usize = 1024;
 
+#[derive(Debug)]
 pub struct Connection {
 	buffer_reader: [u8; BUFFER_SIZE],
 	rx: OwnedReadHalf,
