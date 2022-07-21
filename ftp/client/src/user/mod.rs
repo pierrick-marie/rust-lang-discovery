@@ -156,7 +156,7 @@ impl ClientFtp {
 				}
 				UserCommand::Pass => { self.pass(); }
 				UserCommand::Append(arg) => {
-					let (local, remote) = get_two_args(arg).await;
+					let (local, remote) = get_two_args(arg, "(local file)", "(remote file)").await?;
 					self.append(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
 				UserCommand::Bye => {
@@ -164,14 +164,14 @@ impl ClientFtp {
 					return Ok(());
 				}
 				UserCommand::Cd(arg) => {
-					let path = get_one_arg(arg).await?;
+					let path = get_one_arg(arg, "(directory)").await?;
 					self.cd(PathBuf::from(path)).await?;
 				}
 				UserCommand::CdUp => {
 					self.cdup().await?;
 				}
 				UserCommand::Delete(arg) => {
-					let path = get_one_arg(arg).await?;
+					let path = get_one_arg(arg, "(remote file)").await?;
 					self.delete(PathBuf::from(path)).await?;
 				}
 				UserCommand::Dir => {
@@ -180,6 +180,10 @@ impl ClientFtp {
 				UserCommand::Exit => {
 					self.bye().await;
 					return Ok(());
+				}
+				UserCommand::Get(arg) => {
+					let (remote, local) = get_two_args(arg, "(remote file)", "(local file)").await?;
+					self.get(PathBuf::from(remote), PathBuf::from(local)).await?;
 				}
 			}
 		}
@@ -299,6 +303,47 @@ impl ClientFtp {
 		} else {
 			Err(FtpError::ConnectionError("Failed to initiate data connection".to_string()))
 		};
+	}
+
+	async fn get(&mut self, remote: PathBuf, local: PathBuf) -> FtpResult<()> {
+
+		// TODO Create function to send message + expected response (None is possible)
+
+		self.ctrl_connection.write(TransferType::Binary.to_string()).await?;
+		if let Some(msg) = self.ctrl_connection.read().await {
+			if parse_server_response(&msg).0 == ServerResponse::OK {
+				println!("{}", msg);
+			} else {
+				return Err(FtpError::FileSystemError("Can not change directory".to_string()));
+			}
+		}
+
+		self.setup_data_connection(ClientCommand::Retr(remote).to_string());
+
+		if let Some(msg) = self.ctrl_connection.read().await {
+			if parse_server_response(&msg).0 == ServerResponse::FileStatusOk {
+				println!("{}", msg);
+			} else {
+				return Err(FtpError::FileSystemError("Can not change directory".to_string()));
+			}
+		}
+
+		let file = OpenOptions::new()
+			.write(true)
+			.append(true)
+			.open(path)?;
+		self.save_data(file).await; // TODO remove send message 226 at the end of the function
+
+		if let Some(msg) = self.ctrl_connection.read().await {
+			if parse_server_response(&msg).0 == ServerResponse::ClosingDataConnection {
+				println!("{}", msg);
+			} else {
+				return Err(FtpError::FileSystemError("Can not change directory".to_string()));
+			}
+		}
+
+		error!("Data connection not initialized");
+		Err(FtpError::DataConnectionError)
 	}
 
 	async fn setup_data_connection(&mut self, command: String) -> FtpResult<()> {

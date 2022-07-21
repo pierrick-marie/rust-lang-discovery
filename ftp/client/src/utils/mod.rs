@@ -34,54 +34,48 @@ pub mod connection;
 pub mod error;
 pub mod logger;
 
-pub async fn get_two_args(arg: Option<String>) -> (String, String) {
-	let mut arg1: String = "".to_string();
-	let mut arg2: String = "".to_string();
+pub async fn get_two_args(arg: Option<String>, msg_1: &str, msg_2: &str) -> FtpResult<(String, String)> {
+	let mut arg_1: String = "".to_string();
+	let mut arg_2: String = "".to_string();
 
 	if let Some(args) = arg {
 		let mut split: Vec<&str> = args.split(" ").collect();
 		match split.len() {
 			1 => {
-				arg1 = split.get(0).unwrap().to_string();
-				println!("(local file) {}", arg1);
-				if let Ok(msg) = read_from_cmd_line("(remote file)").await {
-					arg2 = msg.trim().to_string();
+				arg_1 = split.get(0).unwrap().to_string();
+				if let Ok(msg) = read_from_cmd_line(msg_1).await {
+					arg_2 = msg.trim().to_string();
+					return Ok((arg_1, arg_2));
 				}
 			}
 			2 => {
-				arg1 = split.get(0).unwrap().to_string();
-				arg2 = split.get(1).unwrap().to_string();
+				arg_1 = split.get(0).unwrap().to_string();
+				arg_2 = split.get(1).unwrap().to_string();
+				return Ok((arg_1, arg_2));
 			}
-			_ => {
-				if let Ok(msg) = read_from_cmd_line("(local file)").await {
-					arg1 = msg.trim().to_string();
-				}
-				if let Ok(msg) = read_from_cmd_line("(remote file)").await {
-					arg2 = msg.trim().to_string();
-				}
-			}
-		}
-	} else {
-		if let Ok(msg) = read_from_cmd_line("(local file)").await {
-			arg1 = msg.trim().to_string();
-		}
-		if let Ok(msg) = read_from_cmd_line("(remote file)").await {
-			arg2 = msg.trim().to_string();
+			_ => {}
 		}
 	}
-	debug!("Arg1: {} Arg2: {}", arg1, arg2);
-	(arg1, arg2)
+
+	if let Ok(msg) = read_from_cmd_line(msg_1).await {
+		arg_1 = msg.trim().to_string();
+		if let Ok(msg) = read_from_cmd_line(msg_2).await {
+			arg_2 = msg.trim().to_string();
+			return Ok((arg_1, arg_2));
+		}
+	}
+
+	return Err(FtpError::InternalError("Impossible to get args".to_string()));
 }
 
-pub async fn get_one_arg(arg: Option<String>) -> FtpResult<String> {
-
+pub async fn get_one_arg(arg: Option<String>, msg: &str) -> FtpResult<String> {
 	if let Some(args) = arg {
 		let mut split: Vec<&str> = args.split(" ").collect();
 		if split.len() >= 1 {
 			return Ok(split.get(0).unwrap().to_string());
 		}
 	} else {
-		if let Ok(msg) = read_from_cmd_line("(local file)").await {
+		if let Ok(msg) = read_from_cmd_line(msg).await {
 			return Ok(msg.trim().to_string());
 		}
 	}

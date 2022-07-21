@@ -224,7 +224,9 @@ pub enum ClientCommand {
 }
 
 impl ClientCommand {
-	
+
+	// TODO split constructor in two: one with arg, one without arg
+
 	pub fn new(input: &str, arg: &str) -> ClientCommand {
 		
 		debug!("ClientCommant::new {} {}", &input, &arg);
