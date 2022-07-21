@@ -21,6 +21,7 @@ use std::path::PathBuf;
 use log::{debug, error};
 use regex::Regex;
 use crate::ftp_client::command::UserCommand::*;
+use crate::protocol::DELE;
 
 pub const HELP: &str = "help";
 pub const LS: &str = "ls";
@@ -29,6 +30,7 @@ pub const APPEND: &str = "append";
 pub const BYE: &str = "bye";
 pub const CD: &str = "cd";
 pub const CDUP: &str = "cdup";
+pub const DELETE: &str = "delete";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -41,6 +43,7 @@ pub enum UserCommand {
 	Bye,
 	Cd(Option<String>),
 	CdUp,
+	Delete(Option<String>),
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -69,6 +72,7 @@ impl UserCommand {
 			LS => Ls(arg.to_string()),
 			CD => Cd(Some(arg.to_string())),
 			APPEND => Append(Some(arg.to_string())),
+			DELETE => Delete(Some(arg.to_string())),
 			_ => {
 				Unknown(arg.to_string())
 			}
@@ -85,6 +89,7 @@ impl UserCommand {
 			APPEND => Append(None),
 			CD => Cd(None),
 			CDUP => CdUp,
+			DELETE => Delete(None),
 			_ => {
 				Unknown("".to_string())
 			},
@@ -115,6 +120,13 @@ impl Display for UserCommand {
 				}
 			}
 			CdUp => write!(f, "{}", CDUP),
+			Delete(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", DELETE, args)
+				} else {
+					write!(f, "{} <empty>", DELETE)
+				}
+			}
 		}
 	}
 }
