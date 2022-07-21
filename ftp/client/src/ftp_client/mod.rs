@@ -163,7 +163,7 @@ impl ClientFtp {
 
 	fn help(&mut self) {
 		println!(" Help message");
-		println!(" Available commands: help ls pass");
+		println!(" Available commands: help ls pass append");
 	}
 
 	fn pass(&mut self) {
