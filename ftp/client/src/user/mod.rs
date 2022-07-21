@@ -177,13 +177,17 @@ impl ClientFtp {
 				UserCommand::Dir => {
 					self.dir().await?;
 				}
+				UserCommand::Exit => {
+					self.bye().await;
+					return Ok(());
+				}
 			}
 		}
 	}
 
 	fn help(&mut self) {
 		println!(" Help message");
-		println!(" Available commands: help ls pass append bye cd cdup delete dir");
+		println!(" Available commands: help ls pass append bye cd cdup delete dir exit");
 	}
 
 	fn pass(&mut self) {
