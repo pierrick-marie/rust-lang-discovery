@@ -30,7 +30,6 @@ use dialoguer::Password;
 use scanpw::scanpw;
 
 mod protocol;
-mod ftp_server;
 mod utils;
 mod ftp_client;
 
