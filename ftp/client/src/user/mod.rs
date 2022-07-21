@@ -151,7 +151,9 @@ impl ClientFtp {
 			match command {
 				UserCommand::Help => { self.help(); }
 				UserCommand::Unknown(arg) => { println!("Unknown command {}", arg); }
-				UserCommand::Ls(arg) => { self.ls(arg).await; }
+				UserCommand::Ls(arg) => {
+					self.ls(arg).await;
+				}
 				UserCommand::Pass => { self.pass(); }
 				UserCommand::Append(arg) => {
 					let (local, remote) = get_two_args(arg).await;
@@ -191,8 +193,13 @@ impl ClientFtp {
 		}
 	}
 
-	async fn ls(&mut self, path: String) -> FtpResult<()> {
-		self.setup_data_connection(ClientCommand::List(PathBuf::from(path)).to_string()).await?;
+	async fn ls(&mut self, path: Option<String>) -> FtpResult<()> {
+
+		if let Some(file) = path {
+			self.setup_data_connection(ClientCommand::List(PathBuf::from(file)).to_string()).await?;
+		} else {
+			self.setup_data_connection(ClientCommand::List(self.current_work_directory.as_ref().unwrap().clone()).to_string()).await?;
+		}
 
 		return if self.data_connection.is_some() {
 			self.read_data().await

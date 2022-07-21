@@ -36,7 +36,7 @@ pub const DELETE: &str = "delete";
 #[allow(dead_code)]
 pub enum UserCommand {
 	Help,
-	Ls(String),
+	Ls(Option<String>),
 	Pass,
 	Append(Option<String>),
 	Unknown(String),
@@ -67,9 +67,9 @@ pub fn parse_user_command(msg: &String) -> UserCommand {
 impl UserCommand {
 	pub fn new_with_args(input: &str, arg: &str) -> UserCommand {
 		debug!("Command::new {} {}", &input, &arg);
-		
+
 		match input {
-			LS => Ls(arg.to_string()),
+			LS => Ls(Some(arg.to_string())),
 			CD => Cd(Some(arg.to_string())),
 			APPEND => Append(Some(arg.to_string())),
 			DELETE => Delete(Some(arg.to_string())),
@@ -86,13 +86,14 @@ impl UserCommand {
 			HELP => Help,
 			PASS => Pass,
 			BYE => Bye,
+			LS => Ls(None),
 			APPEND => Append(None),
 			CD => Cd(None),
 			CDUP => CdUp,
 			DELETE => Delete(None),
 			_ => {
 				Unknown("".to_string())
-			},
+			}
 		}
 	}
 }
@@ -102,22 +103,28 @@ impl Display for UserCommand {
 		match self {
 			Unknown(arg) => write!(f, "Unknown {}", arg), // doesn't exist in the protocol
 			Help => write!(f, "{}", HELP),
-			Ls(arg) => write!(f, "{} {}", LS, arg),
+			Ls(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", LS, args)
+				} else {
+					write!(f, "{} <empty>", LS)
+				};
+			}
 			Pass => write!(f, "{}", PASS),
 			Append(arg) => {
 				return if let Some(args) = arg {
 					write!(f, "{} {}", APPEND, args)
 				} else {
 					write!(f, "{} <empty>", APPEND)
-				}
-			},
+				};
+			}
 			Bye => write!(f, "{}", BYE),
 			Cd(arg) => {
 				return if let Some(args) = arg {
 					write!(f, "{} {}", CD, args)
 				} else {
 					write!(f, "{} <empty>", CD)
-				}
+				};
 			}
 			CdUp => write!(f, "{}", CDUP),
 			Delete(arg) => {
@@ -125,7 +132,7 @@ impl Display for UserCommand {
 					write!(f, "{} {}", DELETE, args)
 				} else {
 					write!(f, "{} <empty>", DELETE)
-				}
+				};
 			}
 		}
 	}
