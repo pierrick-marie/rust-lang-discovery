@@ -28,6 +28,7 @@ pub const PASS: &str = "pass";
 pub const APPEND: &str = "append";
 pub const BYE: &str = "bye";
 pub const CD: &str = "cd";
+pub const CDUP: &str = "cdup";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -39,6 +40,7 @@ pub enum UserCommand {
 	Unknown(String),
 	Bye,
 	Cd(Option<String>),
+	CdUp,
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -82,9 +84,10 @@ impl UserCommand {
 			BYE => Bye,
 			APPEND => Append(None),
 			CD => Cd(None),
+			CDUP => CdUp,
 			_ => {
 				Unknown("".to_string())
-			}
+			},
 		}
 	}
 }
@@ -111,6 +114,7 @@ impl Display for UserCommand {
 					write!(f, "{} <empty>", CD)
 				}
 			}
+			CdUp => write!(f, "{}", CDUP),
 		}
 	}
 }

@@ -165,6 +165,9 @@ impl ClientFtp {
 					let path = get_one_arg(arg).await?;
 					self.cd(PathBuf::from(path)).await?;
 				}
+				UserCommand::CdUp => {
+					self.cdup().await?;
+				}
 			}
 		}
 	}
@@ -234,6 +237,19 @@ impl ClientFtp {
 
 	async fn cd(&mut self, path: PathBuf) -> FtpResult<()> {
 		if self.ctrl_connection.write(ClientCommand::Cwd(path).to_string()).await.is_ok() {
+			if let Some(msg) = self.ctrl_connection.read().await {
+				if parse_server_response(&msg).0 == ServerResponse::RequestedFileActionOkay {
+					println!("{}", msg);
+				} else {
+					return Err(FtpError::FileSystemError("Can not change directory".to_string()));
+				}
+			}
+		}
+		Ok(())
+	}
+
+	async fn cdup(&mut self) -> FtpResult<()> {
+		if self.ctrl_connection.write(ClientCommand::CdUp.to_string()).await.is_ok() {
 			if let Some(msg) = self.ctrl_connection.read().await {
 				if parse_server_response(&msg).0 == ServerResponse::RequestedFileActionOkay {
 					println!("{}", msg);
