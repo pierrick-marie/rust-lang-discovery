@@ -31,6 +31,7 @@ pub const BYE: &str = "bye";
 pub const CD: &str = "cd";
 pub const CDUP: &str = "cdup";
 pub const DELETE: &str = "delete";
+pub const DIR: &str = "dir";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -44,6 +45,7 @@ pub enum UserCommand {
 	Cd(Option<String>),
 	CdUp,
 	Delete(Option<String>),
+	Dir,
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -91,6 +93,7 @@ impl UserCommand {
 			CD => Cd(None),
 			CDUP => CdUp,
 			DELETE => Delete(None),
+			DIR => Dir,
 			_ => {
 				Unknown("".to_string())
 			}
@@ -134,6 +137,7 @@ impl Display for UserCommand {
 					write!(f, "{} <empty>", DELETE)
 				};
 			}
+			Dir => write!(f, "{}", DIR),
 		}
 	}
 }

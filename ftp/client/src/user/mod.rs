@@ -174,13 +174,16 @@ impl ClientFtp {
 					let path = get_one_arg(arg).await?;
 					self.delete(PathBuf::from(path)).await?;
 				}
+				UserCommand::Dir => {
+					self.dir().await?;
+				}
 			}
 		}
 	}
 
 	fn help(&mut self) {
 		println!(" Help message");
-		println!(" Available commands: help ls pass append bye cd");
+		println!(" Available commands: help ls pass append bye cd cdup delete dir");
 	}
 
 	fn pass(&mut self) {
@@ -194,7 +197,6 @@ impl ClientFtp {
 	}
 
 	async fn ls(&mut self, path: Option<String>) -> FtpResult<()> {
-
 		if let Some(file) = path {
 			self.setup_data_connection(ClientCommand::List(PathBuf::from(file)).to_string()).await?;
 		} else {
@@ -283,6 +285,16 @@ impl ClientFtp {
 			}
 		}
 		Ok(())
+	}
+
+	async fn dir(&mut self) -> FtpResult<()> {
+		self.setup_data_connection(ClientCommand::List(self.current_work_directory.as_ref().unwrap().clone()).to_string()).await?;
+
+		return if self.data_connection.is_some() {
+			self.read_data().await
+		} else {
+			Err(FtpError::ConnectionError("Failed to initiate data connection".to_string()))
+		};
 	}
 
 	async fn setup_data_connection(&mut self, command: String) -> FtpResult<()> {
