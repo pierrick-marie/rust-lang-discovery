@@ -67,7 +67,7 @@ impl Connection {
 							}
 						}
 					} else {
-						error!("Read: Client disconnected");
+						info!("Client disconnected");
 						return None;
 					}
 				}
