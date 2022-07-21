@@ -25,6 +25,7 @@ pub const HELP: &str = "help";
 pub const LS: &str = "ls";
 pub const PASS: &str = "pass";
 pub const APPEND: &str = "append";
+pub const BYE: &str = "bye";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -34,6 +35,7 @@ pub enum UserCommand {
 	Pass,
 	Append(Option<String>),
 	Unknown(String),
+	Bye,
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -73,6 +75,7 @@ impl UserCommand {
 		match input {
 			HELP => Help,
 			PASS => Pass,
+			BYE => Bye,
 			APPEND => Append(None),
 			_ => {
 				Unknown("".to_string())
@@ -95,6 +98,7 @@ impl Display for UserCommand {
 					write!(f, "{} <empty>", APPEND)
 				}
 			},
+			Bye => write!(f, "{}", BYE),
 		}
 	}
 }

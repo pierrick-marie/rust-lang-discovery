@@ -157,6 +157,10 @@ impl ClientFtp {
 					let (local, remote) = get_args(arg).await;
 					self.append(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
+				UserCommand::Bye => {
+					self.bye().await;
+					return Ok(());
+				}
 			}
 		}
 	}
@@ -210,6 +214,18 @@ impl ClientFtp {
 		}
 		error!("Data connection not initialized");
 		Err(FtpError::DataConnectionError)
+	}
+
+	async fn bye(&mut self) {
+		if let Some(mut connection) = self.data_connection.take() {
+			connection.close();
+		}
+		if self.ctrl_connection.write(ClientCommand::Quit.to_string()).await.is_ok() {
+			if let Some(msg) = self.ctrl_connection.read().await {
+				println!("{}", msg);
+			}
+		}
+		self.ctrl_connection.close().await;
 	}
 
 	async fn setup_data_connection(&mut self, command: String) -> FtpResult<()> {
