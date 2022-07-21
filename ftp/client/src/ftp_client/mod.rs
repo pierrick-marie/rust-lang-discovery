@@ -28,7 +28,7 @@ use std::{fs, thread, time};
 use async_std::{io, task};
 use std::{thread::sleep, time::Duration};
 use tokio::sync::mpsc::Receiver;
-use crate::protocol::{ClientCommand, parse_server_response, parse_client_command, ServerResponse, TransfertMode};
+use crate::protocol::*;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use futures::future::err;
@@ -37,8 +37,8 @@ use portpicker::pick_unused_port;
 use scanpw::scanpw;
 use users::get_user_by_name;
 use users::os::unix::UserExt;
-use crate::ftp_client::command::{UserCommand, parse_user_command};
-use crate::utils::{get_absolut_path, get_args, parse_port};
+use crate::ftp_client::command::*;
+use crate::utils::*;
 
 mod command;
 
@@ -154,12 +154,16 @@ impl ClientFtp {
 				UserCommand::Ls(arg) => { self.ls(arg).await; }
 				UserCommand::Pass => { self.pass(); }
 				UserCommand::Append(arg) => {
-					let (local, remote) = get_args(arg).await;
+					let (local, remote) = get_two_args(arg).await;
 					self.append(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
 				UserCommand::Bye => {
 					self.bye().await;
 					return Ok(());
+				}
+				UserCommand::Cd(arg) => {
+					let path = get_one_arg(arg).await?;
+					self.cd(PathBuf::from(path)).await?;
 				}
 			}
 		}
@@ -167,7 +171,7 @@ impl ClientFtp {
 
 	fn help(&mut self) {
 		println!(" Help message");
-		println!(" Available commands: help ls pass append");
+		println!(" Available commands: help ls pass append bye cd");
 	}
 
 	fn pass(&mut self) {
@@ -226,6 +230,19 @@ impl ClientFtp {
 			}
 		}
 		self.ctrl_connection.close().await;
+	}
+
+	async fn cd(&mut self, path: PathBuf) -> FtpResult<()> {
+		if self.ctrl_connection.write(ClientCommand::Cwd(path).to_string()).await.is_ok() {
+			if let Some(msg) = self.ctrl_connection.read().await {
+				if parse_server_response(&msg).0 == ServerResponse::RequestedFileActionOkay {
+					println!("{}", msg);
+				} else {
+					return Err(FtpError::FileSystemError("Can not change directory".to_string()));
+				}
+			}
+		}
+		Ok(())
 	}
 
 	async fn setup_data_connection(&mut self, command: String) -> FtpResult<()> {

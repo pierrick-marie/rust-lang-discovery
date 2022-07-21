@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::fmt::{Display, Formatter};
+use std::net::Shutdown::Write;
 use std::path::PathBuf;
 use log::{debug, error};
 use regex::Regex;
@@ -26,6 +27,7 @@ pub const LS: &str = "ls";
 pub const PASS: &str = "pass";
 pub const APPEND: &str = "append";
 pub const BYE: &str = "bye";
+pub const CD: &str = "cd";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -36,6 +38,7 @@ pub enum UserCommand {
 	Append(Option<String>),
 	Unknown(String),
 	Bye,
+	Cd(Option<String>),
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -62,6 +65,7 @@ impl UserCommand {
 		
 		match input {
 			LS => Ls(arg.to_string()),
+			CD => Cd(Some(arg.to_string())),
 			APPEND => Append(Some(arg.to_string())),
 			_ => {
 				Unknown(arg.to_string())
@@ -77,6 +81,7 @@ impl UserCommand {
 			PASS => Pass,
 			BYE => Bye,
 			APPEND => Append(None),
+			CD => Cd(None),
 			_ => {
 				Unknown("".to_string())
 			}
@@ -99,6 +104,13 @@ impl Display for UserCommand {
 				}
 			},
 			Bye => write!(f, "{}", BYE),
+			Cd(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", CD, args)
+				} else {
+					write!(f, "{} <empty>", CD)
+				}
+			}
 		}
 	}
 }

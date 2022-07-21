@@ -34,8 +34,7 @@ pub mod connection;
 pub mod error;
 pub mod logger;
 
-pub async fn get_args(arg: Option<String>) -> (String, String) {
-
+pub async fn get_two_args(arg: Option<String>) -> (String, String) {
 	let mut arg1: String = "".to_string();
 	let mut arg2: String = "".to_string();
 
@@ -74,6 +73,22 @@ pub async fn get_args(arg: Option<String>) -> (String, String) {
 	(arg1, arg2)
 }
 
+pub async fn get_one_arg(arg: Option<String>) -> FtpResult<String> {
+
+	if let Some(args) = arg {
+		let mut split: Vec<&str> = args.split(" ").collect();
+		if split.len() >= 1 {
+			return Ok(split.get(0).unwrap().to_string());
+		}
+	} else {
+		if let Ok(msg) = read_from_cmd_line("(local file)").await {
+			return Ok(msg.trim().to_string());
+		}
+	}
+
+	return Err(FtpError::InternalError("Impossible to get arg".to_string()));
+}
+
 pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<PathBuf> {
 	if let Some(p) = arg.to_str() { // Path exists
 		let mut path: String = p.to_string();
@@ -95,22 +110,22 @@ pub fn get_absolut_path(arg: &PathBuf, current_directory: &PathBuf) -> Option<Pa
 pub fn parse_port(msg: String) -> Option<(IpAddr, u16)> {
 	debug!("client::parse_port {}", msg);
 	let re = Regex::new(r"(([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}),([[:digit:]]{1,3}))").ok()?;
-	
+
 	let cap = re.captures(msg.as_str())?;
 	if cap.len() < 6 {
 		return None;
 	}
-	
+
 	let mut addr: [u8; 4] = [0; 4];
-	
+
 	for i in 0..4 {
 		addr[i] = cap.get(cap.len() - 6 + i).unwrap().as_str().to_string().parse::<u8>().ok()?;
 	}
-	
+
 	let port1 = cap.get(cap.len() - 2).unwrap().as_str().to_string().parse::<u16>().ok()?;
 	let port2 = cap.get(cap.len() - 1).unwrap().as_str().to_string().parse::<u16>().ok()?;
 	let port = port1 * 256 + port2;
-	
+
 	Some((IpAddr::from(addr), port))
 }
 
@@ -119,13 +134,13 @@ pub fn get_addr_msg(addr: SocketAddr) -> String {
 	let port = addr.port();
 	let port1 = port / 256;
 	let port2 = port % 256;
-	
+
 	format!("{},{},{}", ip, port1, port2)
 }
 
 pub fn get_file(path: &Path) -> Option<Vec<u8>> {
 	let mut result: Vec<u8> = vec![];
-	
+
 	match File::open(path) {
 		Ok(mut file) => {
 			match file.read_to_end(&mut result) {
@@ -146,14 +161,14 @@ pub fn get_file(path: &Path) -> Option<Vec<u8>> {
 
 pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
 	let mut files_info = vec![];
-	
+
 	let mut filename; //  = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
-	
+
 	if working_path.is_dir() {
 		if let Ok(paths) = fs::read_dir(working_path) {
 			for path in paths {
 				filename = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
-				
+
 				if filename.chars().next().unwrap() != '.' {
 					let msg;
 					if prefix.is_empty() {
@@ -165,13 +180,13 @@ pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
 							msg = format!("{}/{}", prefix, filename)
 						}
 					}
-					
+
 					files_info.push(msg);
 				}
 			}
 		}
 	}
-	
+
 	files_info
 }
 
@@ -182,43 +197,43 @@ fn get_file_info(path: &Path) -> FtpResult<String> {
 		let mut octal_right = format!("{:o}", mode);
 		octal_right = octal_right[octal_right.len() - 3..octal_right.len()].to_string();
 		let is_dir;
-		
+
 		let mut right = "".to_string();
 		for c in octal_right.chars() {
 			right += octal_to_string(c);
 		}
-		
+
 		if metadata.is_dir() {
 			is_dir = 'd';
 		} else {
 			is_dir = '-';
 		}
-		
+
 		let modification: DateTime<Utc> = DateTime::from(metadata.modified().unwrap());
-		
+
 		return Ok(format!("{}{} {} {} {}      {}",
-		                  is_dir,
-		                  right,
-		                  metadata.uid(),
-		                  metadata.gid(),
-		                  metadata.size(),
-		                  modification.format("%Y %b %d %H:%M")));
+					is_dir,
+					right,
+					metadata.uid(),
+					metadata.gid(),
+					metadata.size(),
+					modification.format("%Y %b %d %H:%M")));
 	}
 	return Err(FtpError::FileSystemError("Imposible to get file information".to_string()));
 }
 
 pub fn get_ls(path: &Path) -> Vec<String> {
 	let mut files_info = vec![];
-	
+
 	let mut filename; //  = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
-	
-	
+
+
 	if path.exists() {
 		if path.is_dir() {
 			if let Ok(paths) = fs::read_dir(path) {
 				for path in paths {
 					filename = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
-					
+
 					if filename.chars().next().unwrap() != '.' {
 						if let Ok(msg) = get_file_info(path.as_ref().unwrap().path().as_path()) {
 							files_info.push(format!("{} {}", msg, filename));
@@ -229,7 +244,7 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 		} else {
 			if path.is_file() {
 				filename = path.file_name().unwrap().to_str().unwrap().to_string();
-				
+
 				if filename.chars().next().unwrap() != '.' {
 					if let Ok(msg) = get_file_info(path) {
 						files_info.push(format!("{} {}", msg, filename));
@@ -238,16 +253,15 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 			}
 		}
 	}
-	
+
 	files_info
 }
 
 pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
-	
 	let stdin = io::stdin();
 	let mut input_line = String::new();
 	let reader = stdin.read_line(&mut input_line);
-	
+
 	print!("{} ", msg);
 	io::stdout().flush().await;
 
@@ -255,7 +269,7 @@ pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
 		Ok(0) => {
 			info!("Received EOF");
 			return Err(FtpError::Abord("received EOF".to_string()));
-		},
+		}
 		Ok(n) => {
 			return Ok(input_line);
 		}
