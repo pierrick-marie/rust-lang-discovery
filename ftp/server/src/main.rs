@@ -20,7 +20,7 @@ use log::{debug, error, info, Level};
 
 use async_shutdown::Shutdown;
 
-mod protocol_codes;
+mod protocol;
 mod client;
 mod ftp_error;
 mod server;

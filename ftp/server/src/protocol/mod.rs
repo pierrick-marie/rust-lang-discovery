@@ -224,11 +224,9 @@ pub enum ClientCommand {
 }
 
 impl ClientCommand {
-
 	pub fn new_with_args(input: &str, arg: &str) -> ClientCommand {
-		
 		debug!("ClientCommant::new {} {}", &input, &arg);
-		
+
 		match input {
 			ALLO => Allo(arg.to_string().parse::<u32>().unwrap()),
 			APPE => Appe(PathBuf::from(arg.to_string())),
@@ -264,28 +262,26 @@ impl ClientCommand {
 			},
 		}
 	}
-}
 
-pub fn new_without_arg(input: &str) -> ClientCommand {
+	pub fn new_without_arg(input: &str) -> ClientCommand {
+		debug!("ClientCommant::new {}", &input);
 
-	debug!("ClientCommant::new {}", &input);
-
-	match input {
-		ABOR => Abor,
-		CDUP => CdUp,
-		MODE => Mode,
-		NOOP => NoOp,
-		PWD => Pwd,
-		PASV => Pasv,
-		QUIT => Quit,
-		REIN => Rein,
-		STRU => Stru,
-		SYST => Syst,
-		_ => {
-			Unknown("Unknown".to_string())
-		},
+		match input {
+			ABOR => Abor,
+			CDUP => CdUp,
+			MODE => Mode,
+			NOOP => NoOp,
+			PWD => Pwd,
+			PASV => Pasv,
+			QUIT => Quit,
+			REIN => Rein,
+			STRU => Stru,
+			SYST => Syst,
+			_ => {
+				Unknown("Unknown".to_string())
+			},
+		}
 	}
-}
 }
 
 impl Display for ClientCommand {
@@ -306,7 +302,7 @@ impl Display for ClientCommand {
 			CdUp => write!(f, "{}", CDUP),
 			Mkd(arg) => write!(f, "{} {}", MKD, arg.as_path().to_str().unwrap()),
 			Rmd(arg) => write!(f, "{} {}", RMD, arg.as_path().to_str().unwrap()),
- 			NoOp => write!(f, "{}", NOOP),
+			NoOp => write!(f, "{}", NOOP),
 			Unknown(arg) => write!(f, "{} {}", UNKN, arg), // doesn't exist in the protocol
 			Abor => write!(f, "{}", ABOR),
 			Allo(arg) => write!(f, "{} {}", ALLO, arg),

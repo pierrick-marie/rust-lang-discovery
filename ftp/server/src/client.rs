@@ -20,7 +20,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Write, Error, ErrorKind};
 use std::net::{SocketAddr};
 use std::path::{PathBuf};
-use crate::protocol_codes::*;
+use crate::protocol::*;
 use regex::{Regex};
 
 use log::{debug, error, info};
@@ -32,7 +32,7 @@ use portpicker::pick_unused_port;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
-use crate::protocol_codes::TransfertMode::*;
+use crate::protocol::TransfertMode::*;
 
 pub struct Client {
 	ctrl_connection: Connection,
