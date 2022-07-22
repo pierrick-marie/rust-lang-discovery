@@ -21,12 +21,10 @@ use log::{debug, error, info, Level};
 use async_shutdown::Shutdown;
 
 mod protocol;
-mod ftp_error;
 mod server;
-mod ftp_logger;
-mod connection;
 mod utils;
 use server::client::Client;
+use utils::logger;
 
 pub const ADDR: &str = "127.0.0.1";
 pub const PORT: &str = "8080";
@@ -76,7 +74,7 @@ async fn server() {
 #[tokio::main]
 async fn main() {
 	
-	if let Err(e) = ftp_logger::init() {
+	if let Err(e) = logger::init() {
 		error!("Failed to init logger: {:?}", e);
 	}
 	

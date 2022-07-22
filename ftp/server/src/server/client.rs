@@ -17,22 +17,23 @@ along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
 use std::fs;
 use std::fs::{File, OpenOptions};
-use std::io::{Write, Error, ErrorKind};
-use std::net::{SocketAddr};
-use std::path::{PathBuf};
+use std::io::{Error, ErrorKind, Write};
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use crate::protocol::*;
-use regex::{Regex};
+use regex::Regex;
 
 use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
-use crate::{ADDR, connection, utils};
-use crate::connection::Connection;
-use crate::ftp_error::{FtpError, FtpResult};
+use crate::{ADDR, utils};
+use crate::utils::connection::Connection;
+use crate::utils::error::{FtpError, FtpResult};
 use portpicker::pick_unused_port;
 
 use users::{get_user_by_name, User};
 use users::os::unix::UserExt;
 use crate::protocol::TransfertMode::*;
+use crate::utils::connection;
 
 pub struct Client {
 	ctrl_connection: Connection,

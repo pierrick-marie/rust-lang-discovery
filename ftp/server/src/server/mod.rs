@@ -24,7 +24,7 @@ I modified some parts of it.
 use log::{debug, error, info};
 use tokio::net::{TcpListener, TcpStream};
 use crate::{ADDR, Client, PORT};
-use crate::connection::Connection;
+use crate::utils::connection::Connection;
 use async_shutdown::Shutdown;
 use std::net::SocketAddr;
 

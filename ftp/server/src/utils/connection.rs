@@ -22,7 +22,7 @@ use async_std::io as async_io;
 
 use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
 
-use crate::ftp_error::{FtpError, FtpResult};
+use crate::utils::error::{FtpError, FtpResult};
 
 pub const TIME_OUT: u64 = 300;
 const BUFFER_SIZE: usize = 1024;
