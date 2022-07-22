@@ -151,9 +151,9 @@ impl Client {
 			if let Some(cap) = re.captures(msg.as_str()) {
 				if let Some(cmd) = cap.get(1) {
 					if let Some(args) = cap.get(2) {
-						return ClientCommand::new(cmd.as_str(), args.as_str().to_string().trim());
+						return ClientCommand::new_with_args(cmd.as_str(), args.as_str().to_string().trim());
 					} else {
-						return ClientCommand::new(cmd.as_str(), "");
+						return ClientCommand::new_without_arg(cmd.as_str());
 					}
 				}
 			}
