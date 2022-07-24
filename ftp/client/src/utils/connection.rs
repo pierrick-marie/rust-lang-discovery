@@ -21,6 +21,8 @@ use std::time::Duration;
 use async_std::io as async_io;
 
 use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
+use crate::protocol;
+use crate::protocol::{ClientCommand, parse_server_response, ServerResponse};
 use crate::utils::error::{FtpError, FtpResult};
 
 pub const TIME_OUT: u64 = 300;
@@ -41,12 +43,12 @@ impl Connection {
 			tx,
 		}
 	}
-	
+
 	pub async fn read(&mut self) -> Option<String> {
 		debug!("connection::read");
-		
+
 		let mut message: String = String::new();
-		
+
 		loop {
 			match async_io::timeout(Duration::from_secs(TIME_OUT), async {
 				self.buffer_reader = [0; BUFFER_SIZE];
@@ -79,7 +81,7 @@ impl Connection {
 			}
 		}
 	}
-	
+
 	pub async fn write(&mut self, mut msg: String) -> FtpResult<()> {
 		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
@@ -99,10 +101,28 @@ impl Connection {
 			}
 		}
 	}
-	
+
+	pub async fn send(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
+		self.write(command.to_string()).await?;
+
+		if let Some(response) = expectedResponse {
+			if let Some(msg) = self.read().await {
+				let resp = protocol::parse_server_response(&msg);
+				if resp.0 == response {
+					println!("{}", msg);
+					return Ok(());
+				} else {
+					return Err(FtpError::UserConnectionError(format!("Unexpected response {}", msg)));
+				}
+			}
+			return Err(FtpError::UserConnectionError(format!("Expected response {}", response.to_string())));
+		}
+		Ok(())
+	}
+
 	pub async fn close(&mut self) {
 		debug!("connection::close");
-		
+
 		if self.tx.shutdown().await.is_ok() {
 			info!("Connection closed by ftp_server");
 		} else {

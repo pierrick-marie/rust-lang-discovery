@@ -100,7 +100,7 @@ impl UserCommand {
 			DELETE => Delete(None),
 			DIR => Dir,
 			EXIT => Exit,
-			GET => Get,
+			GET => Get(None),
 			_ => {
 				Unknown("".to_string())
 			}
