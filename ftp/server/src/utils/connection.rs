@@ -21,6 +21,7 @@ use std::time::Duration;
 use async_std::io as async_io;
 
 use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
+use crate::protocol::ServerResponse;
 
 use crate::utils::error::{FtpError, FtpResult};
 
@@ -41,12 +42,12 @@ impl Connection {
 			tx,
 		}
 	}
-	
+
 	pub async fn read(&mut self) -> Option<String> {
 		debug!("connection::read");
-		
+
 		let mut message: String = String::new();
-		
+
 		loop {
 			match async_io::timeout(Duration::from_secs(TIME_OUT), async {
 				self.buffer_reader = [0; BUFFER_SIZE];
@@ -79,7 +80,7 @@ impl Connection {
 			}
 		}
 	}
-	
+
 	pub async fn write(&mut self, mut msg: String) -> FtpResult<()> {
 		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
@@ -96,10 +97,15 @@ impl Connection {
 			}
 		}
 	}
-	
+
+	pub async fn send(&mut self, response: ServerResponse, message: &str) -> FtpResult<()> {
+		let message = format!("{} {}", response, message);
+		self.write(message).await
+	}
+
 	pub async fn close(&mut self) {
 		debug!("connection::close");
-		
+
 		if self.tx.shutdown().await.is_ok() {
 			info!("Connection closed by server");
 		} else {
