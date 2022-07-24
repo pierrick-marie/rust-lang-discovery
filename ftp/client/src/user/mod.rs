@@ -241,7 +241,7 @@ impl ClientFtp {
 
 	async fn bye(&mut self) {
 		if let Some(mut connection) = self.data_connection.take() {
-			connection.close();
+			connection.close().await;
 		}
 		if self.ctrl_connection.send(ClientCommand::Quit, None).await.is_ok() {
 			if let Some(msg) = self.ctrl_connection.read().await {
@@ -404,7 +404,7 @@ impl ClientFtp {
 	}
 
 	async fn close_connection(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.close();
+		self.ctrl_connection.close().await;
 		info!("Connection closed");
 		Ok(())
 	}
