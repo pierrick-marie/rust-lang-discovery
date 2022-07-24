@@ -276,43 +276,14 @@ impl ClientFtp {
 
 	async fn get(&mut self, remote_file: PathBuf, local_file: PathBuf) -> FtpResult<()> {
 
-		// TODO Create function to send message + expected response (None is possible)
+		self.setupTransferType(TransferType::Binary).await?;
 
-		// self.ctrl_connection.write(TransferType::Binary.to_string()).await?;
-		// if let Some(msg) = self.ctrl_connection.read().await {
-		// 	if parse_server_response(&msg).0 == ServerResponse::OK {
-		// 		println!("{}", msg);
-		// 	} else {
-		// 		return Err(FtpError::FileSystemError("Can not change directory".to_string()));
-		// 	}
-		// }
-		//
-		// self.setup_data_connection(ClientCommand::Retr(remote_file).to_string());
-		//
-		// if let Some(msg) = self.ctrl_connection.read().await {
-		// 	if parse_server_response(&msg).0 == ServerResponse::FileStatusOk {
-		// 		println!("{}", msg);
-		// 	} else {
-		// 		return Err(FtpError::FileSystemError("Can not change directory".to_string()));
-		// 	}
-		// }
-		//
-		// let file = OpenOptions::new()
-		// 	.write(true)
-		// 	.append(true)
-		// 	.open(local_file)?;
-		// self.save_data(file).await; // TODO remove send message 226 at the end of the function
-		//
-		// if let Some(msg) = self.ctrl_connection.read().await {
-		// 	if parse_server_response(&msg).0 == ServerResponse::ClosingDataConnection {
-		// 		println!("{}", msg);
-		// 	} else {
-		// 		return Err(FtpError::FileSystemError("Can not change directory".to_string()));
-		// 	}
-		// }
-		//
-		// error!("Data connection not initialized");
-		Err(FtpError::DataConnectionError)
+		self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
+
+		let file = OpenOptions::new().write(true).append(true).open(local_file)?;
+		self.save_data(file).await;
+
+		self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await
 	}
 
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
@@ -322,6 +293,11 @@ impl ClientFtp {
 		} else {
 			self.setup_passive_transfert_mode(command, expectedResponse).await
 		}
+	}
+
+	async fn setupTransferType(&mut self, transferType: TransferType) -> FtpResult<()> {
+		self.ctrl_connection.write(transferType.to_string()).await?;
+		self.ctrl_connection.receive(ServerResponse::OK).await
 	}
 
 	async fn setup_active_transfert_mode(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {

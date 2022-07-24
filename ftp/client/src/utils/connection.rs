@@ -19,6 +19,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use log::{debug, error, info};
 use std::time::Duration;
 use async_std::io as async_io;
+use log::kv::ToKey;
 
 use tokio::net::tcp::{OwnedWriteHalf, OwnedReadHalf};
 use crate::protocol;
@@ -82,6 +83,18 @@ impl Connection {
 		}
 	}
 
+	pub async fn receive(&mut self, serverResponse: ServerResponse) -> FtpResult<()> {
+		if let Some(msg) = self.read().await {
+			if protocol::parse_server_response(&msg).0 == serverResponse {
+				println!("{}", msg);
+				return Ok(());
+			} else {
+				return Err(FtpError::UserConnectionError(format!("Unexpected response {}", msg)));
+			}
+		}
+		Err(FtpError::UserConnectionError("Impossible to get response from server".to_string()))
+	}
+
 	pub async fn write(&mut self, mut msg: String) -> FtpResult<()> {
 		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
@@ -104,18 +117,8 @@ impl Connection {
 
 	pub async fn send(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
 		self.write(command.to_string()).await?;
-
 		if let Some(response) = expectedResponse {
-			if let Some(msg) = self.read().await {
-				let resp = protocol::parse_server_response(&msg);
-				if resp.0 == response {
-					println!("{}", msg);
-					return Ok(());
-				} else {
-					return Err(FtpError::UserConnectionError(format!("Unexpected response {}", msg)));
-				}
-			}
-			return Err(FtpError::UserConnectionError(format!("Expected response {}", response.to_string())));
+			return self.receive(response).await;
 		}
 		Ok(())
 	}
