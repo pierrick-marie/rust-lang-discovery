@@ -6,3 +6,7 @@ tetris/assets/score.txt
 target/
 .idea/
 out/
+
+# Sub projects
+music-player
+hello_world
