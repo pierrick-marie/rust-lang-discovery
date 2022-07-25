@@ -206,15 +206,15 @@ impl ClientFtp {
 	/**
 	 * Same to STOR, but if the file exists, the data are not removed.
 	 */
-	async fn append(&mut self, local: PathBuf, remote: PathBuf) -> FtpResult<()> {
-		if let Some(path) = get_absolut_path(&local, self.current_work_directory.as_ref().unwrap()) {
-			if path.exists() {
-				println!("local: {} remote: {}", path.to_str().unwrap(), remote.to_str().unwrap());
+	async fn append(&mut self, local_file: PathBuf, remote_file: PathBuf) -> FtpResult<()> {
+		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
+			if local_path.exists() {
+				println!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
 
-				self.setup_data_connection(ClientCommand::Appe(remote), Some(ServerResponse::FileStatusOk)).await?;
+				self.setup_data_connection(ClientCommand::Appe(remote_file), Some(ServerResponse::FileStatusOk)).await?;
 
 				if self.data_connection.is_some() {
-					if let Some(data) = utils::get_file(path.as_path()) {
+					if let Some(data) = utils::get_file(local_path.as_path()) {
 						return self.send_data(vec![String::from_utf8(data).unwrap()]).await;
 					}
 				}
@@ -260,14 +260,23 @@ impl ClientFtp {
 	}
 
 	async fn get(&mut self, remote_file: PathBuf, local_file: PathBuf) -> FtpResult<()> {
-		self.setupTransferType(TransferType::Binary).await?;
+		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
+			if local_path.exists() {
+				println!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
 
-		self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
+				self.setupTransferType(TransferType::Binary).await?;
 
-		let file = OpenOptions::new().write(true).append(true).open(local_file)?;
-		self.save_data(file).await;
+				self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
 
-		self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await
+
+				let file = OpenOptions::new().write(true).append(false).open(local_path)?;
+				dbg!(&file);
+				self.save_data(file).await?;
+
+				return self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await;
+			}
+		}
+		Err(FtpError::InternalError("Failed to get file".to_string()))
 	}
 
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
@@ -295,7 +304,7 @@ impl ClientFtp {
 
 		debug!("Wait new connection");
 		let (stream, addr) = listener.accept().await?;
-		info!("Data connection open with addr {:?}", addr);
+		info!("Data connection opened with addr {:?}", addr);
 		let (rx, tx) = stream.into_split();
 		self.data_connection = Some(Connection::new(rx, tx));
 
@@ -358,7 +367,7 @@ impl ClientFtp {
 			writeln!(file, "{}", data)?;
 			data_connection.close().await;
 			self.data_connection = None;
-			return self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Transfer complete").await;
+			return Ok(());
 		}
 		error!("Cannot read data connection");
 		Err(FtpError::DataConnectionError)
