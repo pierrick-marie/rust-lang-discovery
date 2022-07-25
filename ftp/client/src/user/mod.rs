@@ -70,22 +70,19 @@ impl ClientFtp {
 
 	pub async fn start(&mut self) {
 		info!("START !");
-		tokio::select! {
-			_ = tokio::spawn(wait_ctrlc()) => {
-				println!("Wait CTRL-C completed first");
-			}
-			_ = self.run() => {
-				println!("Client run completed first");
-			}
-		}
-		self.close_connection().await;
-	}
-
-	async fn run(&mut self) {
+		// tokio::select! {
+		// 	_ = tokio::spawn(wait_ctrlc()) => {
+		// 		println!("Wait CTRL-C completed first");
+		// 	}
+		// 	_ = self.run() => {
+		// 		println!("Client run completed first");
+		// 	}
+		// }
 		if self.connect().await.is_ok() {
 			self.syst().await;
 			self.handle_commands().await;
 		}
+		self.close_connection().await;
 	}
 
 	async fn connect(&mut self) -> FtpResult<()> {
@@ -100,7 +97,7 @@ impl ClientFtp {
 
 	async fn user(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.receive(ServerResponse::ServiceReadyForNewUser).await?;
-		let user_name = utils::read_from_cmd_line("Name: ").await?;
+		let user_name = utils::read_with_rustyline("Name: ")?;
 		self.ctrl_connection.sendCommand(ClientCommand::User(user_name.to_string()), None).await?;
 		let user = get_user_by_name(user_name.trim());
 		if user.is_some() {
@@ -131,7 +128,7 @@ impl ClientFtp {
 	async fn handle_commands(&mut self) -> FtpResult<()> {
 		let mut command: String;
 		loop {
-			command = utils::read_from_cmd_line("ftp>  ").await?;
+			command = utils::read_with_rustyline("ftp>  ")?;
 			let command = parse_user_command(&command);
 			match command {
 				UserCommand::Help => { self.help(); }
@@ -406,17 +403,17 @@ impl ClientFtp {
 	}
 }
 
-async fn wait_ctrlc() {
-	let keep_running = Arc::new(AtomicBool::new(true));
-	let running = keep_running.clone();
-
-	ctrlc::set_handler(move || {
-		info!("Received CTRL-C");
-		running.store(false, Ordering::SeqCst);
-	}).expect("Error setting Ctrl-C handler");
-
-	while keep_running.load(Ordering::SeqCst) {
-		thread::sleep(time::Duration::from_millis(500));
-	}
-	debug!("End of wait CTRL-C");
-}
+// async fn wait_ctrlc() {
+// 	let keep_running = Arc::new(AtomicBool::new(true));
+// 	let running = keep_running.clone();
+//
+// 	ctrlc::set_handler(move || {
+// 		info!("Received CTRL-C");
+// 		running.store(false, Ordering::SeqCst);
+// 	}).expect("Error setting Ctrl-C handler");
+//
+// 	while keep_running.load(Ordering::SeqCst) {
+// 		thread::sleep(time::Duration::from_millis(500));
+// 	}
+// 	debug!("End of wait CTRL-C");
+// }
