@@ -29,12 +29,14 @@ use log::{debug, error, info};
 use regex::Regex;
 use crate::{DEFAULT_ADDR};
 use crate::utils::error::{FtpError, FtpResult};
+use rustyline::error::ReadlineError;
+use rustyline::{Editor};
 
 pub mod connection;
 pub mod error;
 pub mod logger;
 
-pub async fn get_two_args(arg: Option<String>, msg_1: &str, msg_2: &str) -> FtpResult<(String, String)> {
+pub async fn get_two_args(arg: Option<String>, prompt_1: &str, prompt_2: &str) -> FtpResult<(String, String)> {
 	let mut arg_1: String = "".to_string();
 	let mut arg_2: String = "".to_string();
 
@@ -43,7 +45,7 @@ pub async fn get_two_args(arg: Option<String>, msg_1: &str, msg_2: &str) -> FtpR
 		match split.len() {
 			1 => {
 				arg_1 = split.get(0).unwrap().to_string();
-				if let Ok(msg) = read_from_cmd_line(msg_1).await {
+				if let Ok(msg) = read_with_rustyline(prompt_1) {
 					arg_2 = msg.trim().to_string();
 					return Ok((arg_1, arg_2));
 				}
@@ -57,9 +59,9 @@ pub async fn get_two_args(arg: Option<String>, msg_1: &str, msg_2: &str) -> FtpR
 		}
 	}
 
-	if let Ok(msg) = read_from_cmd_line(msg_1).await {
+	if let Ok(msg) = read_with_rustyline(prompt_1) {
 		arg_1 = msg.trim().to_string();
-		if let Ok(msg) = read_from_cmd_line(msg_2).await {
+		if let Ok(msg) = read_with_rustyline(prompt_2) {
 			arg_2 = msg.trim().to_string();
 			return Ok((arg_1, arg_2));
 		}
@@ -68,14 +70,14 @@ pub async fn get_two_args(arg: Option<String>, msg_1: &str, msg_2: &str) -> FtpR
 	return Err(FtpError::InternalError("Impossible to get args".to_string()));
 }
 
-pub async fn get_one_arg(arg: Option<String>, msg: &str) -> FtpResult<String> {
+pub async fn get_one_arg(arg: Option<String>, prompt: &str) -> FtpResult<String> {
 	if let Some(args) = arg {
 		let mut split: Vec<&str> = args.split(" ").collect();
 		if split.len() >= 1 {
 			return Ok(split.get(0).unwrap().to_string());
 		}
 	} else {
-		if let Ok(msg) = read_from_cmd_line(msg).await {
+		if let Ok(msg) = read_with_rustyline(prompt) {
 			return Ok(msg.trim().to_string());
 		}
 	}
@@ -251,26 +253,41 @@ pub fn get_ls(path: &Path) -> Vec<String> {
 	files_info
 }
 
-pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
-	let stdin = io::stdin();
-	let mut input_line = String::new();
-	let reader = stdin.read_line(&mut input_line);
+// pub async fn read_from_cmd_line(msg: &str) -> FtpResult<String> {
+// 	let stdin = io::stdin();
+// 	let mut input_line = String::new();
+// 	let reader = stdin.read_line(&mut input_line);
+//
+// 	print!("{} ", msg);
+// 	io::stdout().flush().await;
+//
+// 	match reader.await {
+// 		Ok(0) => {
+// 			info!("Received EOF");
+// 			return Err(FtpError::Abord("received EOF".to_string()));
+// 		}
+// 		Ok(n) => {
+// 			return Ok(input_line);
+// 		}
+// 		_ => {
+// 			return Err(FtpError::InternalError("Failed to read from async_std::io".to_string()));
+// 		}
+// 	}
+// }
 
-	print!("{} ", msg);
-	io::stdout().flush().await;
-
-	match reader.await {
-		Ok(0) => {
-			info!("Received EOF");
-			return Err(FtpError::Abord("received EOF".to_string()));
-		}
-		Ok(n) => {
-			return Ok(input_line);
-		}
-		_ => {
-			return Err(FtpError::InternalError("Failed to read from async_std::io".to_string()));
-		}
-	}
+pub fn read_with_rustyline(prompt: &str) -> FtpResult<String> {
+	// let mut reader = Editor::<()>::new()?;
+	// let readline = reader.readline(prompt)?;
+	// match readline {
+	// 	Ok(line) => {
+	// 		reader.add_history_entry(line.as_str());
+	// 		return Ok(line);
+	// 	}
+	// 	Err(err) => {
+	// 		return Err(err);
+	// 	}
+	// }
+	Ok(("".to_string()))
 }
 
 fn octal_to_string(octal_right: char) -> &'static str {
