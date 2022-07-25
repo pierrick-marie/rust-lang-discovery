@@ -195,8 +195,8 @@ pub enum TransferType {
 impl Display for TransferType {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
-			TransferType::Ascii => { write!(f, "Ascii mode") }
-			TransferType::Binary => { write!(f, "Binary mode") }
+			TransferType::Ascii => { write!(f, "TYPE A") }
+			TransferType::Binary => { write!(f, "TYPE I") }
 			_ => { write!(f, "Unknown transfert type") }
 		}
 	}
