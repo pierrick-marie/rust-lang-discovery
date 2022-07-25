@@ -92,51 +92,36 @@ impl ClientFtp {
 		self.user().await?;
 		self.password().await?;
 
-		if let Some(msg) = self.ctrl_connection.read().await {
-			let response = protocol::parse_server_response(&msg);
-			if response.0 == ServerResponse::UserLoggedIn {
-				println!("{}", msg);
-				return Ok(());
-			}
+		if self.ctrl_connection.receive(ServerResponse::UserLoggedIn).await.is_err() {
+			return Err(FtpError::UserConnectionError("Failed to login".to_string()));
 		}
-		Err(FtpError::UserConnectionError("Failed to login".to_string()))
+		Ok(())
 	}
 
 	async fn user(&mut self) -> FtpResult<()> {
-		if let Some(msg) = self.ctrl_connection.read().await {
-			let response = protocol::parse_server_response(&msg);
-			if response.0 == ServerResponse::ServiceReadyForNewUser {
-				println!("{}", msg);
-				let user_name = utils::read_from_cmd_line("Name: ").await?;
-				self.ctrl_connection.send(ClientCommand::User(user_name.to_string()), None).await?;
-				let user = get_user_by_name(user_name.trim());
-				if user.is_some() {
-					self.current_work_directory = Some(user.unwrap().home_dir().to_path_buf());
-				}
-				return Ok(());
-			}
+		self.ctrl_connection.receive(ServerResponse::ServiceReadyForNewUser).await?;
+		let user_name = utils::read_from_cmd_line("Name: ").await?;
+		self.ctrl_connection.sendCommand(ClientCommand::User(user_name.to_string()), None).await?;
+		let user = get_user_by_name(user_name.trim());
+		if user.is_some() {
+			self.current_work_directory = Some(user.unwrap().home_dir().to_path_buf());
+			return Ok(());
 		}
 		return Err(FtpError::UserConnectionError("Failed to send USER command to the server".to_string()));
 	}
 
 	async fn password(&mut self) -> FtpResult<()> {
-		if let Some(msg) = self.ctrl_connection.read().await {
-			let response = protocol::parse_server_response(&msg);
-			if response.0 == ServerResponse::UserNameOkayNeedPassword {
-				let handle = tokio::spawn(async move {
-					let password = scanpw!("Password: ");
-					return password;
-				});
-				let password = handle.await.unwrap();
-				self.ctrl_connection.send(ClientCommand::Pass(password), None).await;
-				return Ok(());
-			}
-		}
-		return Err(FtpError::UserConnectionError("Failed to send PASS command to the server".to_string()));
+		self.ctrl_connection.receive(ServerResponse::UserNameOkayNeedPassword).await?;
+		let handle = tokio::spawn(async move {
+			let password = scanpw!("Password: ");
+			return password;
+		});
+		let password = handle.await.unwrap();
+		self.ctrl_connection.sendCommand(ClientCommand::Pass(password), None).await
 	}
 
 	async fn syst(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.send(ClientCommand::Syst, None).await?;
+		self.ctrl_connection.sendCommand(ClientCommand::Syst, None).await?;
 		if let Some(msg) = self.ctrl_connection.read().await {
 			println!("{}", msg);
 		}
@@ -243,7 +228,7 @@ impl ClientFtp {
 		if let Some(mut connection) = self.data_connection.take() {
 			connection.close().await;
 		}
-		if self.ctrl_connection.send(ClientCommand::Quit, None).await.is_ok() {
+		if self.ctrl_connection.sendCommand(ClientCommand::Quit, None).await.is_ok() {
 			if let Some(msg) = self.ctrl_connection.read().await {
 				println!("{}", msg);
 			}
@@ -253,15 +238,15 @@ impl ClientFtp {
 	}
 
 	async fn cd(&mut self, path: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.send(ClientCommand::Cwd(path), Some(ServerResponse::RequestedFileActionOkay)).await
+		self.ctrl_connection.sendCommand(ClientCommand::Cwd(path), Some(ServerResponse::RequestedFileActionOkay)).await
 	}
 
 	async fn cdup(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.send(ClientCommand::CdUp, Some(ServerResponse::RequestedFileActionOkay)).await
+		self.ctrl_connection.sendCommand(ClientCommand::CdUp, Some(ServerResponse::RequestedFileActionOkay)).await
 	}
 
 	async fn delete(&mut self, path: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.send(ClientCommand::Dele(path), Some(ServerResponse::RequestedFileActionOkay)).await
+		self.ctrl_connection.sendCommand(ClientCommand::Dele(path), Some(ServerResponse::RequestedFileActionOkay)).await
 	}
 
 	async fn dir(&mut self) -> FtpResult<()> {
@@ -275,44 +260,14 @@ impl ClientFtp {
 	}
 
 	async fn get(&mut self, remote_file: PathBuf, local_file: PathBuf) -> FtpResult<()> {
+		self.setupTransferType(TransferType::Binary).await?;
 
-		// TODO Create function to send message + expected response (None is possible)
+		self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
 
-		// self.ctrl_connection.write(TransferType::Binary.to_string()).await?;
-		// if let Some(msg) = self.ctrl_connection.read().await {
-		// 	if parse_server_response(&msg).0 == ServerResponse::OK {
-		// 		println!("{}", msg);
-		// 	} else {
-		// 		return Err(FtpError::FileSystemError("Can not change directory".to_string()));
-		// 	}
-		// }
-		//
-		// self.setup_data_connection(ClientCommand::Retr(remote_file).to_string());
-		//
-		// if let Some(msg) = self.ctrl_connection.read().await {
-		// 	if parse_server_response(&msg).0 == ServerResponse::FileStatusOk {
-		// 		println!("{}", msg);
-		// 	} else {
-		// 		return Err(FtpError::FileSystemError("Can not change directory".to_string()));
-		// 	}
-		// }
-		//
-		// let file = OpenOptions::new()
-		// 	.write(true)
-		// 	.append(true)
-		// 	.open(local_file)?;
-		// self.save_data(file).await; // TODO remove send message 226 at the end of the function
-		//
-		// if let Some(msg) = self.ctrl_connection.read().await {
-		// 	if parse_server_response(&msg).0 == ServerResponse::ClosingDataConnection {
-		// 		println!("{}", msg);
-		// 	} else {
-		// 		return Err(FtpError::FileSystemError("Can not change directory".to_string()));
-		// 	}
-		// }
-		//
-		// error!("Data connection not initialized");
-		Err(FtpError::DataConnectionError)
+		let file = OpenOptions::new().write(true).append(true).open(local_file)?;
+		self.save_data(file).await;
+
+		self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await
 	}
 
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
@@ -324,14 +279,19 @@ impl ClientFtp {
 		}
 	}
 
+	async fn setupTransferType(&mut self, transferType: TransferType) -> FtpResult<()> {
+		self.ctrl_connection.write(transferType.to_string()).await?;
+		self.ctrl_connection.receive(ServerResponse::OK).await
+	}
+
 	async fn setup_active_transfert_mode(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
 		let port: u16 = pick_unused_port().expect("No ports free");
 		let listener = TcpListener::bind(format!("{}:{}", DEFAULT_ADDR, port)).await?;
 		let socket_addr = listener.local_addr()?;
 		info!("Server listening data on {:?}", socket_addr);
-		self.ctrl_connection.send(ClientCommand::Port(utils::get_addr_msg(socket_addr)), Some(ServerResponse::OK)).await?;
+		self.ctrl_connection.sendCommand(ClientCommand::Port(utils::get_addr_msg(socket_addr)), Some(ServerResponse::OK)).await?;
 
-		self.ctrl_connection.send(command, expectedResponse).await?;
+		self.ctrl_connection.sendCommand(command, expectedResponse).await?;
 
 		debug!("Wait new connection");
 		let (stream, addr) = listener.accept().await?;
@@ -344,19 +304,16 @@ impl ClientFtp {
 
 	async fn setup_passive_transfert_mode(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
 		self.ctrl_connection.write(ClientCommand::Pasv.to_string()).await?;
-
 		if let Some(msg) = self.ctrl_connection.read().await {
 			let response = parse_server_response(&msg);
 			if response.0 == ServerResponse::EnteringPassiveMode {
 				println!("{}", msg);
-
 				if let Some(addr) = parse_port(response.1) {
 					debug!("Connect to {} {}", &addr.0, &addr.1);
 					let socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
 					let (rx, tx) = socket.into_split();
 					self.data_connection = Some(Connection::new(rx, tx));
-
-					self.ctrl_connection.send(command, expectedResponse).await?;
+					self.ctrl_connection.sendCommand(command, expectedResponse).await?;
 				} else {
 					return Err(FtpError::ConnectionError("Failed to parse port information".to_string()));
 				}
@@ -366,20 +323,12 @@ impl ClientFtp {
 		} else {
 			return Err(FtpError::ConnectionError("Failed to get pasv information".to_string()));
 		}
-
 		Ok(())
 	}
 
 	async fn read_data(&mut self) -> FtpResult<()> {
 		let mut data_connection = self.data_connection.take().unwrap();
-
-		if let Some(msg) = self.ctrl_connection.read().await {
-			if parse_server_response(&msg).0 == ServerResponse::FileStatusOk {
-				println!("{}", msg);
-			} else {
-				return Err(FtpError::ConnectionError("Failed to send LIST command".to_string()));
-			}
-		}
+		self.ctrl_connection.receive(ServerResponse::FileStatusOk).await?;
 
 		let mut msg: Option<String> = data_connection.read().await;
 		while msg.is_some() {
@@ -387,16 +336,7 @@ impl ClientFtp {
 			msg = data_connection.read().await;
 		}
 
-		if let Some(msg) = self.ctrl_connection.read().await {
-			if parse_server_response(&msg).0 == ServerResponse::ClosingDataConnection {
-				println!("{}", msg);
-			} else {
-				return Err(FtpError::ConnectionError("Failed to transfer LIST data".to_string()));
-			}
-		} else {
-			return Err(FtpError::ConnectionError("Failed to finish LIST command".to_string()));
-		}
-
+		self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await?;
 		data_connection.close().await;
 		self.data_connection = None;
 
@@ -418,7 +358,7 @@ impl ClientFtp {
 			writeln!(file, "{}", data)?;
 			data_connection.close().await;
 			self.data_connection = None;
-			return self.ctrl_connection.write(format!("{} Transfer complete", ServerResponse::ClosingDataConnection.to_string())).await;
+			return self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Transfer complete").await;
 		}
 		error!("Cannot read data connection");
 		Err(FtpError::DataConnectionError)
@@ -434,15 +374,9 @@ impl ClientFtp {
 				}
 				Ok::<_, FtpError>(())
 			} => {
-				if let Some(msg) = self.ctrl_connection.read().await {
-					let response = protocol::parse_server_response(&msg);
-					if response.0 == ServerResponse::ClosingDataConnection {
-						data_connection.close().await;
-						self.data_connection = None;
-						return Ok(());
-					}
-				}
-				return Err(FtpError::DataConnectionError);
+				self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await?;
+				data_connection.close().await;
+				self.data_connection = None;
 			}
 			cmd = self.ctrl_connection.read() => {
 				if cmd.is_some() {
@@ -450,10 +384,8 @@ impl ClientFtp {
 						ClientCommand::Abor => {
 							data_connection.close().await;
 							self.data_connection = None;
-							let msg = format!("{} transfer interrupted by ABORD", ServerResponse::ConnectionClosed.to_string());
-							self.ctrl_connection.write(msg).await?;
-							let msg = format!("{} ABORD: ok", ServerResponse::ClosingDataConnection.to_string());
-							self.ctrl_connection.write(msg).await?;
+							self.ctrl_connection.sendResponse(ServerResponse::ConnectionClosed, "transfer interrupted by ABORD").await?;
+							self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "ABORD: ok").await?;
 							return Err(FtpError::Abord("End of transfer file".to_string()));
 						}
 						_ => { }

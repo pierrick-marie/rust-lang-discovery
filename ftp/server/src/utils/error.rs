@@ -27,7 +27,7 @@ pub enum FtpError {
 	SocketWriteError, // Writ socket error
 	FileSystemError,
 	DataConnectionError, // Error with data connection
-	Abord, // Stop current data transfer
+	Abord(String), // Stop current data transfer
 }
 
 pub type FtpResult<T> = result::Result<T, FtpError>;
@@ -38,7 +38,7 @@ impl Display for FtpError {
 			FtpError::SocketWriteError => { write!(f, "!!Error!! Connection closed") }
 			FtpError::DataConnectionError => { write!(f, "!!Error!! Data connection error") }
 			FtpError::FileSystemError => { write!(f, "!!Error!! File system error") }
-			FtpError::Abord => { write!(f, "!!Error!! Stop current data transfer") }
+			FtpError::Abord(msg) => { write!(f, "!!Error!! Stop current data transfer: {}", msg) }
 		}
 	}
 }
