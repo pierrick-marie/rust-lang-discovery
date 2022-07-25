@@ -98,7 +98,7 @@ impl Connection {
 		}
 	}
 
-	pub async fn send(&mut self, response: ServerResponse, message: &str) -> FtpResult<()> {
+	pub async fn sendResponse(&mut self, response: ServerResponse, message: &str) -> FtpResult<()> {
 		let message = format!("{} {}", response, message);
 		self.write(message).await
 	}

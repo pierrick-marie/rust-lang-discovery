@@ -61,7 +61,7 @@ impl Client {
 	}
 
 	pub async fn run(&mut self) -> std::io::Result<()> {
-		if let Err(e) = self.ctrl_connection.send(ServerResponse::ServiceReadyForNewUser, "Waiting for new user").await {
+		if let Err(e) = self.ctrl_connection.sendResponse(ServerResponse::ServiceReadyForNewUser, "Waiting for new user").await {
 			return Err(Error::new(ErrorKind::NotConnected, e.to_string()));
 		}
 
@@ -82,7 +82,7 @@ impl Client {
 		match self.user().await {
 			Some(login) => {
 				info!("Login: {}", login);
-				if let Err(e) = self.ctrl_connection.send(ServerResponse::UserNameOkayNeedPassword, "Waiting for password").await {
+				if let Err(e) = self.ctrl_connection.sendResponse(ServerResponse::UserNameOkayNeedPassword, "Waiting for password").await {
 					error!("Not connected {:?}", e);
 				}
 				if self.password().await.is_some() {
@@ -91,7 +91,7 @@ impl Client {
 					if user.is_some() {
 						self.user = user.clone();
 						self.current_work_directory = Some(user.unwrap().home_dir().to_path_buf());
-						if let Err(e) = self.ctrl_connection.send(ServerResponse::UserLoggedIn, "Logged").await {
+						if let Err(e) = self.ctrl_connection.sendResponse(ServerResponse::UserLoggedIn, "Logged").await {
 							error!("Not connected {:?}", e);
 						}
 						return true;
@@ -100,7 +100,7 @@ impl Client {
 			}
 			_ => {}
 		}
-		if let Err(e) = self.ctrl_connection.send(ServerResponse::NotLoggedIn, "Not logged in").await {
+		if let Err(e) = self.ctrl_connection.sendResponse(ServerResponse::NotLoggedIn, "Not logged in").await {
 			error!("Not connected {:?}", e);
 		}
 		false
@@ -226,7 +226,7 @@ impl Client {
 					self.pwd().await?;
 				}
 				ClientCommand::Quit => {
-					self.ctrl_connection.send(ServerResponse::ServiceClosingControlConnection, "Connection closed").await?;
+					self.ctrl_connection.sendResponse(ServerResponse::ServiceClosingControlConnection, "Connection closed").await?;
 					self.user = None;
 					self.ctrl_connection.close().await;
 					return Ok(());
@@ -295,21 +295,21 @@ impl Client {
 			self.data_connection.take().unwrap().close().await;
 			self.data_connection = None;
 		}
-		self.ctrl_connection.send(ServerResponse::ClosingDataConnection, "ABORD: data connection closed").await
+		self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "ABORD: data connection closed").await
 	}
 
 	/**
 	 * Setup the account of a user
 	 */
 	async fn acct(&mut self, arg: &str) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, arg).await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, arg).await
 	}
 
 	/**
 	 * Books free space to save data later.
 	 */
 	async fn allo(&mut self, _arg: u32) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::OK, "Not necessary for this site").await
+		self.ctrl_connection.sendResponse(ServerResponse::OK, "Not necessary for this site").await
 	}
 
 	/**
@@ -323,14 +323,14 @@ impl Client {
 						.write(true)
 						.append(true)
 						.open(path)?;
-					self.ctrl_connection.send(ServerResponse::FileStatusOk, "Ok to send data").await?;
+					self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Ok to send data").await?;
 					self.save_data(file).await
 				} else {
 					if let Ok(file) = File::create(path) {
-						self.ctrl_connection.send(ServerResponse::FileStatusOk, "Ok to send data").await?;
+						self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Ok to send data").await?;
 						self.save_data(file).await
 					} else {
-						self.ctrl_connection.send(ServerResponse::PermissionDenied, "Cannot create file").await
+						self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, "Cannot create file").await
 					}
 				};
 			}
@@ -342,9 +342,9 @@ impl Client {
 	async fn cdup(&mut self) -> FtpResult<()> {
 		let path = self.current_work_directory.as_ref().unwrap().parent().unwrap().to_path_buf();
 		if let Ok(_) = fs::read_dir(path.clone()) {
-			return self.ctrl_connection.send(ServerResponse::RequestedFileActionOkay, "Directory successfully changed").await;
+			return self.ctrl_connection.sendResponse(ServerResponse::RequestedFileActionOkay, "Directory successfully changed").await;
 		}
-		return self.ctrl_connection.send(ServerResponse::InvalidParameterOrArgument, path.to_str().unwrap()).await;
+		return self.ctrl_connection.sendResponse(ServerResponse::InvalidParameterOrArgument, path.to_str().unwrap()).await;
 	}
 
 	async fn cwd(&mut self, arg: PathBuf) -> FtpResult<()> {
@@ -353,13 +353,13 @@ impl Client {
 			let path = absolut_path.unwrap();
 			if let Ok(_) = fs::read_dir(path.clone()) {
 				self.current_work_directory = Some(path);
-				self.ctrl_connection.send(ServerResponse::RequestedFileActionOkay, "Directory successfully changed").await
+				self.ctrl_connection.sendResponse(ServerResponse::RequestedFileActionOkay, "Directory successfully changed").await
 			} else {
-				self.ctrl_connection.send(ServerResponse::PermissionDenied, "Failed to change directory").await
+				self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, "Failed to change directory").await
 			}
 		} else {
 			error!("CWD unknown error, arg: {}", arg.to_str().unwrap());
-			self.ctrl_connection.send(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await
+			self.ctrl_connection.sendResponse(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await
 		}
 	}
 
@@ -369,17 +369,17 @@ impl Client {
 			if let Err(e) = fs::remove_file(path.as_path()) {
 				match e.kind() {
 					ErrorKind::PermissionDenied => {
-						return self.ctrl_connection.send(ServerResponse::PermissionDenied, path.to_str().unwrap()).await;
+						return self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, path.to_str().unwrap()).await;
 					}
 					_ => {
-						return self.ctrl_connection.send(ServerResponse::BadSequenceOfCommands, path.to_str().unwrap()).await;
+						return self.ctrl_connection.sendResponse(ServerResponse::BadSequenceOfCommands, path.to_str().unwrap()).await;
 					}
 				}
 			} else {
-				return self.ctrl_connection.send(ServerResponse::RequestedFileActionOkay, path.to_str().unwrap()).await;
+				return self.ctrl_connection.sendResponse(ServerResponse::RequestedFileActionOkay, path.to_str().unwrap()).await;
 			}
 		} else {
-			return self.ctrl_connection.send(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await;
+			return self.ctrl_connection.sendResponse(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await;
 		}
 	}
 
@@ -387,17 +387,17 @@ impl Client {
 		let mut message: String = "".to_string();
 		message.push_str(" CDUP CWD DELE HELP LIST MKD PASS PASV PORT PWD QUIT RETR RMD SYST USER\n");
 		message.push_str(" RNFR RNTO NOOP NLST STAT\n");
-		self.ctrl_connection.send(ServerResponse::RecognizedCommandsBeginMessage, message.as_str()).await;
-		self.ctrl_connection.send(ServerResponse::RecognizedCommandsEndMessage, "214 Help OK").await
+		self.ctrl_connection.sendResponse(ServerResponse::RecognizedCommandsBeginMessage, message.as_str()).await;
+		self.ctrl_connection.sendResponse(ServerResponse::RecognizedCommandsEndMessage, "214 Help OK").await
 	}
 
 	async fn list(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
-				self.ctrl_connection.send(ServerResponse::FileStatusOk, "Here comes the directory listing").await?;
+				self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Here comes the directory listing").await?;
 
 				if self.send_data(utils::get_ls(path.as_path())).await.is_ok() {
-					self.ctrl_connection.send(ServerResponse::ClosingDataConnection, "Directory send OK").await?;
+					self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Directory send OK").await?;
 				}
 			}
 
@@ -414,20 +414,20 @@ impl Client {
 			if let Err(e) = fs::create_dir(path.as_path()) {
 				match e.kind() {
 					ErrorKind::AlreadyExists => {
-						self.ctrl_connection.send(ServerResponse::AlreadyExists, path.to_str().unwrap()).await
+						self.ctrl_connection.sendResponse(ServerResponse::AlreadyExists, path.to_str().unwrap()).await
 					}
 					ErrorKind::PermissionDenied => {
-						self.ctrl_connection.send(ServerResponse::PermissionDenied, path.to_str().unwrap()).await
+						self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, path.to_str().unwrap()).await
 					}
 					_ => {
-						self.ctrl_connection.send(ServerResponse::BadSequenceOfCommands, path.to_str().unwrap()).await
+						self.ctrl_connection.sendResponse(ServerResponse::BadSequenceOfCommands, path.to_str().unwrap()).await
 					}
 				}
 			} else {
-				self.ctrl_connection.send(ServerResponse::PathNameCreated, path.to_str().unwrap()).await
+				self.ctrl_connection.sendResponse(ServerResponse::PathNameCreated, path.to_str().unwrap()).await
 			}
 		} else {
-			self.ctrl_connection.send(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await
+			self.ctrl_connection.sendResponse(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await
 		}
 	}
 
@@ -435,20 +435,20 @@ impl Client {
 	 * Set transfer mode
 	 */
 	async fn mode(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, "").await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, "").await
 	}
 
 	async fn noop(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::OK, "NOOP").await
+		self.ctrl_connection.sendResponse(ServerResponse::OK, "NOOP").await
 	}
 
 	async fn nlst(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
-				self.ctrl_connection.send(ServerResponse::FileStatusOk, "Here comes the directory listing");
+				self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Here comes the directory listing");
 
 				if self.send_data(utils::get_nls(path.as_path(), arg.as_path().to_str().unwrap())).await.is_ok() {
-					self.ctrl_connection.send(ServerResponse::ClosingDataConnection, "Directory send OK").await?;
+					self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Directory send OK").await?;
 				}
 			}
 			Ok(())
@@ -468,7 +468,7 @@ impl Client {
 		let socket_addr = listener.local_addr()?;
 		info!("Server listening data on {:?}", socket_addr);
 
-		self.ctrl_connection.send(ServerResponse::EnteringPassiveMode, utils::get_addr_msg(socket_addr).as_str()).await?;
+		self.ctrl_connection.sendResponse(ServerResponse::EnteringPassiveMode, utils::get_addr_msg(socket_addr).as_str()).await?;
 
 		let (stream, addr) = listener.accept().await?;
 		info!("Data connection open with addr {:?}", addr);
@@ -484,7 +484,7 @@ impl Client {
 			let (rx, tx) = socket.into_split();
 			self.data_connection = Some(Connection::new(rx, tx));
 
-			self.ctrl_connection.send(ServerResponse::OK, "PORT command successful. Consider using PASV").await?;
+			self.ctrl_connection.sendResponse(ServerResponse::OK, "PORT command successful. Consider using PASV").await?;
 			Ok(())
 		} else {
 			Err(FtpError::DataConnectionError)
@@ -493,35 +493,35 @@ impl Client {
 
 	async fn pwd(&mut self) -> FtpResult<()> {
 		let message = format!("{} is the current directory", self.current_work_directory.as_ref().unwrap().to_str().unwrap());
-		self.ctrl_connection.send(ServerResponse::PathNameCreated, message.as_str()).await
+		self.ctrl_connection.sendResponse(ServerResponse::PathNameCreated, message.as_str()).await
 	}
 
 	/**
 	 * Restart a user connection
 	 */
 	async fn rein(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, "").await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, "").await
 	}
 
 	/**
 	 * Restart a data transfer process
 	 */
 	async fn rest(&mut self, _arg: String) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, "").await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, "").await
 	}
 
 	async fn retr(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				if let Some(data) = utils::get_file(path.as_path()) {
-					self.ctrl_connection.send(ServerResponse::FileStatusOk, "Start transfer file").await?;
+					self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Start transfer file").await?;
 
 					if self.send_data(vec![String::from_utf8(data).unwrap()]).await.is_ok() {
-						return self.ctrl_connection.send(ServerResponse::ClosingDataConnection, "Transfer complete").await;
+						return self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Transfer complete").await;
 					}
 				}
 			}
-			self.ctrl_connection.send(ServerResponse::PermissionDenied, "Failed to open file").await
+			self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, "Failed to open file").await
 		} else {
 			error!("Data connection not initialized");
 			Err(FtpError::DataConnectionError)
@@ -534,19 +534,19 @@ impl Client {
 			if let Err(e) = fs::remove_dir(path.as_path()) {
 				match e.kind() {
 					ErrorKind::PermissionDenied => {
-						self.ctrl_connection.send(ServerResponse::PermissionDenied, path.to_str().unwrap()).await
+						self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, path.to_str().unwrap()).await
 					}
 					_ => {
 						error!("RMDIR unknown error: {}", e);
-						self.ctrl_connection.send(ServerResponse::BadSequenceOfCommands, path.to_str().unwrap()).await
+						self.ctrl_connection.sendResponse(ServerResponse::BadSequenceOfCommands, path.to_str().unwrap()).await
 					}
 				}
 			} else {
-				self.ctrl_connection.send(ServerResponse::RequestedFileActionOkay, path.to_str().unwrap()).await
+				self.ctrl_connection.sendResponse(ServerResponse::RequestedFileActionOkay, path.to_str().unwrap()).await
 			}
 		} else {
 			error!("RMDIR unknown error, arg: {}", arg.to_str().unwrap());
-			self.ctrl_connection.send(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await
+			self.ctrl_connection.sendResponse(ServerResponse::InvalidParameterOrArgument, arg.to_str().unwrap()).await
 		}
 	}
 
@@ -554,10 +554,10 @@ impl Client {
 		if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 			if path.exists() {
 				self.current_working_path = Some(path);
-				return self.ctrl_connection.send(ServerResponse::RequestedFileActionPendingFurtherInformation, "Ready for RNTO").await;
+				return self.ctrl_connection.sendResponse(ServerResponse::RequestedFileActionPendingFurtherInformation, "Ready for RNTO").await;
 			}
 		}
-		self.ctrl_connection.send(ServerResponse::PermissionDenied, "command failed").await
+		self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, "command failed").await
 	}
 
 	async fn rnto(&mut self, arg: PathBuf) -> FtpResult<()> {
@@ -565,25 +565,25 @@ impl Client {
 			if let Some(working_path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				if fs::rename(origin_path, working_path).is_ok() {
 					self.current_working_path = None;
-					return self.ctrl_connection.send(ServerResponse::RequestedFileActionOkay, "Rename successful").await;
+					return self.ctrl_connection.sendResponse(ServerResponse::RequestedFileActionOkay, "Rename successful").await;
 				}
 			}
 		}
-		self.ctrl_connection.send(ServerResponse::PermissionDenied, "command failed").await
+		self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, "command failed").await
 	}
 
 	/**
 	 * Specific commands for this site
 	 */
 	async fn site(&mut self, arg: String) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, arg.as_str()).await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, arg.as_str()).await
 	}
 
 	/**
 	 * Mount a file system
 	 */
 	async fn smnt(&mut self, arg: PathBuf) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, arg.to_str().unwrap()).await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, arg.to_str().unwrap()).await
 	}
 
 	async fn stat(&mut self, arg: PathBuf) -> FtpResult<()> {
@@ -610,7 +610,7 @@ impl Client {
 				message.push_str("End of status");
 			}
 		}
-		self.ctrl_connection.send(ServerResponse::FileStatus, message.as_str()).await
+		self.ctrl_connection.sendResponse(ServerResponse::FileStatus, message.as_str()).await
 	}
 
 	/**
@@ -621,10 +621,10 @@ impl Client {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				return if let Ok(file) = File::create(path) {
-					self.ctrl_connection.send(ServerResponse::FileStatusOk, "Ok to send data").await?;
+					self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Ok to send data").await?;
 					self.save_data(file).await
 				} else {
-					self.ctrl_connection.send(ServerResponse::PermissionDenied, "Cannot create file").await
+					self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, "Cannot create file").await
 				};
 			}
 		}
@@ -649,10 +649,10 @@ impl Client {
 
 				return if let Ok(file) = File::create(&path) {
 					let msg = format!("File: {}", &path.file_name().unwrap().to_str().unwrap());
-					self.ctrl_connection.send(ServerResponse::FileStatusOk, msg.as_str()).await?;
+					self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, msg.as_str()).await?;
 					self.save_data(file).await
 				} else {
-					self.ctrl_connection.send(ServerResponse::PermissionDenied, "Cannot create file").await
+					self.ctrl_connection.sendResponse(ServerResponse::PermissionDenied, "Cannot create file").await
 				};
 			}
 		}
@@ -664,29 +664,29 @@ impl Client {
 	 * Set File Structure
 	 */
 	async fn stru(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, "").await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, "").await
 	}
 
 	async fn syst(&mut self) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::SystemType, "").await
+		self.ctrl_connection.sendResponse(ServerResponse::SystemType, "").await
 	}
 
 	async fn transfer_type(&mut self, arg: TransferType) -> FtpResult<()> {
 		let message;
 		return match arg {
 			TransferType::Unknown => {
-				self.ctrl_connection.send(ServerResponse::InvalidParameterOrArgument, "Transfert type unknown").await
+				self.ctrl_connection.sendResponse(ServerResponse::InvalidParameterOrArgument, "Transfert type unknown").await
 			}
 			_ => {
 				self.transfert_type = arg;
 				message = format!("Switch to {}", arg.to_string());
-				self.ctrl_connection.send(ServerResponse::OK, message.as_str()).await
+				self.ctrl_connection.sendResponse(ServerResponse::OK, message.as_str()).await
 			}
 		};
 	}
 
 	async fn unknown(&mut self, arg: String) -> FtpResult<()> {
-		self.ctrl_connection.send(ServerResponse::CommandNotImplemented, arg.as_str()).await
+		self.ctrl_connection.sendResponse(ServerResponse::CommandNotImplemented, arg.as_str()).await
 	}
 
 	async fn save_data(&mut self, mut file: File) -> FtpResult<()> {
@@ -698,7 +698,7 @@ impl Client {
 			writeln!(file, "{}", data)?;
 			data_connection.close().await;
 			self.data_connection = None;
-			return self.ctrl_connection.send(ServerResponse::ClosingDataConnection, "Transfer complete").await;
+			return self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Transfer complete").await;
 		}
 		error!("Cannot read data connection");
 		Err(FtpError::DataConnectionError)
@@ -723,11 +723,9 @@ impl Client {
 						ClientCommand::Abor => {
 							data_connection.close().await;
 							self.data_connection = None;
-							let msg = format!("{} transfer interrupted by ABORD", ServerResponse::ConnectionClosed.to_string());
-							self.ctrl_connection.write(msg).await?;
-							let msg = format!("{} ABORD: ok", ServerResponse::ClosingDataConnection.to_string());
-							self.ctrl_connection.write(msg).await?;
-							return Err(FtpError::Abord);
+							self.ctrl_connection.sendResponse(ServerResponse::ConnectionClosed, "transfer interrupted by ABORD").await?;
+							self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "ABORD: ok").await?;
+							return Err(FtpError::Abord("End of transfer file".to_string()));
 						}
 						_ => { }
 					}
@@ -740,7 +738,7 @@ impl Client {
 	pub async fn close_connection(&mut self) {
 		info!("Close client connection");
 		if self.user.is_some() {
-			if let Err(e) = self.ctrl_connection.send(ServerResponse::ConnectionClosed, "").await {
+			if let Err(e) = self.ctrl_connection.sendResponse(ServerResponse::ConnectionClosed, "").await {
 				error!("Failed to close connection with client: {:?}", e);
 			}
 			self.user = None;

@@ -115,7 +115,12 @@ impl Connection {
 		}
 	}
 
-	pub async fn send(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
+	pub async fn sendResponse(&mut self, response: ServerResponse, message: &str) -> FtpResult<()> {
+		let message = format!("{} {}", response, message);
+		self.write(message).await
+	}
+
+	pub async fn sendCommand(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
 		self.write(command.to_string()).await?;
 		if let Some(response) = expectedResponse {
 			return self.receive(response).await;
