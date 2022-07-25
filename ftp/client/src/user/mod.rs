@@ -39,6 +39,7 @@ use users::get_user_by_name;
 use users::os::unix::UserExt;
 use crate::user::command::*;
 use crate::utils::*;
+use crate::utils::cmd_line_reader::CmdLineReader;
 
 mod command;
 
@@ -47,6 +48,7 @@ pub struct ClientFtp {
 	data_connection: Option<Connection>,
 	current_work_directory: Option<PathBuf>,
 	mode: TransfertMode,
+	cmd_reader: CmdLineReader,
 }
 
 impl ClientFtp {
@@ -56,12 +58,14 @@ impl ClientFtp {
 		return if let Ok(socket) = TcpStream::connect(SocketAddr::new(addr, port.to_string().parse::<u16>().unwrap())).await {
 			let (rx, tx) = socket.into_split();
 			let mut connection = Connection::new(rx, tx);
+			let rd = CmdLineReader::new()?;
 
 			Ok(ClientFtp {
 				ctrl_connection: connection,
 				data_connection: None,
 				mode: TransfertMode::Active,
 				current_work_directory: None,
+				cmd_reader: rd,
 			})
 		} else {
 			Err(FtpError::ConnectionError("Impossible to init control connection".to_string()))
@@ -70,14 +74,6 @@ impl ClientFtp {
 
 	pub async fn start(&mut self) {
 		info!("START !");
-		// tokio::select! {
-		// 	_ = tokio::spawn(wait_ctrlc()) => {
-		// 		println!("Wait CTRL-C completed first");
-		// 	}
-		// 	_ = self.run() => {
-		// 		println!("Client run completed first");
-		// 	}
-		// }
 		if self.connect().await.is_ok() {
 			self.syst().await;
 			self.handle_commands().await;
@@ -97,7 +93,7 @@ impl ClientFtp {
 
 	async fn user(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.receive(ServerResponse::ServiceReadyForNewUser).await?;
-		let user_name = utils::read_with_rustyline("Name: ")?;
+		let user_name = self.cmd_reader.get_user_name()?;
 		self.ctrl_connection.sendCommand(ClientCommand::User(user_name.to_string()), None).await?;
 		let user = get_user_by_name(user_name.trim());
 		if user.is_some() {
@@ -128,7 +124,7 @@ impl ClientFtp {
 	async fn handle_commands(&mut self) -> FtpResult<()> {
 		let mut command: String;
 		loop {
-			command = utils::read_with_rustyline("ftp>  ")?;
+			command = self.cmd_reader.read_line("ftp>  ")?;
 			let command = parse_user_command(&command);
 			match command {
 				UserCommand::Help => { self.help(); }
@@ -138,7 +134,7 @@ impl ClientFtp {
 				}
 				UserCommand::Pass => { self.pass(); }
 				UserCommand::Append(arg) => {
-					let (local, remote) = get_two_args(arg, "(local file)", "(remote file)").await?;
+					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
 					self.append(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
 				UserCommand::Bye => {
@@ -146,14 +142,14 @@ impl ClientFtp {
 					return Ok(());
 				}
 				UserCommand::Cd(arg) => {
-					let path = get_one_arg(arg, "(directory)").await?;
+					let path = self.cmd_reader.get_one_arg(arg, "(directory)").await?;
 					self.cd(PathBuf::from(path)).await?;
 				}
 				UserCommand::CdUp => {
 					self.cdup().await?;
 				}
 				UserCommand::Delete(arg) => {
-					let path = get_one_arg(arg, "(remote file)").await?;
+					let path = self.cmd_reader.get_one_arg(arg, "(remote file)").await?;
 					self.delete(PathBuf::from(path)).await?;
 				}
 				UserCommand::Dir => {
@@ -164,7 +160,7 @@ impl ClientFtp {
 					return Ok(());
 				}
 				UserCommand::Get(arg) => {
-					let (remote, local) = get_two_args(arg, "(remote file)", "(local file)").await?;
+					let (remote, local) = self.cmd_reader.get_two_args(arg, "(remote file)", "(local file)").await?;
 					self.get(PathBuf::from(remote), PathBuf::from(local)).await?;
 				}
 			}
