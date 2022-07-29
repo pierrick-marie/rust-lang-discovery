@@ -22,6 +22,7 @@ use log::{debug, error};
 use regex::Regex;
 use crate::user::command::UserCommand::*;
 use crate::protocol::DELE;
+use crate::protocol::TransferType::Binary;
 
 pub const HELP: &str = "help";
 pub const LS: &str = "ls";
@@ -34,6 +35,8 @@ pub const DELETE: &str = "delete";
 pub const DIR: &str = "dir";
 pub const EXIT: &str = "exit";
 pub const GET: &str = "get";
+pub const ASCII: &str = "ascii";
+pub const IMAGE: &str = "binary";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -50,6 +53,8 @@ pub enum UserCommand {
 	Dir,
 	Exit,
 	Get(Option<String>),
+	Ascii,
+	Image,
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -101,6 +106,8 @@ impl UserCommand {
 			DIR => Dir,
 			EXIT => Exit,
 			GET => Get(None),
+			ASCII => Ascii,
+			IMAGE => Image,
 			_ => {
 				Unknown("".to_string())
 			}
@@ -153,6 +160,8 @@ impl Display for UserCommand {
 					write!(f, "{} <empty>", GET)
 				};
 			}
+			Ascii => write!(f, "{}", ASCII),
+			Image => write!(f, "{}", Image),
 		}
 	}
 }

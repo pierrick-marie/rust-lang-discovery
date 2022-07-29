@@ -49,6 +49,7 @@ pub struct ClientFtp {
 	current_work_directory: Option<PathBuf>,
 	mode: TransfertMode,
 	cmd_reader: CmdLineReader,
+	transfert_type: TransferType,
 }
 
 impl ClientFtp {
@@ -66,6 +67,7 @@ impl ClientFtp {
 				mode: TransfertMode::Active,
 				current_work_directory: None,
 				cmd_reader: rd,
+				transfert_type: TransferType::Ascii,
 			})
 		} else {
 			Err(FtpError::ConnectionError("Impossible to init control connection".to_string()))
@@ -163,13 +165,21 @@ impl ClientFtp {
 					let (remote, local) = self.cmd_reader.get_two_args(arg, "(remote file)", "(local file)").await?;
 					self.get(PathBuf::from(remote), PathBuf::from(local)).await?;
 				}
+				UserCommand::Ascii => {
+					self.transfert_type = TransferType::Ascii;
+					println!("Set to ASCII transfer type");
+				}
+				UserCommand::Image => {
+					self.transfert_type = TransferType::Binary;
+					println!("Set to Binary transfer type");
+				}
 			}
 		}
 	}
 
 	fn help(&mut self) {
 		println!(" Help message");
-		println!(" Available commands: help ls pass append bye cd cdup delete dir exit get");
+		println!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image");
 	}
 
 	fn pass(&mut self) {
@@ -257,7 +267,8 @@ impl ClientFtp {
 			if local_path.exists() {
 				println!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
 
-				self.setupTransferType(TransferType::Binary).await?;
+				self.transfert_type = TransferType::Binary;
+				self.setupTransferType(self.transfert_type).await?;
 
 				self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
 
@@ -397,18 +408,3 @@ impl ClientFtp {
 		Ok(())
 	}
 }
-
-// async fn wait_ctrlc() {
-// 	let keep_running = Arc::new(AtomicBool::new(true));
-// 	let running = keep_running.clone();
-//
-// 	ctrlc::set_handler(move || {
-// 		info!("Received CTRL-C");
-// 		running.store(false, Ordering::SeqCst);
-// 	}).expect("Error setting Ctrl-C handler");
-//
-// 	while keep_running.load(Ordering::SeqCst) {
-// 		thread::sleep(time::Duration::from_millis(500));
-// 	}
-// 	debug!("End of wait CTRL-C");
-// }
