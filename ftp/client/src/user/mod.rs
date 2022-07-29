@@ -181,6 +181,9 @@ impl ClientFtp {
 						error!("Impossible to change working directory")
 					}
 				}
+				UserCommand::Nlist(arg) => {
+					self.nlst(arg).await?;
+				}
 			}
 		}
 	}
@@ -288,6 +291,25 @@ impl ClientFtp {
 			}
 		}
 		Err(FtpError::InternalError("Failed to get file".to_string()))
+	}
+
+	async fn nlst(&mut self, arg: Option<String>) -> FtpResult<()> {
+		let paths: Vec<&str>;
+		let args: String;
+
+		if arg.is_some() {
+			args = arg.unwrap();
+		} else {
+			args = self.cmd_reader.get_one_arg(arg, "(remote files) ").await?;
+		}
+		paths = args.split(" ").collect();
+
+		for path in paths {
+			self.setup_data_connection(ClientCommand::Nlst(PathBuf::from(path)), None).await?;
+
+		}
+
+		Ok(())
 	}
 
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
