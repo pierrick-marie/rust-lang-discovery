@@ -199,7 +199,11 @@ impl Client {
 					self.help(arg).await?;
 				}
 				ClientCommand::List(arg) => {
-					self.list(arg).await?;
+					if let Some(path) = arg {
+						self.list(path).await?;
+					} else {
+						self.list(self.current_work_directory.as_ref().unwrap().clone()).await?;
+					}
 				}
 				ClientCommand::Mkd(arg) => {
 					self.mkdir(arg).await?;
@@ -207,8 +211,12 @@ impl Client {
 				ClientCommand::Mode => {
 					self.mode().await?;
 				}
-				ClientCommand::Nlst(arg) => {
-					self.nlst(arg).await?;
+				ClientCommand::Nlist(arg) => {
+					if let Some(path) = arg {
+						self.nlist(path).await?;
+					} else {
+						self.nlist(self.current_work_directory.as_ref().unwrap().clone()).await?;
+					}
 				}
 				ClientCommand::NoOp => {
 					self.noop().await?;
@@ -442,7 +450,7 @@ impl Client {
 		self.ctrl_connection.sendResponse(ServerResponse::OK, "NOOP").await
 	}
 
-	async fn nlst(&mut self, arg: PathBuf) -> FtpResult<()> {
+	async fn nlist(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
 				self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Here comes the directory listing").await?;
