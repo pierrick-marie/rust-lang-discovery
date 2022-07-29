@@ -37,6 +37,7 @@ pub const EXIT: &str = "exit";
 pub const GET: &str = "get";
 pub const ASCII: &str = "ascii";
 pub const IMAGE: &str = "binary";
+pub const LCD: &str = "lcd";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -55,6 +56,7 @@ pub enum UserCommand {
 	Get(Option<String>),
 	Ascii,
 	Image,
+	Lcd,
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -108,6 +110,7 @@ impl UserCommand {
 			GET => Get(None),
 			ASCII => Ascii,
 			IMAGE => Image,
+			LCD => Lcd,
 			_ => {
 				Unknown("".to_string())
 			}
@@ -162,6 +165,7 @@ impl Display for UserCommand {
 			}
 			Ascii => write!(f, "{}", ASCII),
 			Image => write!(f, "{}", Image),
+			Lcd => write!(f, "{}", Lcd),
 		}
 	}
 }

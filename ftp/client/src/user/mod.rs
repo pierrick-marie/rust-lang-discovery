@@ -24,7 +24,7 @@ use crate::{Connection, DEFAULT_ADDR, protocol, utils};
 use crate::utils::error::{FtpError, FtpResult};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{fs, thread, time};
+use std::{env, fs, thread, time};
 use async_std::{io, task};
 use std::{thread::sleep, time::Duration};
 use tokio::sync::mpsc::Receiver;
@@ -173,13 +173,21 @@ impl ClientFtp {
 					self.transfert_type = TransferType::Binary;
 					println!("Set to Binary transfer type");
 				}
+				UserCommand::Lcd => {
+					if let Ok(path) = env::current_dir() {
+						println!("Set working directory to {}", path.display());
+						self.current_work_directory = Some(path);
+					} else {
+						error!("Impossible to change working directory")
+					}
+				}
 			}
 		}
 	}
 
 	fn help(&mut self) {
 		println!(" Help message");
-		println!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image");
+		println!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd");
 	}
 
 	fn pass(&mut self) {
