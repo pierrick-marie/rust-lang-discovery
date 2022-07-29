@@ -100,7 +100,6 @@ pub fn get_file(path: &Path) -> Option<Vec<u8>> {
 
 pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
 	let mut files_info = vec![];
-
 	let mut filename; //  = path.as_ref().unwrap().file_name().to_str().unwrap().to_string();
 
 	if working_path.is_dir() {
@@ -124,6 +123,8 @@ pub fn get_nls(working_path: &Path, prefix: &str) -> Vec<String> {
 				}
 			}
 		}
+	} else {
+		files_info.push(working_path.to_str().unwrap().to_string());
 	}
 
 	files_info

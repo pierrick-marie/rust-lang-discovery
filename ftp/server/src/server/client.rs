@@ -445,11 +445,9 @@ impl Client {
 	async fn nlst(&mut self, arg: PathBuf) -> FtpResult<()> {
 		if self.data_connection.is_some() {
 			if let Some(path) = utils::get_absolut_path(&arg, self.current_work_directory.as_ref().unwrap()) {
-				self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Here comes the directory listing");
-
-				if self.send_data(utils::get_nls(path.as_path(), arg.as_path().to_str().unwrap())).await.is_ok() {
-					self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Directory send OK").await?;
-				}
+				self.ctrl_connection.sendResponse(ServerResponse::FileStatusOk, "Here comes the directory listing").await?;
+				self.send_data(utils::get_nls(path.as_path(), path.as_path().to_str().unwrap())).await?;
+				self.ctrl_connection.sendResponse(ServerResponse::ClosingDataConnection, "Directory send OK").await?;
 			}
 			Ok(())
 		} else {
