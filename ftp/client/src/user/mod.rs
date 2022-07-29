@@ -169,7 +169,7 @@ impl ClientFtp {
 
 	fn help(&mut self) {
 		println!(" Help message");
-		println!(" Available commands: help ls pass append bye cd cdup delete dir exit");
+		println!(" Available commands: help ls pass append bye cd cdup delete dir exit get");
 	}
 
 	fn pass(&mut self) {
@@ -263,7 +263,6 @@ impl ClientFtp {
 
 
 				let file = OpenOptions::new().write(true).append(false).open(local_path)?;
-				dbg!(&file);
 				self.save_data(file).await?;
 
 				return self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await;
