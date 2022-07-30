@@ -229,7 +229,7 @@ pub const HELP: &str = "HELP";
 pub const LIST: &str = "LIST";
 pub const MKD: &str = "MKD";
 pub const MODE: &str = "MODE";
-pub const NLST: &str = "NLST";
+pub const NLIST: &str = "NLIST";
 pub const NOOP: &str = "NOOP";
 pub const PASS: &str = "PASS";
 pub const PASV: &str = "PASV";
@@ -264,10 +264,10 @@ pub enum ClientCommand {
 	Cwd(PathBuf),
 	Dele(PathBuf),
 	Help(String),
-	List(PathBuf),
+	List(Option<PathBuf>),
 	Mkd(PathBuf),
 	Mode,
-	Nlst(PathBuf),
+	Nlist(Option<PathBuf>),
 	NoOp,
 	Pass(String),
 	Pasv,
@@ -320,9 +320,9 @@ impl ClientCommand {
 			CWD => Cwd(PathBuf::from(arg.to_string())),
 			DELE => Dele(PathBuf::from(arg.to_string())),
 			HELP => Help(arg.to_string()),
-			LIST => List(PathBuf::from(arg.to_string())),
+			LIST => List(Some(PathBuf::from(arg.to_string()))),
 			MKD => Mkd(PathBuf::from(arg.to_string())),
-			NLST => Nlst(PathBuf::from(arg.to_string())),
+			NLIST => Nlist(Some(PathBuf::from(arg.to_string()))),
 			PASS => Pass(arg.to_string()),
 			PORT => Port(arg.to_string()),
 			REST => Rest(arg.to_string()),
@@ -363,6 +363,8 @@ impl ClientCommand {
 			REIN => Rein,
 			STRU => Stru,
 			SYST => Syst,
+			LIST => List(None),
+			NLIST => Nlist(None),
 			_ => {
 				Unknown("Unknown command".to_string())
 			}
@@ -374,7 +376,13 @@ impl Display for ClientCommand {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Cwd(arg) => write!(f, "{} {}", CWD, arg.as_path().to_str().unwrap()),
-			List(arg) => write!(f, "{} {}", LIST, arg.as_path().to_str().unwrap()),
+			List(arg) => {
+				if let Some(path) = arg {
+					write!(f, "{} {}", LIST, path.as_path().to_str().unwrap())
+				} else {
+					write!(f, "{}", LIST)
+				}
+			},
 			Pass(arg) => write!(f, "{} {}", PASS, arg),
 			Port(arg) => write!(f, "{} {}", PORT, arg),
 			Pwd => write!(f, "{}", PWD),
@@ -397,7 +405,13 @@ impl Display for ClientCommand {
 			Dele(arg) => write!(f, "{} {}", DELE, arg.as_path().to_str().unwrap()),
 			Help(arg) => write!(f, "{} {}", HELP, arg),
 			Mode => write!(f, "{}", MODE),
-			Nlst(arg) => write!(f, "{} {}", NLST, arg.as_path().to_str().unwrap()),
+			Nlist(arg) => {
+				if let Some(path) = arg {
+					write!(f, "{} {}", NLIST, path.as_path().to_str().unwrap())
+				} else {
+					write!(f, "{}", NLIST)
+				}
+			},
 			Rein => write!(f, "{}", REIN),
 			Rest(arg) => write!(f, "{} {}", REST, arg),
 			Rnto(arg) => write!(f, "{} {}", RNTO, arg.as_path().to_str().unwrap()),

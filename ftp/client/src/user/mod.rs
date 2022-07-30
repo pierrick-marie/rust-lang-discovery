@@ -182,7 +182,7 @@ impl ClientFtp {
 					}
 				}
 				UserCommand::Nlist(arg) => {
-					self.nlst(arg).await?;
+					self.nlist(arg).await?;
 				}
 			}
 		}
@@ -293,7 +293,7 @@ impl ClientFtp {
 		Err(FtpError::InternalError("Failed to get file".to_string()))
 	}
 
-	async fn nlst(&mut self, arg: Option<String>) -> FtpResult<()> {
+	async fn nlist(&mut self, arg: Option<String>) -> FtpResult<()> {
 		let paths: Vec<&str>;
 		let args: String;
 
@@ -305,7 +305,7 @@ impl ClientFtp {
 		paths = args.split(" ").collect();
 
 		for path in paths {
-			self.setup_data_connection(ClientCommand::Nlst(PathBuf::from(path)), None).await?;
+			self.setup_data_connection(ClientCommand::Nlist(PathBuf::from(path)), None).await?;
 
 		}
 
