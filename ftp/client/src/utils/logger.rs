@@ -28,6 +28,7 @@ impl log::Log for SimpleLogger {
 	
 	fn log(&self, record: &Record) {
 		if self.enabled(record.metadata()) {
+			// Ignore debug trace from rustyine
 			if !record.target().eq("rustyline") {
 				if record.level() == Level::Info {
 					println!("{}", record.args());

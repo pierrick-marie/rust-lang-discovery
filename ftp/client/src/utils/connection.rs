@@ -46,10 +46,7 @@ impl Connection {
 	}
 
 	pub async fn read(&mut self) -> Option<String> {
-		debug!("connection::read");
-
 		let mut message: String = String::new();
-
 		loop {
 			match async_io::timeout(Duration::from_secs(TIME_OUT), async {
 				self.buffer_reader = [0; BUFFER_SIZE];
@@ -96,7 +93,6 @@ impl Connection {
 	}
 
 	pub async fn write(&mut self, mut msg: String) -> FtpResult<()> {
-		debug!("connection::write");
 		match async_io::timeout(Duration::from_secs(TIME_OUT), async {
 			msg.push_str("\r\n");
 			self.tx.write(msg.as_bytes()).await
@@ -129,8 +125,6 @@ impl Connection {
 	}
 
 	pub async fn close(&mut self) {
-		debug!("connection::close");
-
 		if self.tx.shutdown().await.is_ok() {
 			debug!("Connection closed by ftp_server");
 		} else {

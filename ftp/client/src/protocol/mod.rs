@@ -120,7 +120,6 @@ impl Display for ServerResponse {
 }
 
 pub fn parse_server_response(msg: &String) -> (ServerResponse, String) {
-	debug!("protocol::parse_server_response '{}'", msg);
 	if let Some(re) = Regex::new(r"^([[:digit:]]{3})( .+)*$").ok() {
 		if let Some(cap) = re.captures(msg.as_str()) {
 			if let Some(cmd) = cap.get(1) {
