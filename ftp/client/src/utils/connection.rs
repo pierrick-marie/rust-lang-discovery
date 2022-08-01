@@ -60,7 +60,7 @@ impl Connection {
 						match String::from_utf8(self.buffer_reader[..n].to_vec()) {
 							Ok(msg) => {
 								message.push_str(msg.trim());
-								info!(" <<<< {}", message);
+								debug!(" <<<< {}", message);
 								if n < BUFFER_SIZE {
 									return Some(message);
 								}
@@ -71,7 +71,7 @@ impl Connection {
 							}
 						}
 					} else {
-						info!("Client disconnected");
+						debug!("Client disconnected");
 						return None;
 					}
 				}
@@ -103,9 +103,9 @@ impl Connection {
 		}).await {
 			Ok(_) => {
 				if msg.starts_with("PASS") {
-					info!(" >>>> PASS xxxx\n");
+					debug!(" >>>> PASS xxxx\n");
 				} else {
-					info!(" >>>> {}", msg);
+					debug!(" >>>> {}", msg);
 				}
 				return Ok(());
 			}
@@ -132,7 +132,7 @@ impl Connection {
 		debug!("connection::close");
 
 		if self.tx.shutdown().await.is_ok() {
-			info!("Connection closed by ftp_server");
+			debug!("Connection closed by ftp_server");
 		} else {
 			error!("Error while closing socket");
 		}
