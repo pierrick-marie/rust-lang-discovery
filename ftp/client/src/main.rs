@@ -44,7 +44,7 @@ pub const IPV4: bool = true;
 pub const IPV6: bool = !IPV4;
 pub const DEFAULT_PORT: u16 = 21;
 
-pub const LEVEL: Level = Level::Info;
+pub const LEVEL: Level = Level::Debug;
 
 use rustyline::error::ReadlineError;
 use rustyline::{Editor, Result};
@@ -58,7 +58,7 @@ async fn run() {
 	
 	// Init logger
 	if let Err(e) = logger::init() {
-		println!("Failed to init logger: {:?}", e);
+		error!("Failed to init logger: {:?}", e);
 		return;
 	}
 

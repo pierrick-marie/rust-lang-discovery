@@ -118,7 +118,7 @@ impl ClientFtp {
 	async fn syst(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.sendCommand(ClientCommand::Syst, None).await?;
 		if let Some(msg) = self.ctrl_connection.read().await {
-			println!("{}", msg);
+			info!("{}", msg);
 		}
 		Ok(())
 	}
@@ -130,7 +130,7 @@ impl ClientFtp {
 			let command = parse_user_command(&command);
 			match command {
 				UserCommand::Help => { self.help(); }
-				UserCommand::Unknown(arg) => { println!("Unknown command {}", arg); }
+				UserCommand::Unknown(arg) => { info!("Unknown command {}", arg); }
 				UserCommand::Ls(arg) => {
 					self.ls(arg).await;
 				}
@@ -167,15 +167,15 @@ impl ClientFtp {
 				}
 				UserCommand::Ascii => {
 					self.transfert_type = TransferType::Ascii;
-					println!("Set to ASCII transfer type");
+					info!("Set to ASCII transfer type");
 				}
 				UserCommand::Image => {
 					self.transfert_type = TransferType::Binary;
-					println!("Set to Binary transfer type");
+					info!("Set to Binary transfer type");
 				}
 				UserCommand::Lcd => {
 					if let Ok(path) = env::current_dir() {
-						println!("Set working directory to {}", path.display());
+						info!("Set working directory to {}", path.display());
 						self.current_work_directory = Some(path);
 					} else {
 						error!("Impossible to change working directory")
@@ -189,17 +189,17 @@ impl ClientFtp {
 	}
 	
 	fn help(&mut self) {
-		println!(" Help message");
-		println!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd");
+		info!(" Help message");
+		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd");
 	}
 	
 	fn pass(&mut self) {
 		if self.mode == TransfertMode::Passive {
 			self.mode = TransfertMode::Active;
-			println!("Set up active mode");
+			info!("Set up active mode");
 		} else {
 			self.mode = TransfertMode::Passive;
-			println!("Set up passive mode");
+			info!("Set up passive mode");
 		}
 	}
 	
@@ -223,7 +223,7 @@ impl ClientFtp {
 	async fn append(&mut self, local_file: PathBuf, remote_file: PathBuf) -> FtpResult<()> {
 		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
 			if local_path.exists() {
-				println!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
+				info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
 				
 				self.setup_data_connection(ClientCommand::Appe(remote_file), Some(ServerResponse::FileStatusOk)).await?;
 				
@@ -244,7 +244,7 @@ impl ClientFtp {
 		}
 		if self.ctrl_connection.sendCommand(ClientCommand::Quit, None).await.is_ok() {
 			if let Some(msg) = self.ctrl_connection.read().await {
-				println!("{}", msg);
+				info!("{}", msg);
 			}
 		}
 		
@@ -276,7 +276,7 @@ impl ClientFtp {
 	async fn get(&mut self, remote_file: PathBuf, local_file: PathBuf) -> FtpResult<()> {
 		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
 			if local_path.exists() {
-				println!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
+				info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
 				
 				self.transfert_type = TransferType::Binary;
 				self.setupTransferType(self.transfert_type).await?;
@@ -348,7 +348,7 @@ impl ClientFtp {
 		if let Some(msg) = self.ctrl_connection.read().await {
 			let response = parse_server_response(&msg);
 			if response.0 == ServerResponse::EnteringPassiveMode {
-				println!("{}", msg);
+				info!("{}", msg);
 				if let Some(addr) = parse_port(response.1) {
 					debug!("Connect to {} {}", &addr.0, &addr.1);
 					let socket = TcpStream::connect(SocketAddr::new(addr.0, addr.1)).await?;
@@ -373,7 +373,7 @@ impl ClientFtp {
 		
 		let mut msg: Option<String> = data_connection.read().await;
 		while msg.is_some() {
-			println!("{}", msg.unwrap());
+			info!("{}", msg.unwrap());
 			msg = data_connection.read().await;
 		}
 		

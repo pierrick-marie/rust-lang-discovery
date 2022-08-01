@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with rust-discovery.  If not, see <http://www.gnu.org/licenses/>. */
 
-use log::{Record, Metadata, SetLoggerError};
+use log::{Record, Metadata, SetLoggerError, Level};
 
 struct SimpleLogger;
 
@@ -28,7 +28,13 @@ impl log::Log for SimpleLogger {
 	
 	fn log(&self, record: &Record) {
 		if self.enabled(record.metadata()) {
-			println!("#{}: {}", record.level(), record.args());
+			if !record.target().eq("rustyline") {
+				if record.level() == Level::Info {
+					println!("{}", record.args());
+				} else {
+					println!("#{}: {}", record.level(), record.args());
+				}
+			}
 		}
 	}
 	

@@ -86,7 +86,7 @@ impl Connection {
 	pub async fn receive(&mut self, serverResponse: ServerResponse) -> FtpResult<()> {
 		if let Some(msg) = self.read().await {
 			if protocol::parse_server_response(&msg).0 == serverResponse {
-				println!("{}", msg);
+				info!("{}", msg);
 				return Ok(());
 			} else {
 				return Err(FtpError::UserConnectionError(format!("Unexpected response {}", msg)));
