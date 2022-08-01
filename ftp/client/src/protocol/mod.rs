@@ -172,14 +172,8 @@ pub fn parse_server_response(msg: &String) -> (ServerResponse, String) {
 				} else {
 					return (response, "".to_string());
 				}
-			} else {
-				dbg!("2");
 			}
-		} else {
-			dbg!("1");
 		}
-	} else {
-		dbg!("0");
 	}
 	error!("failed to parse response: {}", msg);
 	(UnknownCommand, String::new())
@@ -229,7 +223,7 @@ pub const HELP: &str = "HELP";
 pub const LIST: &str = "LIST";
 pub const MKD: &str = "MKD";
 pub const MODE: &str = "MODE";
-pub const NLIST: &str = "NLIST";
+pub const NLIST: &str = "NLST";
 pub const NOOP: &str = "NOOP";
 pub const PASS: &str = "PASS";
 pub const PASV: &str = "PASV";
