@@ -188,13 +188,16 @@ impl ClientFtp {
 					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
 					self.put(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
+				UserCommand::Pwd => {
+					self.pwd().await?;
+				}
 			}
 		}
 	}
 	
 	fn help(&mut self) {
 		info!(" Help message");
-		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put");
+		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd");
 	}
 	
 	fn pass(&mut self) {
@@ -335,6 +338,10 @@ impl ClientFtp {
 		}
 		error!("Data connection not initialized");
 		Err(FtpError::DataConnectionError)
+	}
+	
+	async fn pwd(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.sendCommand(ClientCommand::Pwd, Some(ServerResponse::PathNameCreated)).await
 	}
 	
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
