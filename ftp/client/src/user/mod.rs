@@ -206,6 +206,10 @@ impl ClientFtp {
 					let remote_dir = self.cmd_reader.get_one_arg(arg, "(directory-name) ").await?;
 					self.rmdir(PathBuf::from(remote_dir)).await?;
 				}
+				UserCommand::Send(arg) => {
+					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file) ", "(remote file) ").await?;
+					self.put(PathBuf::from(local), PathBuf::from(remote)).await?;
+				}
 			}
 		}
 	}
@@ -340,6 +344,9 @@ impl ClientFtp {
 		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
 			if local_path.exists() {
 				info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
+				
+				self.transfert_type = TransferType::Binary;
+				self.setupTransferType(self.transfert_type).await?;
 				
 				self.setup_data_connection(ClientCommand::Stor(remote_file), Some(ServerResponse::FileStatusOk)).await?;
 				

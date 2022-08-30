@@ -46,6 +46,7 @@ pub const QUIT: &str = "quit";
 pub const RECV: &str = "recv";
 pub const RENAME: &str = "rename";
 pub const RMDIR: &str = "rmdir";
+pub const SEND: &str = "send";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -72,6 +73,7 @@ pub enum UserCommand {
 	Recv(Option<String>),
 	Rename(Option<String>),
 	Rmdir(Option<String>),
+	Send(Option<String>),
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -107,6 +109,7 @@ impl UserCommand {
 			RECV => Recv(Some(arg.to_string())),
 			RENAME => Rename(Some(arg.to_string())),
 			RMDIR => Rmdir(Some(arg.to_string())),
+			SEND => Send(Some(arg.to_string())),
 			_ => {
 				Unknown(arg.to_string())
 			}
@@ -138,6 +141,7 @@ impl UserCommand {
 			RECV => Recv(None),
 			RENAME => Rename(None),
 			RMDIR => Rmdir(None),
+			SEND => Send(None),
 			_ => {
 				Unknown("".to_string())
 			}
@@ -228,6 +232,13 @@ impl Display for UserCommand {
 					write!(f, "{} {}", RMDIR, args)
 				} else {
 					write!(f, "{} <empty>", RMDIR)
+				};
+			}
+			Send(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", SEND, args)
+				} else {
+					write!(f, "{} <empty>", SEND)
 				};
 			}
 		}
