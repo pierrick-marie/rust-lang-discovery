@@ -184,6 +184,10 @@ impl ClientFtp {
 				UserCommand::Nlist(arg) => {
 					self.nlist(arg).await?;
 				}
+				UserCommand::Put(arg) => {
+					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
+					self.put(PathBuf::from(local), PathBuf::from(remote)).await?;
+				}
 			}
 		}
 	}
@@ -310,6 +314,27 @@ impl ClientFtp {
 		}
 		
 		Ok(())
+	}
+	
+	/**
+	 * STOR command
+	 */
+	async fn put(&mut self, local_file: PathBuf, remote_file: PathBuf) -> FtpResult<()> {
+		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
+			if local_path.exists() {
+				info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
+				
+				self.setup_data_connection(ClientCommand::Stor(remote_file), Some(ServerResponse::FileStatusOk)).await?;
+				
+				if self.data_connection.is_some() {
+					if let Some(data) = utils::get_file(local_path.as_path()) {
+						return self.send_data(vec![String::from_utf8(data).unwrap()]).await;
+					}
+				}
+			}
+		}
+		error!("Data connection not initialized");
+		Err(FtpError::DataConnectionError)
 	}
 	
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {

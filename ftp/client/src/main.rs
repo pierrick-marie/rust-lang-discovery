@@ -115,7 +115,8 @@ async fn run() {
 	if let Ok(mut client) = r_client {
 		client.start().await;
 	} else {
-		error!("Client is not initialised");
+		error!("Impossible to start the client");
+		info!("Check the address and port number or the server status")
 	}
 	
 	info!("Finished");

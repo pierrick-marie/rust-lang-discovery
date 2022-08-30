@@ -39,6 +39,7 @@ pub const ASCII: &str = "ascii";
 pub const IMAGE: &str = "binary";
 pub const LCD: &str = "lcd";
 pub const NLIST: &str = "nlist";
+pub const PUT: &str = "put";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -59,6 +60,7 @@ pub enum UserCommand {
 	Image,
 	Lcd,
 	Nlist(Option<String>),
+	Put(Option<String>),
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -90,6 +92,7 @@ impl UserCommand {
 			DELETE => Delete(Some(arg.to_string())),
 			GET => Get(Some(arg.to_string())),
 			NLIST => Nlist(Some(arg.to_string())),
+			PUT => Put(Some(arg.to_string())),
 			_ => {
 				Unknown(arg.to_string())
 			}
@@ -115,6 +118,7 @@ impl UserCommand {
 			IMAGE => Image,
 			LCD => Lcd,
 			NLIST => Nlist(None),
+			PUT => Put(None),
 			_ => {
 				Unknown("".to_string())
 			}
@@ -175,6 +179,13 @@ impl Display for UserCommand {
 					write!(f, "{} {}", NLIST, args)
 				} else {
 					write!(f, "{} <empty>", NLIST)
+				};
+			}
+			Put(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", PUT, args)
+				} else {
+					write!(f, "{} <empty>", PUT)
 				};
 			}
 		}

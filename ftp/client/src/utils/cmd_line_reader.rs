@@ -15,7 +15,7 @@ impl CmdLineReader {
 		}
 		return Err(FtpError::InternalError("Impossible to create reader".to_string()));
 	}
-
+	
 	pub fn read_line(&mut self, prompt: &str) -> FtpResult<String> {
 		let readline = self.reader.readline(prompt);
 		match readline {
@@ -34,7 +34,7 @@ impl CmdLineReader {
 			}
 		}
 	}
-
+	
 	/*
 	 * The function read line without saving the history
 	 */
@@ -55,20 +55,18 @@ impl CmdLineReader {
 			}
 		}
 	}
-
+	
 	pub async fn get_two_args(&mut self, arg: Option<String>, prompt_1: &str, prompt_2: &str) -> FtpResult<(String, String)> {
 		let mut arg_1: String = "".to_string();
 		let mut arg_2: String = "".to_string();
-
+		
 		if let Some(args) = arg {
 			let mut split: Vec<&str> = args.split(" ").collect();
 			match split.len() {
 				1 => {
 					arg_1 = split.get(0).unwrap().to_string();
-					if let Ok(msg) = self.read_line(prompt_1) {
-						arg_2 = msg.trim().to_string();
-						return Ok((arg_1, arg_2));
-					}
+					arg_2 = arg_1.to_string().clone();
+					return Ok((arg_1, arg_2));
 				}
 				2 => {
 					arg_1 = split.get(0).unwrap().to_string();
@@ -78,7 +76,7 @@ impl CmdLineReader {
 				_ => {}
 			}
 		}
-
+		
 		if let Ok(msg) = self.read_line(prompt_1) {
 			arg_1 = msg.trim().to_string();
 			if let Ok(msg) = self.read_line(prompt_2) {
@@ -86,10 +84,10 @@ impl CmdLineReader {
 				return Ok((arg_1, arg_2));
 			}
 		}
-
+		
 		return Err(FtpError::InternalError("Impossible to get args".to_string()));
 	}
-
+	
 	pub async fn get_one_arg(&mut self, arg: Option<String>, prompt: &str) -> FtpResult<String> {
 		if let Some(args) = arg {
 			let mut split: Vec<&str> = args.split(" ").collect();
@@ -101,7 +99,7 @@ impl CmdLineReader {
 				return Ok(msg.trim().to_string());
 			}
 		}
-
+		
 		return Err(FtpError::InternalError("Impossible to get arg".to_string()));
 	}
 }
