@@ -16,6 +16,9 @@ impl CmdLineReader {
 		return Err(FtpError::InternalError("Impossible to create reader".to_string()));
 	}
 	
+	/*
+	 * The function read line and save the history
+	 */
 	pub fn read_line(&mut self, prompt: &str) -> FtpResult<String> {
 		let readline = self.reader.readline(prompt);
 		match readline {

@@ -191,6 +191,9 @@ impl ClientFtp {
 				UserCommand::Pwd => {
 					self.pwd().await?;
 				}
+				UserCommand::Quit => {
+					return self.quit().await;
+				}
 			}
 		}
 	}
@@ -342,6 +345,10 @@ impl ClientFtp {
 	
 	async fn pwd(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.sendCommand(ClientCommand::Pwd, Some(ServerResponse::PathNameCreated)).await
+	}
+	
+	async fn quit(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.sendCommand(ClientCommand::Quit, Some(ServerResponse::ServiceClosingControlConnection)).await
 	}
 	
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {

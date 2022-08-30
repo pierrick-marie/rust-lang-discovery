@@ -41,6 +41,7 @@ pub const LCD: &str = "lcd";
 pub const NLIST: &str = "nlist";
 pub const PUT: &str = "put";
 pub const PWD: &str = "pwd";
+pub const QUIT: &str = "quit";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -63,6 +64,7 @@ pub enum UserCommand {
 	Nlist(Option<String>),
 	Put(Option<String>),
 	Pwd,
+	Quit,
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -122,6 +124,7 @@ impl UserCommand {
 			NLIST => Nlist(None),
 			PUT => Put(None),
 			PWD => Pwd,
+			QUIT => Quit,
 			_ => {
 				Unknown("".to_string())
 			}
@@ -191,7 +194,8 @@ impl Display for UserCommand {
 					write!(f, "{} <empty>", PUT)
 				};
 			}
-			Pwd => write!(f, "{}", Pwd),
+			Pwd => write!(f, "{}", PWD),
+			Quit => write!(f, "{}", QUIT),
 		}
 	}
 }
