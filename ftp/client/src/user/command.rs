@@ -43,6 +43,7 @@ pub const PUT: &str = "put";
 pub const PWD: &str = "pwd";
 pub const QUIT: &str = "quit";
 pub const RECV: &str = "recv";
+pub const RENAME: &str = "rename";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -67,6 +68,7 @@ pub enum UserCommand {
 	Pwd,
 	Quit,
 	Recv(Option<String>),
+	Rename(Option<String>),
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -100,6 +102,7 @@ impl UserCommand {
 			NLIST => Nlist(Some(arg.to_string())),
 			PUT => Put(Some(arg.to_string())),
 			RECV => Recv(Some(arg.to_string())),
+			RENAME => Rename(Some(arg.to_string())),
 			_ => {
 				Unknown(arg.to_string())
 			}
@@ -129,6 +132,7 @@ impl UserCommand {
 			PWD => Pwd,
 			QUIT => Quit,
 			RECV => Recv(None),
+			RENAME => Rename(None),
 			_ => {
 				Unknown("".to_string())
 			}
@@ -205,6 +209,13 @@ impl Display for UserCommand {
 					write!(f, "{} {}", RECV, args)
 				} else {
 					write!(f, "{} <empty>", RECV)
+				};
+			}
+			Rename(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", RENAME, args)
+				} else {
+					write!(f, "{} <empty>", RENAME)
 				};
 			}
 		}

@@ -198,13 +198,17 @@ impl ClientFtp {
 					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
 					self.recv(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
+				UserCommand::Rename(arg) => {
+					let (from_name, to_name) = self.cmd_reader.get_two_args(arg, "(from-name)", "(to-name)").await?;
+					self.rename(PathBuf::from(from_name), PathBuf::from(to_name)).await?;
+				}
 			}
 		}
 	}
 	
 	fn help(&mut self) {
 		info!(" Help message");
-		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv");
+		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename");
 	}
 	
 	fn pass(&mut self) {
@@ -374,6 +378,11 @@ impl ClientFtp {
 			}
 		}
 		Err(FtpError::InternalError("Failed to get file".to_string()))
+	}
+	
+	async fn rename(&mut self, from_name: PathBuf, to_name: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.sendCommand(ClientCommand::Rnfr(from_name), Some(ServerResponse::RequestedFileActionPendingFurtherInformation)).await?;
+		self.ctrl_connection.sendCommand(ClientCommand::Rnto(to_name), Some(ServerResponse::RequestedFileActionOkay)).await
 	}
 	
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
