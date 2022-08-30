@@ -20,6 +20,7 @@ use std::net::Shutdown::Write;
 use std::path::PathBuf;
 use log::{debug, error};
 use regex::Regex;
+use crate::protocol::ClientCommand::Rmd;
 use crate::user::command::UserCommand::*;
 use crate::protocol::DELE;
 use crate::protocol::TransferType::Binary;
@@ -44,6 +45,7 @@ pub const PWD: &str = "pwd";
 pub const QUIT: &str = "quit";
 pub const RECV: &str = "recv";
 pub const RENAME: &str = "rename";
+pub const RMDIR: &str = "rmdir";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -69,6 +71,7 @@ pub enum UserCommand {
 	Quit,
 	Recv(Option<String>),
 	Rename(Option<String>),
+	Rmdir(Option<String>),
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -103,6 +106,7 @@ impl UserCommand {
 			PUT => Put(Some(arg.to_string())),
 			RECV => Recv(Some(arg.to_string())),
 			RENAME => Rename(Some(arg.to_string())),
+			RMDIR => Rmdir(Some(arg.to_string())),
 			_ => {
 				Unknown(arg.to_string())
 			}
@@ -133,6 +137,7 @@ impl UserCommand {
 			QUIT => Quit,
 			RECV => Recv(None),
 			RENAME => Rename(None),
+			RMDIR => Rmdir(None),
 			_ => {
 				Unknown("".to_string())
 			}
@@ -216,6 +221,13 @@ impl Display for UserCommand {
 					write!(f, "{} {}", RENAME, args)
 				} else {
 					write!(f, "{} <empty>", RENAME)
+				};
+			}
+			Rmdir(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", RMDIR, args)
+				} else {
+					write!(f, "{} <empty>", RMDIR)
 				};
 			}
 		}

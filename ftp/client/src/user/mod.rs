@@ -136,7 +136,7 @@ impl ClientFtp {
 				}
 				UserCommand::Pass => { self.pass(); }
 				UserCommand::Append(arg) => {
-					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
+					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file) ", "(remote file) ").await?;
 					self.append(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
 				UserCommand::Bye => {
@@ -144,14 +144,14 @@ impl ClientFtp {
 					return Ok(());
 				}
 				UserCommand::Cd(arg) => {
-					let path = self.cmd_reader.get_one_arg(arg, "(directory)").await?;
+					let path = self.cmd_reader.get_one_arg(arg, "(directory) ").await?;
 					self.cd(PathBuf::from(path)).await?;
 				}
 				UserCommand::CdUp => {
 					self.cdup().await?;
 				}
 				UserCommand::Delete(arg) => {
-					let path = self.cmd_reader.get_one_arg(arg, "(remote file)").await?;
+					let path = self.cmd_reader.get_one_arg(arg, "(remote file) ").await?;
 					self.delete(PathBuf::from(path)).await?;
 				}
 				UserCommand::Dir => {
@@ -162,7 +162,7 @@ impl ClientFtp {
 					return Ok(());
 				}
 				UserCommand::Get(arg) => {
-					let (remote, local) = self.cmd_reader.get_two_args(arg, "(remote file)", "(local file)").await?;
+					let (remote, local) = self.cmd_reader.get_two_args(arg, "(remote file) ", "(local file) ").await?;
 					self.get(PathBuf::from(remote), PathBuf::from(local)).await?;
 				}
 				UserCommand::Ascii => {
@@ -185,7 +185,7 @@ impl ClientFtp {
 					self.nlist(arg).await?;
 				}
 				UserCommand::Put(arg) => {
-					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
+					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file) ", "(remote file) ").await?;
 					self.put(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
 				UserCommand::Pwd => {
@@ -195,12 +195,16 @@ impl ClientFtp {
 					return self.quit().await;
 				}
 				UserCommand::Recv(arg) => {
-					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
+					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file) ", "(remote file) ").await?;
 					self.recv(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
 				UserCommand::Rename(arg) => {
-					let (from_name, to_name) = self.cmd_reader.get_two_args(arg, "(from-name)", "(to-name)").await?;
+					let (from_name, to_name) = self.cmd_reader.get_two_args(arg, "(from-name) ", "(to-name) ").await?;
 					self.rename(PathBuf::from(from_name), PathBuf::from(to_name)).await?;
+				}
+				UserCommand::Rmdir(arg) => {
+					let remote_dir = self.cmd_reader.get_one_arg(arg, "(directory-name) ").await?;
+					self.rmdir(PathBuf::from(remote_dir)).await?;
 				}
 			}
 		}
@@ -208,7 +212,7 @@ impl ClientFtp {
 	
 	fn help(&mut self) {
 		info!(" Help message");
-		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename");
+		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename rmdir");
 	}
 	
 	fn pass(&mut self) {
@@ -383,6 +387,10 @@ impl ClientFtp {
 	async fn rename(&mut self, from_name: PathBuf, to_name: PathBuf) -> FtpResult<()> {
 		self.ctrl_connection.sendCommand(ClientCommand::Rnfr(from_name), Some(ServerResponse::RequestedFileActionPendingFurtherInformation)).await?;
 		self.ctrl_connection.sendCommand(ClientCommand::Rnto(to_name), Some(ServerResponse::RequestedFileActionOkay)).await
+	}
+	
+	async fn rmdir(&mut self, directory_name: PathBuf) -> FtpResult<()> {
+		self.ctrl_connection.sendCommand(ClientCommand::Rmd(directory_name), Some(ServerResponse::RequestedFileActionOkay)).await
 	}
 	
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
