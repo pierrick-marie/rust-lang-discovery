@@ -26,6 +26,7 @@ use crate::protocol::DELE;
 use crate::protocol::TransferType::Binary;
 
 pub const HELP: &str = "help";
+pub const QUESTION: &str = "?";
 pub const LS: &str = "ls";
 pub const PASS: &str = "pass";
 pub const APPEND: &str = "append";
@@ -52,7 +53,7 @@ pub const SYSTEM: &str = "system";
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum UserCommand {
-	Help,
+	Help(Option<String>),
 	Ls(Option<String>),
 	Pass,
 	Append(Option<String>),
@@ -81,10 +82,11 @@ pub enum UserCommand {
 pub fn parse_user_command(msg: &String) -> UserCommand {
 	let msg = msg.trim().to_string();
 	debug!("command::parse_command '{}'", msg);
-	if let Some(re) = Regex::new(r"^([[:word:]]+)( .+)*$").ok() {
+	if let Some(re) = Regex::new(r"^(([[:word:]]+)|\?)( .+)*$").ok() {
 		if let Some(cap) = re.captures(msg.as_str()) {
+			dbg!(&cap);
 			if let Some(cmd) = cap.get(1) {
-				if let Some(args) = cap.get(2) {
+				if let Some(args) = cap.get(cap.len() - 1) {
 					return UserCommand::new_with_args(cmd.as_str(), args.as_str().to_string().trim());
 				} else {
 					return UserCommand::new_without_arg(cmd.as_str());
@@ -102,6 +104,8 @@ impl UserCommand {
 
 		match input {
 			LS => Ls(Some(arg.to_string())),
+			HELP => Help(Some(arg.to_string())),
+			QUESTION => Help(Some(arg.to_string())),
 			CD => Cd(Some(arg.to_string())),
 			APPEND => Append(Some(arg.to_string())),
 			DELETE => Delete(Some(arg.to_string())),
@@ -122,7 +126,8 @@ impl UserCommand {
 		debug!("Command::new {}", &input);
 
 		match input {
-			HELP => Help,
+			HELP => Help(None),
+			QUESTION => Help(None),
 			PASS => Pass,
 			BYE => Bye,
 			LS => Ls(None),
@@ -156,7 +161,13 @@ impl Display for UserCommand {
 	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Unknown(arg) => write!(f, "Unknown {}", arg), // doesn't exist in the protocol
-			Help => write!(f, "{}", HELP),
+			Help(arg) => {
+				return if let Some(args) = arg {
+					write!(f, "{} {}", HELP, args)
+				} else {
+					write!(f, "{} <empty>", HELP)
+				};
+			}
 			Ls(arg) => {
 				return if let Some(args) = arg {
 					write!(f, "{} {}", LS, args)

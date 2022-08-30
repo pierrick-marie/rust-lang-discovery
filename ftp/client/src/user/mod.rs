@@ -38,6 +38,7 @@ use scanpw::scanpw;
 use users::get_user_by_name;
 use users::os::unix::UserExt;
 use crate::user::command::*;
+use crate::user::command::{PASS, CDUP, NLIST, PWD, QUIT};
 use crate::utils::*;
 use crate::utils::cmd_line_reader::CmdLineReader;
 
@@ -128,8 +129,11 @@ impl ClientFtp {
 		loop {
 			command = self.cmd_reader.read_line("ftp>  ")?;
 			let command = parse_user_command(&command);
+			dbg!(&command);
 			match command {
-				UserCommand::Help => { self.help(); }
+				UserCommand::Help(arg) => {
+					self.help(arg);
+				}
 				UserCommand::Unknown(arg) => { info!("Unknown command {}", arg); }
 				UserCommand::Ls(arg) => {
 					self.ls(arg).await;
@@ -217,9 +221,39 @@ impl ClientFtp {
 		}
 	}
 	
-	fn help(&mut self) {
-		info!(" Help message");
-		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename rmdir send system");
+	fn help(&mut self, arg: Option<String>) {
+		if let Some(command) = arg {
+			match command.as_str() {
+				PASS => info!("passiv mode"),
+				BYE => info!("close session"),
+				LS => info!("list content of current directory"),
+				APPEND => info!("append to a file"),
+				CD => info!("change current directory"),
+				CDUP => info!("change current directory to its parent"),
+				DELETE => info!("delete file"),
+				DIR => info!("list content of remote directory"),
+				EXIT => info!("close session"),
+				GET => info!("receive file"),
+				ASCII => info!("setup ascii transfer mode"),
+				IMAGE => info!("setup binary transfer mode"),
+				LCD => info!("change local working directory"),
+				NLIST => info!("nlist content od remote directory"),
+				PUT => info!("send one file"),
+				PWD => info!("get path of remote directory"),
+				QUIT => info!("close session"),
+				RECV => info!("receive remote file"),
+				RENAME => info!("rename a remote file"),
+				RMDIR => info!("remove remote directory"),
+				SEND => info!("send one file"),
+				SYSTEM => info!("get remote system information"),
+				_ => {
+					info!("unknown command")
+				}
+			}
+		} else {
+			info!(" Help message");
+			info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename rmdir send system");
+		}
 	}
 	
 	fn pass(&mut self) {
@@ -304,19 +338,17 @@ impl ClientFtp {
 	
 	async fn get(&mut self, remote_file: PathBuf, local_file: PathBuf) -> FtpResult<()> {
 		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
-			if local_path.exists() {
-				info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
-				
-				self.transfert_type = TransferType::Binary;
-				self.setupTransferType(self.transfert_type).await?;
-				
-				self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
-				
-				let file = OpenOptions::new().write(true).append(false).open(local_path)?;
-				self.save_data(file).await?;
-				
-				return self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await;
-			}
+			info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
+			
+			self.transfert_type = TransferType::Binary;
+			self.setupTransferType(self.transfert_type).await?;
+			
+			self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
+			
+			let file = OpenOptions::new().write(true).append(false).open(local_path)?;
+			self.save_data(file).await?;
+			
+			return self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await;
 		}
 		Err(FtpError::InternalError("Failed to get file".to_string()))
 	}
@@ -377,19 +409,17 @@ impl ClientFtp {
 	 */
 	async fn recv(&mut self, local_file: PathBuf, remote_file: PathBuf) -> FtpResult<()> {
 		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
-			if local_path.exists() {
-				info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
-				
-				self.transfert_type = TransferType::Binary;
-				self.setupTransferType(self.transfert_type).await?;
-				
-				self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
-				
-				let file = OpenOptions::new().write(true).append(true).open(local_path)?;
-				self.save_data(file).await?;
-				
-				return self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await;
-			}
+			info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
+			
+			self.transfert_type = TransferType::Binary;
+			self.setupTransferType(self.transfert_type).await?;
+			
+			self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
+			
+			let file = OpenOptions::new().write(true).append(true).open(local_path)?;
+			self.save_data(file).await?;
+			
+			return self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await;
 		}
 		Err(FtpError::InternalError("Failed to get file".to_string()))
 	}
