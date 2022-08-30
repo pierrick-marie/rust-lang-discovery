@@ -210,13 +210,16 @@ impl ClientFtp {
 					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file) ", "(remote file) ").await?;
 					self.put(PathBuf::from(local), PathBuf::from(remote)).await?;
 				}
+				UserCommand::System => {
+					self.system().await?;
+				}
 			}
 		}
 	}
 	
 	fn help(&mut self) {
 		info!(" Help message");
-		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename rmdir send");
+		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename rmdir send system");
 	}
 	
 	fn pass(&mut self) {
@@ -398,6 +401,10 @@ impl ClientFtp {
 	
 	async fn rmdir(&mut self, directory_name: PathBuf) -> FtpResult<()> {
 		self.ctrl_connection.sendCommand(ClientCommand::Rmd(directory_name), Some(ServerResponse::RequestedFileActionOkay)).await
+	}
+	
+	async fn system(&mut self) -> FtpResult<()> {
+		self.ctrl_connection.sendCommand(ClientCommand::Syst, Some(ServerResponse::SystemType)).await
 	}
 	
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {

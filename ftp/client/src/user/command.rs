@@ -47,6 +47,7 @@ pub const RECV: &str = "recv";
 pub const RENAME: &str = "rename";
 pub const RMDIR: &str = "rmdir";
 pub const SEND: &str = "send";
+pub const SYSTEM: &str = "system";
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -74,6 +75,7 @@ pub enum UserCommand {
 	Rename(Option<String>),
 	Rmdir(Option<String>),
 	Send(Option<String>),
+	System,
 }
 
 pub fn parse_user_command(msg: &String) -> UserCommand {
@@ -142,6 +144,7 @@ impl UserCommand {
 			RENAME => Rename(None),
 			RMDIR => Rmdir(None),
 			SEND => Send(None),
+			SYSTEM => System,
 			_ => {
 				Unknown("".to_string())
 			}
@@ -241,6 +244,7 @@ impl Display for UserCommand {
 					write!(f, "{} <empty>", SEND)
 				};
 			}
+			System => write!(f, "{}", SYSTEM),
 		}
 	}
 }
