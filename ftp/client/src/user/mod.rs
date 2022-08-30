@@ -194,13 +194,17 @@ impl ClientFtp {
 				UserCommand::Quit => {
 					return self.quit().await;
 				}
+				UserCommand::Recv(arg) => {
+					let (local, remote) = self.cmd_reader.get_two_args(arg, "(local file)", "(remote file)").await?;
+					self.recv(PathBuf::from(local), PathBuf::from(remote)).await?;
+				}
 			}
 		}
 	}
 	
 	fn help(&mut self) {
 		info!(" Help message");
-		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit");
+		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv");
 	}
 	
 	fn pass(&mut self) {
@@ -293,7 +297,6 @@ impl ClientFtp {
 				
 				self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
 				
-				
 				let file = OpenOptions::new().write(true).append(false).open(local_path)?;
 				self.save_data(file).await?;
 				
@@ -349,6 +352,28 @@ impl ClientFtp {
 	
 	async fn quit(&mut self) -> FtpResult<()> {
 		self.ctrl_connection.sendCommand(ClientCommand::Quit, Some(ServerResponse::ServiceClosingControlConnection)).await
+	}
+	
+	/**
+	 * RETR command
+	 */
+	async fn recv(&mut self, local_file: PathBuf, remote_file: PathBuf) -> FtpResult<()> {
+		if let Some(local_path) = get_absolut_path(&local_file, self.current_work_directory.as_ref().unwrap()) {
+			if local_path.exists() {
+				info!("local: {} remote: {}", local_path.to_str().unwrap(), remote_file.to_str().unwrap());
+				
+				self.transfert_type = TransferType::Binary;
+				self.setupTransferType(self.transfert_type).await?;
+				
+				self.setup_data_connection(ClientCommand::Retr(remote_file), Some(ServerResponse::FileStatusOk)).await?;
+				
+				let file = OpenOptions::new().write(true).append(true).open(local_path)?;
+				self.save_data(file).await?;
+				
+				return self.ctrl_connection.receive(ServerResponse::ClosingDataConnection).await;
+			}
+		}
+		Err(FtpError::InternalError("Failed to get file".to_string()))
 	}
 	
 	async fn setup_data_connection(&mut self, command: ClientCommand, expectedResponse: Option<ServerResponse>) -> FtpResult<()> {
