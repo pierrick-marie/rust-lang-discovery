@@ -216,7 +216,7 @@ impl ClientFtp {
 	
 	fn help(&mut self) {
 		info!(" Help message");
-		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename rmdir");
+		info!(" Available commands: help ls pass append bye cd cdup delete dir exit get ascii image lcd put pwd quit recv rename rmdir send");
 	}
 	
 	fn pass(&mut self) {
