@@ -6,9 +6,7 @@ Tester et expérimenter les exemples du livre « Rust Programming by Example »
 
 # Licence
 
-GNU GENERAL PUBLIC LICENSE v3
-
-https://framagit.org/pierrick/test-rust/-/tree/master/licence-gpl-3.0.txt
+BSD 3-Clause License
 
 # Exemple 1 : Hello World
 
