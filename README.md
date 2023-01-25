@@ -114,4 +114,4 @@ Do not hesitate to improve to this program. Feel free to send PR or contact me t
 
 # Badges
 
-[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) [![made-Rust](https://img.shields.io/badge/Made%20with-Rust-1f425f.svg)] (https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) [![made-Rust](https://img.shields.io/badge/Made%20with-Rust-1f425f.svg)](https://www.rust-lang.org/)
