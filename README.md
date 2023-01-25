@@ -1,14 +1,19 @@
-# Rust Programming by Example
+Rust Programming by Example
+========================
 
 Tester et expérimenter les exemples du livre « Rust Programming by Example »
 
 ![Rust Programming by Example](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/rust-programming-example.jpg)
 
-# Licence
+# License: BSD 3-Clause 
 
-GNU GENERAL PUBLIC LICENSE v3
+https://framagit.org/pierrick/mqtt-sn/-/raw/master/LICENSE
 
-https://framagit.org/pierrick/test-rust/-/tree/master/licence-gpl-3.0.txt
+# Get source code
+
+```
+	git clone https://framagit.org/pierrick/rust-lang-discovery.git
+```
 
 # Exemple 1 : Hello World
 
@@ -102,3 +107,11 @@ Pour la partie graphique, le lecteur utilise la bibliothèque Relm (https://gith
 ## Documentation
 
 http://abcdrfc.free.fr/rfc-vf/pdf/rfc959.pdf
+
+# Contributing
+
+Do not hesitate to improve to this program. Feel free to send PR or contact me to send comments. You are welcome to fork this project also ;)
+
+# Badges
+
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) [![made-Rust](https://img.shields.io/badge/Made%20with-Rust-1f425f.svg)] (https://www.rust-lang.org/)
