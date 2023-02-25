@@ -71,7 +71,7 @@ La partie s'arrête quand il n'est plus possible d'ajouter une nouvelle pièce d
 Le score du joueur est affiché à droite de la grille.
 L'historique des scrores du joueur sont enregistré par ordre décroissant de points dans le fichier `assets/score.txt` au format suivant : `date heure minute : points = XX lines = YY`
 
-# Exemple 3 : Music play (en cours)
+# Exemple 3 : Music play
 
 https://github.com/pierrick-marie/rust-lang-discovery/tree/master/music-player
 
@@ -102,11 +102,19 @@ Pour la partie graphique, le lecteur utilise la bibliothèque Relm (https://gith
 
 ![Lecteur de music en rust](https://github.com/pierrick-marie/rust-lang-discovery/raw/master/wiki/music-player/music-player.jpg)
 
-# Server & client FTP
+# Command line Server & client FTP
 
 ## Documentation
 
 http://abcdrfc.free.fr/rfc-vf/pdf/rfc959.pdf
+
+## Client
+
+https://github.com/pierrick-marie/rust-lang-discovery/tree/master/ftp/client
+
+## Server
+
+https://github.com/pierrick-marie/rust-lang-discovery/tree/master/ftp/server
 
 # Contributing
 
