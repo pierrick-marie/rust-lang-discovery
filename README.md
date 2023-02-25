@@ -7,17 +7,17 @@ Tester et expérimenter les exemples du livre « Rust Programming by Example »
 
 # License: BSD 3-Clause 
 
-https://framagit.org/pierrick/mqtt-sn/-/raw/master/LICENSE
+https://raw.githubusercontent.com/pierrick-marie/rust-lang-discovery/master/LICENSE
 
 # Get source code
 
 ```
-	git clone https://framagit.org/pierrick/rust-lang-discovery.git
+	git clone https://github.com/pierrick-marie/rust-lang-discovery.git
 ```
 
 # Exemple 1 : Hello World
 
-https://framagit.org/pierrick/test-rust/-/tree/master/hello_world 
+https://github.com/pierrick-marie/rust-lang-discovery/tree/master/hello-world
 
 Découvrir les bases du langage
 
@@ -30,14 +30,14 @@ Découvrir les bases du langage
 
 # Exemple 2 : Tetris
 
-https://framagit.org/pierrick/test-rust/-/tree/master/tetris
+https://github.com/pierrick-marie/rust-lang-discovery/tree/master/tetris
 
 Développer un tetris avec la bibliothèque SDL2
 
 * jouer une partie
 * enregistrer les scores dans un fichier texte
 
-![Tetris screenshot](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/tetris/tetris.jpg)
+![Tetris screenshot](https://github.com/pierrick-marie/rust-lang-discovery/raw/master/wiki/tetris/tetris.jpg)
 
 ## 2.1. Prérequis
 
@@ -73,7 +73,7 @@ L'historique des scrores du joueur sont enregistré par ordre décroissant de po
 
 # Exemple 3 : Music play (en cours)
 
-https://framagit.org/pierrick/test-rust/-/tree/master/music-player
+https://github.com/pierrick-marie/rust-lang-discovery/tree/master/music-player
 
 Développer un lecteur de music pour desktop
 
@@ -100,7 +100,7 @@ Installer les paquest suivants (Gnu\Linux) :
 Le lecteur utilise dans sa version finale la bibliothèque Gstreamer pour lire les fichiers audio.
 Pour la partie graphique, le lecteur utilise la bibliothèque Relm (https://github.com/antoyo/relm) basée sur GTK.
 
-![Lecteur de music en rust](https://framagit.org/pierrick/test-rust/-/raw/master/wiki/music-player/music-player.jpg)
+![Lecteur de music en rust](https://github.com/pierrick-marie/rust-lang-discovery/raw/master/wiki/music-player/music-player.jpg)
 
 # Server & client FTP
 
